@@ -1,0 +1,143 @@
+# Simple EDMS - One Day Build Plan
+
+## Project Overview
+
+A basic Enterprise Document Management System using React, Node.js/Express, and MongoDB with JWT authentication and role-based access control.
+
+## Morning (9:00 AM - 12:00 PM)
+
+### Project Setup (9:00 - 9:30)
+
+- [ ]  Create project repositories (frontend/backend)
+- [ ]  Initialize package.json files
+- [ ]  Install core dependencies
+
+### Backend Foundation (9:30 - 11:00)
+
+- [ ]  Set up Express server
+- [ ]  Connect to MongoDB
+- [ ]  Create database schemas:
+    - [ ]  User schema (name, email, password, role)
+    - [ ]  Document schema (name, path, size, type, uploadDate, owner, permissions)
+- [ ]  Implement JWT authentication middleware
+
+### API Development (11:00 - 12:00)
+
+- [ ]  Create user routes:
+    - [ ]  POST /api/users/register
+    - [ ]  POST /api/users/login
+    - [ ]  GET /api/users/profile
+- [ ]  Create document routes:
+    - [ ]  GET /api/documents (list documents)
+    - [ ]  POST /api/documents (upload document)
+    - [ ]  GET /api/documents/:id (download document)
+    - [ ]  DELETE /api/documents/:id (delete document)
+
+## Afternoon (1:00 PM - 5:00 PM)
+
+### Frontend Foundation (1:00 - 2:30)
+
+- [ ]  Create React project with component structure
+- [ ]  Set up React Router
+- [ ]  Create auth context for user state management
+- [ ]  Design basic UI components:
+    - [ ]  Login/Register forms
+    - [ ]  Navigation bar
+    - [ ]  Document list
+    - [ ]  Upload component
+
+### Frontend Features (2:30 - 4:00)
+
+- [ ]  Implement authentication flow
+- [ ]  Create document management interface:
+    - [ ]  Document listing with search filter
+    - [ ]  Document upload with drag-and-drop
+    - [ ]  Document preview
+    - [ ]  Delete functionality
+- [ ]  Implement API service for backend communication
+
+### Integration & Testing (4:00 - 5:00)
+
+- [ ]  Connect frontend to backend APIs
+- [ ]  Test user authentication
+- [ ]  Test document upload and retrieval
+- [ ]  Test search functionality
+
+## Evening (6:00 PM - 9:00 PM)
+
+### Enhancement & Security (6:00 - 7:30)
+
+- [ ]  Implement role-based access control
+- [ ]  Add document sharing functionality
+- [ ]  Add request validation and sanitization
+- [ ]  Implement proper error handling
+
+### Refinement & Deployment (7:30 - 9:00)
+
+- [ ]  Style improvements and responsive design
+- [ ]  Fix bugs from testing
+- [ ]  Prepare for deployment
+- [ ]  Deploy to platform of choice (Heroku, Vercel, etc.)
+
+## Tech Stack Details
+
+### Frontend
+
+- React.js
+- React Router for navigation
+- Axios for API requests
+- Context API for state management
+- Basic CSS for styling (or minimal CSS framework)
+
+### Backend
+
+- Node.js with Express
+- MongoDB with Mongoose
+- JWT for authentication
+- Multer for file uploads
+- Bcrypt for password hashing
+
+### Security Features
+
+- JWT token validation
+- Password encryption
+- Role-based middleware
+- Input validation
+
+## Database Schema
+
+### User Collection
+
+```
+{
+  _id: ObjectId,
+  name: String,
+  email: String,
+  password: String (hashed),
+  role: String (admin/user),
+  createdAt: Date
+}
+
+```
+
+### Document Collection
+
+```
+{
+  _id: ObjectId,
+  name: String,
+  originalName: String,
+  path: String,
+  size: Number,
+  type: String,
+  owner: ObjectId (ref: User),
+  permissions: [
+    {
+      user: ObjectId (ref: User),
+      access: String (read/write)
+    }
+  ],
+  uploadDate: Date
+}
+
+```
