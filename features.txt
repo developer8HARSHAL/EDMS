@@ -1,0 +1,64 @@
+## The Enterprise Document Management System (EDMS) project contains the following core features:
+
+
+
+
+##Core Functions of an EDMS
+
+1. Document Storage: Secure, centralized storage for all organization documents
+2. Version Control: Tracking changes and maintaining document history
+3. Search & Retrieval: Quick access to documents through metadata and content search
+4. Access Control: Role-based permissions for document security
+5. Workflow Automation: Routing documents for approval, review, and processing
+6. Audit Trails: Recording document access and changes for compliance
+7. Integration: Connecting with other business systems like ERP or CRM
+
+
+
+
+
+1. **User Authentication & Authorization**
+    - Secure login and registration system
+    - JWT (JSON Web Token) based authentication
+    - Role-based access control (admin vs regular users)
+    - Password encryption using bcrypt
+2. **Document Management**
+    - Upload documents with metadata
+    - Download documents
+    - View document details (name, size, type, upload date)
+    - Delete documents (with proper permissions)
+    - Automatic file type validation
+3. **Document Organization**
+    - List all documents with sorting (by date)
+    - Search functionality by document name
+    - Filter documents by type or other metadata
+    - User-specific document views
+4. **Security Features**
+    - Role-based permissions (admin/user)
+    - Document-level access control
+    - Document sharing with specific permissions (read/write)
+    - Secure file storage
+5. **User Experience**
+    - Responsive web interface
+    - Drag-and-drop file upload
+    - Document preview capabilities
+    - Upload progress indication
+    - Intuitive navigation
+6. **API Integration**
+    - RESTful API architecture
+    - Secure endpoints with JWT verification
+    - Complete CRUD operations for documents
+    - User profile management
+7. **Database Structure**
+    - MongoDB integration for document metadata
+    - User management system
+    - Document permission tracking
+    - Audit capabilities for document access
+8. **Technical Implementation**
+    - React frontend with context API for state management
+    - Node.js/Express backend
+    - MongoDB database with Mongoose ODM
+    - Multer for file upload handling
+    - Error handling and validation
+
+The system is designed to be simple yet functional, focusing on essential document management capabilities while maintaining security and usability. It's structured to be deployed in a single day while still providing a solid foundation that can be expanded with additional features later.
