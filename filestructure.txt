@@ -1,18 +1,25 @@
 |-- backend
     |-- .env
     |-- config
+        |-- .gitkeep
     |-- controllers
+        |-- .gitkeep
     |-- middleware
+        |-- .gitkeep
     |-- models
+        |-- .gitkeep
     |-- package.json
     |-- routes
+        |-- .gitkeep
     |-- server.js
     |-- uploads
+        |-- .gitkeep
 |-- features.txt
 |-- flow.txt
 |-- frontend
     |-- .gitignore
     |-- hooks
+        |-- .gitkeep
     |-- package-lock.json
     |-- package.json
     |-- public
@@ -28,12 +35,17 @@
         |-- App.js
         |-- App.test.js
         |-- components
+            |-- .gitkeep
         |-- context
+            |-- .gitkeep
         |-- index.css
         |-- index.js
         |-- logo.svg
         |-- pages
+            |-- .gitkeep
         |-- reportWebVitals.js
         |-- services
+            |-- .gitkeep
         |-- setupTests.js
         |-- utils
+            |-- .gitkeep
