@@ -8,30 +8,30 @@ A basic Enterprise Document Management System using React, Node.js/Express, and 
 
 ### Project Setup (9:00 - 9:30)
 
-- [ ]  Create project repositories (frontend/backend)
-- [ ]  Initialize package.json files
-- [ ]  Install core dependencies
+- [x]  Create project repositories (frontend/backend)
+- [x]  Initialize package.json files
+- [x]  Install core dependencies
 
 ### Backend Foundation (9:30 - 11:00)
 
-- [ ]  Set up Express server
-- [ ]  Connect to MongoDB
-- [ ]  Create database schemas:
-    - [ ]  User schema (name, email, password, role)
-    - [ ]  Document schema (name, path, size, type, uploadDate, owner, permissions)
-- [ ]  Implement JWT authentication middleware
+- [x]  Set up Express server
+- [x]  Connect to MongoDB
+- [x]  Create database schemas:
+    - [x]  User schema (name, email, password, role)
+    - [x]  Document schema (name, path, size, type, uploadDate, owner, permissions)
+- [x]  Implement JWT authentication middleware
 
 ### API Development (11:00 - 12:00)
 
-- [ ]  Create user routes:
-    - [ ]  POST /api/users/register
-    - [ ]  POST /api/users/login
-    - [ ]  GET /api/users/profile
-- [ ]  Create document routes:
-    - [ ]  GET /api/documents (list documents)
-    - [ ]  POST /api/documents (upload document)
-    - [ ]  GET /api/documents/:id (download document)
-    - [ ]  DELETE /api/documents/:id (delete document)
+- [x]  Create user routes:
+    - [x]  POST /api/users/register
+    - [x]  POST /api/users/login
+    - [x]  GET /api/users/profile
+- [x]  Create document routes:
+    - [x]  GET /api/documents (list documents)
+    - [x]  POST /api/documents (upload document)
+    - [x]  GET /api/documents/:id (download document)
+    - [x]  DELETE /api/documents/:id (delete document)
 
 ## Afternoon (1:00 PM - 5:00 PM)
 
@@ -141,3 +141,5 @@ A basic Enterprise Document Management System using React, Node.js/Express, and 
 }
 
 ```
+
+[Key Features of the Enterprise Document Management System](https://www.notion.so/Key-Features-of-the-Enterprise-Document-Management-System-1eff288b84e080beab5cf01a0215df09?pvs=21)

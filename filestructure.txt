@@ -1,19 +1,28 @@
 |-- backend
     |-- .env
+    |-- .env.local
+    |-- api_test.js
     |-- config
         |-- .gitkeep
     |-- controllers
-        |-- .gitkeep
+        |-- documentController.js
+        |-- userController.js
     |-- middleware
-        |-- .gitkeep
+        |-- auth.js
     |-- models
-        |-- .gitkeep
+        |-- documentModel.js
+        |-- userModel.js
+    |-- package-lock.json
     |-- package.json
     |-- routes
-        |-- .gitkeep
+        |-- documentRoutes.js
+        |-- userRoutes.js
     |-- server.js
+    |-- test_dependencies.json
     |-- uploads
         |-- .gitkeep
+        |-- 2687872e-c172-4166-9076-a84e895d584d.txt
+        |-- d89eca03-c5f0-4de4-9494-6d3349b811c7.txt
 |-- features.txt
 |-- flow.txt
 |-- frontend
@@ -32,20 +41,14 @@
     |-- README.md
     |-- src
         |-- App.css
-        |-- App.js
         |-- App.test.js
-        |-- components
-            |-- .gitkeep
         |-- context
-            |-- .gitkeep
         |-- index.css
         |-- index.js
         |-- logo.svg
         |-- pages
-            |-- .gitkeep
         |-- reportWebVitals.js
         |-- services
-            |-- .gitkeep
         |-- setupTests.js
         |-- utils
             |-- .gitkeep
