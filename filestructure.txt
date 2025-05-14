@@ -23,6 +23,11 @@
         |-- .gitkeep
         |-- 2687872e-c172-4166-9076-a84e895d584d.txt
         |-- d89eca03-c5f0-4de4-9494-6d3349b811c7.txt
+        |-- document_6821835a21d70dc6cf744411_1747075161480.pdf
+        |-- document_6821835a21d70dc6cf744411_1747075183438.pdf
+        |-- document_6821835a21d70dc6cf744411_1747075818558.js
+        |-- document_6821835a21d70dc6cf744411_1747076250522.js
+        |-- document_6822e33c632885783d03359b_1747247693002.pdf
 |-- features.txt
 |-- flow.txt
 |-- frontend
@@ -31,6 +36,7 @@
         |-- .gitkeep
     |-- package-lock.json
     |-- package.json
+    |-- postcss.config.js
     |-- public
         |-- favicon.ico
         |-- index.html
@@ -41,14 +47,31 @@
     |-- README.md
     |-- src
         |-- App.css
+        |-- App.js
         |-- App.test.js
+        |-- components
+            |-- Navbar.js
+            |-- NotFound.js
+            |-- ProtectedRoute.js
+            |-- ui
+                |-- color-mode.jsx
         |-- context
+            |-- AuthContext.js
         |-- index.css
         |-- index.js
         |-- logo.svg
         |-- pages
+            |-- AuthDebugger.js
+            |-- Dashboard.js
+            |-- DocumentList.js
+            |-- Login.js
+            |-- Register.js
+            |-- UploadDocument.js
         |-- reportWebVitals.js
         |-- services
+            |-- apiService.js
         |-- setupTests.js
         |-- utils
             |-- .gitkeep
+    |-- tailwind.config.js
+    |-- theme.js

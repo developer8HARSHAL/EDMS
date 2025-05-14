@@ -2,27 +2,28 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Define User Schema
 const UserSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please add a name'],
+    required: [true, 'Please provide a name'],
     trim: true,
-    maxlength: [50, 'Name cannot be more than 50 characters']
   },
   email: {
     type: String,
-    required: [true, 'Please add an email'],
+    required: [true, 'Please provide an email'],
     unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      'Please add a valid email'
-    ]
+      'Please provide a valid email'
+    ],
+    lowercase: true,
   },
   password: {
     type: String,
-    required: [true, 'Please add a password'],
-    minlength: 6,
-    select: false
+    required: [true, 'Please provide a password'],
+    minlength: 8,
+    select: false, // Don't return password in queries by default
   },
   role: {
     type: String,
@@ -35,22 +36,37 @@ const UserSchema = new mongoose.Schema({
   }
 });
 
-// Encrypt password using bcrypt
+// Encrypt password before saving
 UserSchema.pre('save', async function(next) {
+  // Only hash the password if it's modified (or new)
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
-
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  
+  try {
+    // Generate salt
+    const salt = await bcrypt.genSalt(10);
+    // Hash password with salt
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Sign JWT and return
 UserSchema.methods.getSignedJwtToken = function() {
   return jwt.sign(
-    { id: this._id, role: this.role },
+    { 
+      id: this._id,
+      name: this.name,
+      email: this.email,
+      role: this.role
+    },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
+    {
+      expiresIn: process.env.JWT_EXPIRE || '30d'
+    }
   );
 };
 
