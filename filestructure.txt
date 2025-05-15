@@ -28,8 +28,10 @@
         |-- document_6821835a21d70dc6cf744411_1747075818558.js
         |-- document_6821835a21d70dc6cf744411_1747076250522.js
         |-- document_6822e33c632885783d03359b_1747247693002.pdf
+        |-- document_6822e33c632885783d03359b_1747282935760.js
 |-- features.txt
 |-- flow.txt
+|-- flow_done.txt
 |-- frontend
     |-- .gitignore
     |-- hooks
@@ -50,11 +52,14 @@
         |-- App.js
         |-- App.test.js
         |-- components
+            |-- ApplicationRoutes.js
+            |-- AuthStatus.js
             |-- Navbar.js
             |-- NotFound.js
             |-- ProtectedRoute.js
             |-- ui
                 |-- color-mode.jsx
+            |-- WithAuth.js
         |-- context
             |-- AuthContext.js
         |-- index.css
@@ -64,7 +69,9 @@
             |-- AuthDebugger.js
             |-- Dashboard.js
             |-- DocumentList.js
+            |-- DocumentPreview.js
             |-- Login.js
+            |-- Profile.js
             |-- Register.js
             |-- UploadDocument.js
         |-- reportWebVitals.js
@@ -73,5 +80,6 @@
         |-- setupTests.js
         |-- utils
             |-- .gitkeep
+            |-- AuthUtils.js
     |-- tailwind.config.js
     |-- theme.js

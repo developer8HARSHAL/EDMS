@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentApi } from '../services/apiService';
+import { useAuth } from '../context/AuthContext';
 
 const UploadDocument = () => {
   const [file, setFile] = useState(null);
@@ -9,6 +10,14 @@ const UploadDocument = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+
+  // Redirect unauthenticated users to login
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: '/documents/upload' } });
+    }
+  }, [isAuthenticated, navigate]);
 
   // Max file size (50MB)
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -79,6 +88,11 @@ const UploadDocument = () => {
       formData.append('file', file);
       formData.append('name', documentName);
       
+      // Add user ID if available
+      if (user && (user.id || user._id)) {
+        formData.append('userId', user.id || user._id);
+      }
+      
       // Upload document
       const response = await documentApi.uploadDocument(formData, {
         onUploadProgress: (progressEvent) => {
@@ -91,7 +105,7 @@ const UploadDocument = () => {
       
       // Success notification or redirection
       alert('Document uploaded successfully');
-      navigate('/');
+      navigate('/documents');
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Failed to upload document. Please try again.');
@@ -133,6 +147,16 @@ const UploadDocument = () => {
     
     return 'far fa-file text-gray-500';
   };
+
+  // If not authenticated, don't render anything (will redirect via useEffect)
+  if (!isAuthenticated) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        <p className="ml-3 text-gray-600">Checking authentication...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">

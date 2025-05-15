@@ -7,7 +7,8 @@ const {
   getDocument,
   updateDocument,
   deleteDocument,
-  shareDocument
+  shareDocument,
+  previewDocument
 } = require('../controllers/documentController');
 
 // Base route: /api/documents
@@ -22,6 +23,9 @@ router.get('/', protect, getDocuments);
 router.get('/:id', protect, getDocument);
 router.put('/:id', protect, updateDocument);
 router.delete('/:id', protect, deleteDocument);
+
+// Preview document
+router.get('/:id/preview', protect, previewDocument);
 
 // Share document with another user
 router.post('/:id/share', protect, shareDocument);

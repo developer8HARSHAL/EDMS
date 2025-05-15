@@ -93,45 +93,38 @@ const Dashboard = () => {
 
   // Helper function to safely extract documents from API response
   const extractDocumentsFromResponse = (response) => {
-    // Log the exact structure for debugging
-    console.log('Raw API response:', JSON.stringify(response, null, 2));
-    
     if (!response) {
       console.warn('Received null/undefined response');
       return [];
     }
     
-    // Handle array response
+    // Handle case where we already have an array
     if (Array.isArray(response)) {
-      console.log('Response is an array with', response.length, 'items');
       return response;
     }
     
-    // Handle { data: [...] } format
-    if (response.data && Array.isArray(response.data)) {
-      console.log('Response has data array with', response.data.length, 'items');
-      return response.data;
+    // Try to extract from response.data
+    if (response.data) {
+      // If data is an array, return it
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      
+      // If data.documents exists and is an array, return it
+      if (response.data.documents && Array.isArray(response.data.documents)) {
+        return response.data.documents;
+      }
     }
     
-    // Handle { data: { documents: [...] } } format
-    if (response.data && response.data.documents && Array.isArray(response.data.documents)) {
-      console.log('Response has nested documents array with', response.data.documents.length, 'items');
-      return response.data.documents;
-    }
-    
-    // Handle { documents: [...] } format
+    // Try to extract from response.documents
     if (response.documents && Array.isArray(response.documents)) {
-      console.log('Response has documents array with', response.documents.length, 'items');
       return response.documents;
     }
     
-    // Try to extract object values if it's an object but not in expected format
-    if (typeof response === 'object' && response !== null) {
-      const values = Object.values(response).filter(val => val && typeof val === 'object');
-      if (values.length > 0) {
-        console.log('Extracted', values.length, 'objects from response');
-        return values;
-      }
+    // Handle the correct API response format based on documentController.js
+    // The controller returns { success: true, data: documents }
+    if (response.success && response.data && Array.isArray(response.data)) {
+      return response.data;
     }
     
     console.warn('Could not extract documents from response, returning empty array');
@@ -147,22 +140,26 @@ const Dashboard = () => {
         console.log('Fetching dashboard data...');
         
         // Fetch all documents
-        const allDocsResponse = await documentApi.getAllDocuments();
-        const allDocs = extractDocumentsFromResponse(allDocsResponse);
+        let allDocs = [];
+        let sharedDocs = [];
         
-        if (allDocs.length === 0) {
-          console.warn('No documents found in the response. Check API endpoint and response format.');
-        } else {
-          console.log('Successfully extracted', allDocs.length, 'documents');
-          // Log the first document to check structure
-          if (allDocs[0]) {
-            console.log('Sample document structure:', JSON.stringify(allDocs[0], null, 2));
-          }
+        try {
+          const allDocsResponse = await documentApi.getAllDocuments();
+          console.log('All documents API response:', allDocsResponse);
+          allDocs = extractDocumentsFromResponse(allDocsResponse);
+        } catch (docError) {
+          console.error('Error fetching all documents:', docError);
+          // Continue with empty array instead of throwing
         }
         
-        // Fetch shared documents
-        const sharedDocsResponse = await documentApi.getSharedDocuments();
-        const sharedDocs = extractDocumentsFromResponse(sharedDocsResponse);
+        try {
+          const sharedDocsResponse = await documentApi.getSharedDocuments();
+          console.log('Shared documents API response:', sharedDocsResponse);
+          sharedDocs = extractDocumentsFromResponse(sharedDocsResponse);
+        } catch (sharedError) {
+          console.error('Error fetching shared documents:', sharedError);
+          // Continue with empty array instead of throwing
+        }
         
         // Calculate stats
         const thisMonth = new Date().getMonth();
@@ -194,6 +191,10 @@ const Dashboard = () => {
         
         console.log('Recent docs for display:', recentDocs.length);
         setDocuments(recentDocs);
+        
+        if (allDocs.length === 0 && recentDocs.length === 0) {
+          console.log('No documents found. This may be normal for new users.');
+        }
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError("Failed to load dashboard data. Please try again later.");
@@ -344,7 +345,7 @@ const Dashboard = () => {
                             <Td>
                               <Button
                                 as={RouterLink}
-                                to={`/document/${docId}`}
+                                to={`/documents/preview/${docId}`}
                                 size="sm"
                                 colorScheme="blue"
                                 variant="outline"

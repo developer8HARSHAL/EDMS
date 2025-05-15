@@ -173,6 +173,39 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  // Update user profile function - FIXED
+  const updateUserProfile = async (profileData) => {
+    clearError();
+    setLoading(true);
+    
+    try {
+      // Call the API service to update the profile
+      const updatedUserData = await userApi.updateProfile(profileData);
+      
+      // Check if we have a valid response with data
+      if (!updatedUserData || !updatedUserData.data) {
+        throw new Error('Invalid response from server');
+      }
+      
+      // Update user state with new data
+      setUser(prev => ({
+        ...prev,
+        name: updatedUserData.data.name || prev.name,
+        // Other fields that might be updated in the future
+      }));
+      
+      return updatedUserData;
+    } catch (error) {
+      console.error('Profile update error:', error);
+      // Use specific error message or fallback to generic message
+      const errorMessage = error.message || 'Failed to update profile';
+      setError(errorMessage);
+      throw error; // Re-throw to let the component handle it
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Values to expose through context
   const value = {
     user,
@@ -182,6 +215,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     clearError,
+    updateUserProfile,
     isAuthenticated: !!user,
   };
 

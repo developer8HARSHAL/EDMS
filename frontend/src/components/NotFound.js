@@ -1,32 +1,23 @@
 // src/pages/NotFound.js
 import React from 'react';
-import { Box, Heading, Text, Button, Center, VStack } from '@chakra-ui/react';
-import { Link as RouterLink } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const NotFound = () => {
-  const { isAuthenticated } = useAuth();
-  
   return (
-    <Center h="80vh">
-      <VStack spacing={6} align="center">
-        <Heading as="h1" size="2xl">404</Heading>
-        <Heading as="h2" size="xl">Page Not Found</Heading>
-        <Text fontSize="lg" textAlign="center">
-          The page you are looking for doesn't exist or has been moved.
-        </Text>
-        <Box mt={4}>
-          <Button 
-            as={RouterLink} 
-            to={isAuthenticated ? '/dashboard' : '/login'} 
-            colorScheme="blue"
-            size="lg"
-          >
-            Go to {isAuthenticated ? 'Dashboard' : 'Login'}
-          </Button>
-        </Box>
-      </VStack>
-    </Center>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
+      <div className="text-6xl font-bold text-blue-600 mb-4">404</div>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Page Not Found</h1>
+      <p className="text-gray-600 text-center mb-8 max-w-md">
+        The page you are looking for might have been removed, had its name changed,
+        or is temporarily unavailable.
+      </p>
+      <Link
+        to="/"
+        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+      >
+        Back to Dashboard
+      </Link>
+    </div>
   );
 };
 

@@ -1,4 +1,4 @@
-// Fixed apiService.js with correct endpoints
+// apiService.js - Centralized API service with document and user endpoints
 import axios from 'axios';
 
 // Base URL for API requests
@@ -73,51 +73,173 @@ export const documentApi = {
     }
   },
   
+  // Get single document details
+  getDocument: async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/documents/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch document with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Updated previewDocument function for apiService.js
+previewDocument: async (id) => {
+  try {
+    console.log(`Attempting to preview document with ID ${id}`);
+    const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
+      responseType: 'blob'
+    });
+    console.log('Preview response received:', response.status);
+    return response.data;
+  } catch (error) {
+    console.error(`Failed to preview document with ID ${id}:`, error);
+    
+    // Log more detailed error info
+    if (error.response) {
+      console.error('Error status:', error.response.status);
+      console.error('Error data:', error.response.data);
+      // If we got a 404, it means the preview endpoint might not be implemented
+      if (error.response.status === 404) {
+        console.warn('Preview endpoint returned 404 - falling back to document download');
+        // We could implement a fallback here, but we'll let the component handle this
+      }
+    }
+    
+    throw error;
+  }
+},
+  
   // Upload a new document
   uploadDocument: async (formData) => {
-    const response = await axios.post(`${API_URL}/documents`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-    return response.data;
+    try {
+      const response = await axios.post(`${API_URL}/documents`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to upload document:', error);
+      throw error;
+    }
   },
   
   // Download a document
-  downloadDocument: async (id) => {
-    const response = await axios.get(`${API_URL}/documents/${id}`, {
+ // Updated downloadDocument function for apiService.js
+  // Download a document
+ // Updated downloadDocument function for apiService.js
+downloadDocument: async (id) => {
+  try {
+    console.log(`Attempting to download document with ID ${id}`);
+    // This should point to the /preview endpoint which serves the file content
+    const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
       responseType: 'blob'
     });
+    console.log('Download response received:', response.status);
     return response;
-  },
+  } catch (error) {
+    console.error(`Failed to download document with ID ${id}:`, error);
+    throw error;
+  }
+},
   
   // Delete a document
   deleteDocument: async (id) => {
-    const response = await axios.delete(`${API_URL}/documents/${id}`);
-    return response.data;
+    try {
+      const response = await axios.delete(`${API_URL}/documents/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to delete document with ID ${id}:`, error);
+      throw error;
+    }
   },
   
   // Get documents shared with user
   getSharedDocuments: async () => {
     try {
-      const response = await axios.get(`${API_URL}/documents/shared`);
+      // Better approach: use server-side filtering with a query parameter
+      const response = await axios.get(`${API_URL}/documents?shared=true`);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch shared documents:', error);
-      if (error.response && error.response.status === 404) {
-        return { data: [] }; // Return empty array if endpoint doesn't exist yet
-      }
-      throw error;
+      // Return empty data structure on error to prevent dashboard crashes
+      return { success: true, data: [] };
     }
   }
 };
 
-// User-related API functions - FIXED to use correct endpoints
+// User-related API functions
 export const userApi = {
   // Get user profile
   getProfile: async () => {
-    const response = await axios.get(`${API_URL}/users/profile`);
-    return response.data;
+    try {
+      const response = await axios.get(`${API_URL}/users/profile`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      throw error;
+    }
+  },
+
+  // Update user profile with improved error handling
+  updateProfile: async (userData) => {
+    try {
+      // Only include fields that are actually needed to update
+      const updateData = {
+        name: userData.name
+      };
+      
+      // Only include password fields if there's actually a password change
+      if (userData.currentPassword && userData.newPassword) {
+        updateData.currentPassword = userData.currentPassword;
+        updateData.newPassword = userData.newPassword;
+      }
+      
+      // Log the data being sent (omit passwords for security)
+      if (DEBUG) {
+        console.log('Updating profile with data:', {
+          ...updateData,
+          currentPassword: updateData.currentPassword ? '[REDACTED]' : undefined,
+          newPassword: updateData.newPassword ? '[REDACTED]' : undefined
+        });
+      }
+      
+      const response = await axios.put(`${API_URL}/users/profile`, updateData);
+      
+      if (!response || !response.data) {
+        throw new Error('No response data received from server');
+      }
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Profile update failed');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      
+      // More descriptive error handling
+      if (!error.response) {
+        throw new Error('Cannot connect to server. Please check your internet connection.');
+      }
+      
+      if (error.response.status === 400) {
+        throw new Error(error.response.data.message || 'Invalid input. Please check your data.');
+      }
+      
+      if (error.response.status === 401) {
+        throw new Error('Current password is incorrect.');
+      }
+      
+      // If we have an error message from the server, use it
+      if (error.response && error.response.data && error.response.data.message) {
+        throw new Error(error.response.data.message);
+      }
+      
+      throw error;
+    }
   },
 
   // Login function with correct endpoint

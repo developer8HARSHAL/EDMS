@@ -1,0 +1,149 @@
+# Simple EDMS - One Day Build Plan
+
+## Project Overview
+
+A basic Enterprise Document Management System using React, Node.js/Express, and MongoDB with JWT authentication and role-based access control.
+
+## Morning (9:00 AM - 12:00 PM)
+
+### Project Setup (9:00 - 9:30)
+
+- [x] Create project repositories (frontend/backend)
+- [x] Initialize package.json files
+- [x] Install core dependencies
+
+### Backend Foundation (9:30 - 11:00)
+
+- [x] Set up Express server
+- [x] Connect to MongoDB
+- [x] Create database schemas:
+    - [x] User schema (name, email, password, role)
+    - [x] Document schema (name, path, size, type, uploadDate, owner, permissions)
+- [x] Implement JWT authentication middleware
+
+### API Development (11:00 - 12:00)
+
+- [x] Create user routes:
+    - [x] POST /api/users/register
+    - [x] POST /api/users/login
+    - [x] GET /api/users/profile
+- [x] Create document routes:
+    - [x] GET /api/documents (list documents)
+    - [x] POST /api/documents (upload document)
+    - [x] GET /api/documents/:id (download document)
+    - [x] DELETE /api/documents/:id (delete document)
+
+## Afternoon (1:00 PM - 5:00 PM)
+
+### Frontend Foundation (1:00 - 2:30)
+
+- [x] Create React project with component structure
+- [x] Set up React Router
+- [x] Create auth context for user state management
+- [x] Design basic UI components:
+    - [x] Login/Register forms
+    - [x] Navigation bar
+    - [x] Document list
+    - [x] Upload component
+
+### Frontend Features (2:30 - 4:00)
+
+- [x] Implement authentication flow
+- [x] Create document management interface:
+    - [x] Document listing with search filter
+    - [x] Document upload with drag-and-drop (partially implemented)
+    - [x] Document preview
+    - [x] Delete functionality
+- [x] Implement API service for backend communication
+
+### Integration & Testing (4:00 - 5:00)
+
+- [x] Connect frontend to backend APIs
+- [x] Test user authentication
+- [x] Test document upload and retrieval
+- [x] Test search functionality (partially implemented)
+
+## Evening (6:00 PM - 9:00 PM)
+
+### Enhancement & Security (6:00 - 7:30)
+
+- [x] Implement role-based access control
+- [x] Add document sharing functionality
+- [ ] Add request validation and sanitization
+- [x] Implement proper error handling
+
+### Refinement & Deployment (7:30 - 9:00)
+
+- [ ] Style improvements and responsive design
+- [ ] Fix bugs from testing
+- [ ] Prepare for deployment
+- [ ] Deploy to platform of choice (Heroku, Vercel, etc.)
+
+## Current Status Summary
+
+### Completed:
+- Backend foundation is fully implemented including server setup, database connectivity, schemas, and authentication
+- API endpoints for users and documents are working
+- Frontend authentication system is robust and working (login, register, token handling)
+- Document listing and basic management operations are implemented
+- Role-based access control is in place
+
+### In Progress / Partially Implemented:
+- Document upload with drag-and-drop interface
+- Search functionality needs further testing
+- Error handling is implemented but may need refinement
+
+### Remaining Tasks:
+- Document preview functionality
+- Additional request validation and sanitization
+- UI/UX improvements for responsive design
+- Bug fixing from testing
+- Deployment preparation and execution
+
+
+
+
+What's Already Been Done
+Backend
+
+Server Setup: Express server is configured with middleware for CORS, JSON parsing, and file uploads
+Database Connection: MongoDB integration is working
+Authentication: JWT authentication is fully implemented
+Models: User and Document schemas are complete
+API Routes: All planned routes for users and documents are implemented
+Controllers: Full functionality for user and document operations
+
+Frontend
+
+Project Structure: React application with proper folder organization
+Authentication Context:
+
+Robust AuthContext implementation with JWT handling
+Token validation, login, registration, and logout functionality
+Auto-login with token persistence
+
+
+Components:
+
+Login page with validation and error handling
+Document list component with search, filtering, and actions
+Protected routes implementation
+
+
+API Service: Service layer for backend communication is implemented
+
+What Needs to Be Done Next
+Based on the updated flow, your next tasks should focus on:
+
+Document Preview: Implement functionality to preview documents before download
+Upload Component Enhancement: Finish the drag-and-drop functionality for document uploads
+Testing: Complete testing for search functionality
+Validation & Sanitization: Add more comprehensive request validation
+UI/UX Improvements:
+
+Make the interface fully responsive
+Polish the design for better user experience
+
+
+Bug Fixing: Test all features thoroughly and fix any issues
+Deployment: Prepare and deploy the application

@@ -227,6 +227,125 @@ exports.deleteDocument = async (req, res) => {
   }
 };
 
+
+
+// @desc    Get document content for preview
+// @route   GET /api/documents/:id/preview
+// @access  Private
+exports.previewDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check if user is authorized to access this document
+    const isOwner = document.owner.toString() === req.user.id;
+    const hasPermission = document.permissions.some(
+      permission => permission.user.toString() === req.user.id
+    );
+
+    if (!isOwner && !hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this document'
+      });
+    }
+
+    // Get the file path
+    const filePath = path.join(__dirname, '..', document.path);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'File not found on server'
+      });
+    }
+
+    // Handle different preview scenarios based on file type
+    const fileType = document.type.toLowerCase();
+    
+    // For text files - read and send as text
+    if (
+      fileType.includes('text') ||
+      fileType.includes('javascript') ||
+      fileType.includes('json') ||
+      fileType.includes('css') ||
+      fileType.includes('html') ||
+      fileType.includes('xml') ||
+      fileType.includes('csv') ||
+      fileType.includes('md')
+    ) {
+      fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+          console.error('Error reading text file:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Error reading file'
+          });
+        }
+        
+        // Send the text content with appropriate headers
+        res.setHeader('Content-Type', 'text/plain');
+        res.send(data);
+      });
+    } 
+    // For binary files (images, PDFs, etc.) - stream the file
+    else {
+      // Set appropriate content type
+      res.setHeader('Content-Type', document.type);
+      
+      // Set content disposition to inline for browser preview
+      res.setHeader('Content-Disposition', `inline; filename="${document.originalName || document.name}"`);
+      
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    }
+  } catch (error) {
+    console.error('Error previewing document:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not preview document',
+      error: error.message
+    });
+  }
+};
+
+
+
+// @desc    Get documents shared with the user (not owned by user)
+// @route   GET /api/documents/shared
+// @access  Private
+exports.getSharedDocuments = async (req, res) => {
+  try {
+    // Find documents where user has permissions but is not the owner
+    const documents = await Document.find({
+      owner: { $ne: req.user.id }, // Not owned by the user
+      'permissions.user': req.user.id // User has permissions
+    }).select('-__v');
+
+    res.status(200).json({
+      success: true,
+      count: documents.length,
+      data: documents
+    });
+  } catch (error) {
+    console.error('Error getting shared documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve shared documents',
+      error: error.message
+    });
+  }
+};
+
+
 // @desc    Share document with another user
 // @route   POST /api/documents/:id/share
 // @access  Private
