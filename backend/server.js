@@ -1,9 +1,9 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fileUpload = require('express-fileupload');
+const connectDB = require('./config/db'); // Import the DB connection function
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
@@ -16,13 +16,24 @@ dotenv.config();
 const app = express();
 
 // Enhanced CORS configuration for production
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? [
+      process.env.FRONTEND_URL || 'https://your-edms-app.netlify.app', // Use env variable if available
+      'https://edms-document-app.netlify.app' // Add your expected Netlify domain here
+    ] 
+  : ['http://localhost:3000']; // In development, allow localhost
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        'https://your-edms-app.netlify.app', // Replace with your actual Netlify domain when deployed
-        process.env.FRONTEND_URL // Optional: Add as environment variable in Render
-      ] 
-    : '*', // In development, allow all origins
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true
 }));
 
@@ -36,15 +47,12 @@ app.use(fileUpload({
 // Static directory for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// MongoDB Connection with better error handling
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-  .then(() => console.log('MongoDB Connected'))
+// Connect to MongoDB using our config function
+connectDB()
+  .then(() => console.log('MongoDB Connected Successfully'))
   .catch(err => {
-    console.error('MongoDB Connection Error:', err);
-    process.exit(1);
+    console.error('Failed to connect to MongoDB:', err);
+    // We're not exiting the process here because connectDB already handles that
   });
 
 // Routes
@@ -58,7 +66,11 @@ app.get('/', (req, res) => {
 
 // Health check endpoint for monitoring
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', env: process.env.NODE_ENV });
+  res.status(200).json({ 
+    status: 'ok', 
+    env: process.env.NODE_ENV,
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
 });
 
 // Error handling middleware

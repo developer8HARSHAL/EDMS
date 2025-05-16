@@ -1,0 +1,190 @@
+EDMS Project Deployment Guide
+This guide will walk you through deploying your Enterprise Document Management System (EDMS) to production using:
+
+MongoDB Atlas for the database
+Render for the backend API
+Netlify for the frontend
+
+1. MongoDB Atlas Setup
+Create MongoDB Atlas Cluster
+
+Log in to MongoDB Atlas at cloud.mongodb.com
+Create a new project named "EDMS" (if needed)
+Build a new database:
+
+Select the M0 Free tier
+Choose your preferred region
+Name your cluster (e.g., "edms-cluster")
+Click "Create"
+
+
+
+Set Up Database Access
+
+Go to "Security" > "Database Access"
+Click "Add New Database User"
+Create new credentials:
+
+Authentication method: Password
+Username: edms_admin (or your preferred username)
+Password: Generate a secure password
+Database User Privileges: "Read and Write to Any Database"
+
+
+Click "Add User"
+
+Configure Network Access
+
+Go to "Security" > "Network Access"
+Click "Add IP Address"
+Select "Allow Access from Anywhere" (0.0.0.0/0)
+Click "Confirm"
+
+Get Connection String
+
+Go to your cluster and click "Connect"
+Select "Connect your application"
+Copy the connection string:
+mongodb+srv://<username>:<password>@edms-cluster.mongodb.net/edms?retryWrites=true&w=majority
+
+Replace <username> and <password> with your credentials
+
+2. Backend Deployment to Render
+Prepare Your Backend Code
+
+Make sure your package.json has the correct scripts:
+json"scripts": {
+  "start": "node server.js",
+  "dev": "nodemon server.js"
+}
+
+Update your server.js with the production configuration (use the updated file provided)
+Commit and push your changes to your Git repository
+
+Create Render Web Service
+
+Log in to Render at render.com
+Click "New" > "Web Service"
+Connect your Git repository
+Configure the service:
+
+Name: "edms-api"
+Region: (Choose closest to your users)
+Branch: main (or your default branch)
+Root Directory: backend (assuming your repo has both frontend/backend)
+Runtime: Node
+Build Command: npm install
+Start Command: npm start
+Plan: Free
+
+
+
+Set Environment Variables
+
+Expand "Advanced" > "Environment Variables"
+Add the following variables:
+
+PORT: 10000
+MONGO_URI: Your MongoDB Atlas connection string
+JWT_SECRET: Your JWT secret from local .env (or generate a new one)
+JWT_EXPIRE: 30d
+NODE_ENV: production
+
+
+Click "Create Web Service" and wait for deployment to complete
+Note your service URL: https://edms-api.onrender.com
+
+3. Frontend Deployment to Netlify
+Update Frontend Configuration
+
+Create a .env.production file in your frontend directory:
+REACT_APP_API_URL=https://edms-api.onrender.com/api
+
+Update your API service to use the environment variable (use the updated file provided)
+Commit and push your changes
+
+Deploy to Netlify
+
+Log in to Netlify at netlify.com
+Click "Add new site" > "Import an existing project"
+Connect to your Git repository
+Configure build settings:
+
+Branch to deploy: main
+Base directory: frontend (assuming your repo has both frontend/backend)
+Build command: npm run build
+Publish directory: build
+
+
+Add environment variables:
+
+Click "Advanced build settings" > "Add variable"
+Add REACT_APP_API_URL with value https://edms-api.onrender.com/api
+
+
+Click "Deploy site"
+Once deployment completes, update your backend CORS settings in Render with your Netlify domain
+
+4. Post-Deployment Configuration
+Update CORS on Backend
+
+Go to your Render dashboard
+Find your EDMS API service
+Go to "Environment" tab
+Add a new variable:
+
+Key: FRONTEND_URL
+Value: Your Netlify URL (e.g., https://your-edms-app.netlify.app)
+
+
+Click "Save Changes" and wait for redeployment
+
+Test Your Application
+
+Visit your Netlify URL
+Try to register a new account
+Log in and test document upload/download functionality
+Verify document sharing works correctly
+
+5. Troubleshooting
+Backend Issues
+
+Check Render logs: Go to your service > Logs
+Common issues:
+
+MongoDB connection errors: Double-check your connection string
+CORS errors: Verify your frontend URL is properly configured
+
+
+
+Frontend Issues
+
+Check Netlify build logs: Go to Deploys > Latest deploy > Deploy log
+Common issues:
+
+Build failures: Check for syntax errors or missing dependencies
+API connection issues: Verify your REACT_APP_API_URL is correct
+
+
+
+Database Issues
+
+Check MongoDB Atlas monitoring dashboard
+Review database logs for connection issues
+
+6. Future Considerations
+Performance Optimization
+
+Set up a CDN for document delivery
+Implement database indexing for faster queries
+
+Security Enhancements
+
+Set up SSL for your API endpoint
+Implement rate limiting
+Add more comprehensive input validation
+
+Backup Strategy
+
+Configure automated MongoDB Atlas backups
+Set up a document backup strategy for the file system

@@ -1,6 +1,18 @@
+// documentController.js - Updated for GridFS storage
+const mongoose = require('mongoose');
 const Document = require('../models/documentModel');
+const User = require('../models/userModel');
 const path = require('path');
-const fs = require('fs');
+const { ObjectId } = mongoose.Types;
+
+// Set up GridFS bucket
+let gfs;
+mongoose.connection.once('open', () => {
+  gfs = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+    bucketName: 'uploads'
+  });
+  console.log('GridFS initialized successfully');
+});
 
 // @desc    Upload new document
 // @route   POST /api/documents
@@ -24,19 +36,34 @@ exports.uploadDocument = async (req, res) => {
       });
     }
 
-    // Create custom filename
-    const fileExt = path.extname(file.name);
-    const fileName = `document_${req.user.id}_${Date.now()}${fileExt}`;
-    const filePath = path.join(__dirname, '../uploads', fileName);
+    // Create a unique filename
+    const fileId = new ObjectId();
+    const fileName = `document_${req.user.id}_${Date.now()}${path.extname(file.name)}`;
 
-    // Move file to upload directory
-    await file.mv(filePath);
+    // Create writable stream to GridFS
+    const writeStream = gfs.openUploadStreamWithId(fileId, fileName, {
+      contentType: file.mimetype,
+      metadata: {
+        originalName: file.name,
+        ownerId: req.user.id
+      }
+    });
 
-    // Create document in database
+    // Write file buffer to GridFS
+    writeStream.write(file.data);
+    writeStream.end();
+
+    // Wait for the upload to complete
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    // Create document record in database
     const document = await Document.create({
       name: req.body.name || file.name,
       originalName: file.name,
-      path: `uploads/${fileName}`,
+      path: fileId.toString(), // Store the GridFS file ID as the path
       size: file.size,
       type: file.mimetype,
       owner: req.user.id,
@@ -204,10 +231,14 @@ exports.deleteDocument = async (req, res) => {
       });
     }
 
-    // Delete file from filesystem
-    const filePath = path.join(__dirname, '..', document.path);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Delete file from GridFS
+    try {
+      // The document.path contains the GridFS file ID
+      const fileId = new ObjectId(document.path);
+      await gfs.delete(fileId);
+    } catch (fileError) {
+      console.error('Error deleting file from GridFS:', fileError);
+      // Continue with document deletion even if file deletion fails
     }
 
     // Remove document from database
@@ -226,8 +257,6 @@ exports.deleteDocument = async (req, res) => {
     });
   }
 };
-
-
 
 // @desc    Get document content for preview
 // @route   GET /api/documents/:id/preview
@@ -256,56 +285,45 @@ exports.previewDocument = async (req, res) => {
       });
     }
 
-    // Get the file path
-    const filePath = path.join(__dirname, '..', document.path);
+    // Get the file from GridFS
+    try {
+      const fileId = new ObjectId(document.path);
+      
+      // Check if file exists in GridFS
+      const files = await mongoose.connection.db.collection('uploads.files').findOne({ _id: fileId });
+      
+      if (!files) {
+        return res.status(404).json({
+          success: false,
+          message: 'File not found on server'
+        });
+      }
 
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'File not found on server'
-      });
-    }
-
-    // Handle different preview scenarios based on file type
-    const fileType = document.type.toLowerCase();
-    
-    // For text files - read and send as text
-    if (
-      fileType.includes('text') ||
-      fileType.includes('javascript') ||
-      fileType.includes('json') ||
-      fileType.includes('css') ||
-      fileType.includes('html') ||
-      fileType.includes('xml') ||
-      fileType.includes('csv') ||
-      fileType.includes('md')
-    ) {
-      fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-          console.error('Error reading text file:', err);
-          return res.status(500).json({
-            success: false,
-            message: 'Error reading file'
-          });
-        }
-        
-        // Send the text content with appropriate headers
-        res.setHeader('Content-Type', 'text/plain');
-        res.send(data);
-      });
-    } 
-    // For binary files (images, PDFs, etc.) - stream the file
-    else {
       // Set appropriate content type
       res.setHeader('Content-Type', document.type);
       
       // Set content disposition to inline for browser preview
       res.setHeader('Content-Disposition', `inline; filename="${document.originalName || document.name}"`);
       
-      // Stream the file
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
+      // Stream the file from GridFS
+      const downloadStream = gfs.openDownloadStream(fileId);
+      downloadStream.pipe(res);
+      
+      // Handle errors in the stream
+      downloadStream.on('error', (err) => {
+        console.error('Error streaming file:', err);
+        res.status(500).json({
+          success: false,
+          message: 'Error streaming file'
+        });
+      });
+    } catch (error) {
+      console.error('Error accessing file in GridFS:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Could not access file',
+        error: error.message
+      });
     }
   } catch (error) {
     console.error('Error previewing document:', error);
@@ -316,8 +334,6 @@ exports.previewDocument = async (req, res) => {
     });
   }
 };
-
-
 
 // @desc    Get documents shared with the user (not owned by user)
 // @route   GET /api/documents/shared
@@ -344,7 +360,6 @@ exports.getSharedDocuments = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Share document with another user
 // @route   POST /api/documents/:id/share
