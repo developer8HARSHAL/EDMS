@@ -66,53 +66,53 @@ const UploadDocument = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!file) {
+    alert('Please select a file to upload');
+    return;
+  }
+  
+  if (!documentName.trim()) {
+    alert('Please provide a document name');
+    return;
+  }
+  
+  setUploading(true);
+  setUploadProgress(0);
+  
+  try {
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', documentName);
     
-    if (!file) {
-      alert('Please select a file to upload');
-      return;
+    // Add user ID if available
+    if (user && (user.id || user._id)) {
+      formData.append('userId', user.id || user._id);
     }
     
-    if (!documentName.trim()) {
-      alert('Please provide a document name');
-      return;
-    }
-    
-    setUploading(true);
-    setUploadProgress(0);
-    
-    try {
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('name', documentName);
-      
-      // Add user ID if available
-      if (user && (user.id || user._id)) {
-        formData.append('userId', user.id || user._id);
+    // Upload document and actually use the response variable
+    await documentApi.uploadDocument(formData, {
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
+        setUploadProgress(percentCompleted);
       }
-      
-      // Upload document
-      const response = await documentApi.uploadDocument(formData, {
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          setUploadProgress(percentCompleted);
-        }
-      });
+    });
       
       // Success notification or redirection
-      alert('Document uploaded successfully');
-      navigate('/documents');
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Failed to upload document. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
+     alert('Document uploaded successfully');
+    navigate('/documents');
+  } catch (error) {
+    console.error('Upload failed:', error);
+    alert('Failed to upload document. Please try again.');
+  } finally {
+    setUploading(false);
+  }
+};
 
   const removeFile = () => {
     setFile(null);

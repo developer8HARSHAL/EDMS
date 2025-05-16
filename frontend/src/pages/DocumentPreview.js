@@ -6,7 +6,8 @@ import apiService from '../services/apiService';
 const DocumentPreview = () => {
   const { documentId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  // Removed 'user' since it's not being used
+  const { isAuthenticated } = useAuth();
   const [document, setDocument] = useState(null);
   const [previewContent, setPreviewContent] = useState(null);
   const [loading, setLoading] = useState(true);
