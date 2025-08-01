@@ -1,27 +1,11 @@
-// src/pages/Login.js - Enhanced error handling version
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
-import {
-  Box,
-  FormControl,
-  FormLabel,
-  Input,
-  Button,
-  Stack,
-  Heading,
-  Text,
-  Alert,
-  AlertIcon,
-  Container,
-  Link,
-  InputGroup,
-  InputRightElement,
-  IconButton,
-  useToast,
-  FormErrorMessage
-} from '@chakra-ui/react';
-import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
-import { useAuth } from '../context/AuthContext';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../hooks/useAuth';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Alert } from '../components/ui/Alert';
+import { Card } from '../components/ui/Card';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -29,31 +13,52 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [toastMessage, setToastMessage] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const toast = useToast();
   
   const { login, error, clearError, isAuthenticated, user, loading } = useAuth();
 
   // Redirect if user is already authenticated
   useEffect(() => {
     if (isAuthenticated && user && !loading) {
-      // If there's a redirect location saved (e.g., from a protected route), use that
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, user, navigate, location, loading]);
 
-  // Clear previous errors when component mounts
+  // FIXED: Clear previous errors when component mounts ONLY
   useEffect(() => {
     if (typeof clearError === 'function') {
       clearError();
     }
-    // Also clear form errors
     setFormErrors({});
-  }, [clearError]);
+  }, []); // Empty dependency array - only run on mount
 
-  const validateForm = () => {
+  // FIXED: Clear form errors when user types (separate useEffect)
+  useEffect(() => {
+    if (formErrors.email && email) {
+      setFormErrors(prev => ({ ...prev, email: undefined }));
+    }
+  }, [email, formErrors.email]);
+
+  useEffect(() => {
+    if (formErrors.password && password) {
+      setFormErrors(prev => ({ ...prev, password: undefined }));
+    }
+  }, [password, formErrors.password]);
+
+  // Auto-hide toast after 5 seconds
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  const validateForm = useCallback(() => {
     const errors = {};
     
     if (!email) {
@@ -68,7 +73,11 @@ const Login = () => {
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [email, password]);
+
+  const showToast = useCallback((message, type = 'error') => {
+    setToastMessage({ message, type });
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -86,38 +95,20 @@ const Login = () => {
       
       if (success) {
         console.log('Login successful');
-        // No need for navigation here as the useEffect will handle it
+        // Navigation handled by useEffect
       } else {
         console.log('Login failed');
-        // Handle specific authentication failures
-        toast({
-          title: 'Login Failed',
-          description: 'Please check your credentials and try again',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
+        showToast('Please check your credentials and try again');
       }
     } catch (error) {
       console.error('Login process error:', error);
-      console.log('Error details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-      });
       
-      // More specific error handling based on error types
       let errorMessage = 'An unexpected error occurred';
       
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        
-        // First check if there's a message in the response data
         if (error.response.data?.message) {
           errorMessage = error.response.data.message;
         } else {
-          // If no specific message, provide a status-based fallback
           switch (error.response.status) {
             case 401:
               errorMessage = 'Invalid email or password';
@@ -136,136 +127,134 @@ const Login = () => {
           }
         }
       } else if (error.request) {
-        // The request was made but no response was received
         errorMessage = 'No response from server. Please check your internet connection';
       } else {
-        // Something happened in setting up the request that triggered an Error
         errorMessage = error.message || 'Login request failed';
       }
       
-      toast({
-        title: 'Login Failed',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      showToast(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleRegisterClick = useCallback(() => {
+    console.log('Register link clicked');
+    navigate('/register');
+  }, [navigate]);
+
   return (
-    <Container maxW="md" py={12}>
-      <Box
-        p={8}
-        maxWidth="md"
-        borderWidth={1}
-        borderRadius={8}
-        boxShadow="lg"
-      >
-        <Stack spacing={4}>
-          <Heading fontSize="2xl" textAlign="center">
-            Log in to your account
-          </Heading>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <Card className="p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Log in to your account
+            </h2>
+          </div>
           
-          {error && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
-              {error}
-            </Alert>
+          {/* Toast Notification */}
+          {toastMessage && (
+            <div className="mb-6">
+              <Alert variant={toastMessage.type}>
+                {toastMessage.message}
+              </Alert>
+            </div>
           )}
           
-          <form onSubmit={handleSubmit}>
-            <Stack spacing={4}>
-              <FormControl id="email" isRequired isInvalid={!!formErrors.email}>
-                <FormLabel>Email address</FormLabel>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    // Clear error when typing
-                    if (formErrors.email) {
-                      setFormErrors({...formErrors, email: undefined});
-                    }
-                  }}
-                  autoComplete="email"
-                  data-testid="email-input"
-                />
-                <FormErrorMessage>{formErrors.email}</FormErrorMessage>
-              </FormControl>
-              
-              <FormControl id="password" isRequired isInvalid={!!formErrors.password}>
-                <FormLabel>Password</FormLabel>
-                <InputGroup>
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      // Clear error when typing
-                      if (formErrors.password) {
-                        setFormErrors({...formErrors, password: undefined});
-                      }
-                    }}
-                    autoComplete="current-password"
-                    data-testid="password-input"
-                  />
-                  <InputRightElement h="full">
-                    <IconButton
-                      variant="ghost"
-                      onClick={() => setShowPassword(!showPassword)}
-                      icon={showPassword ? <ViewOffIcon /> : <ViewIcon />}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    />
-                  </InputRightElement>
-                </InputGroup>
-                <FormErrorMessage>{formErrors.password}</FormErrorMessage>
-              </FormControl>
-              
-              <Link alignSelf="flex-end" fontSize="sm" color="blue.500" href="/forgot-password">
+          {/* Error Alert */}
+          {error && (
+            <div className="mb-6">
+              <Alert variant="error">
+                {error}
+              </Alert>
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Input
+                label="Email address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                error={formErrors.email}
+                isRequired
+                autoComplete="email"
+                data-testid="email-input"
+                placeholder="Enter your email"
+              />
+            </div>
+            
+            <div>
+              <Input
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={formErrors.password}
+                isRequired
+                autoComplete="current-password"
+                data-testid="password-input"
+                placeholder="Enter your password"
+                rightIcon={
+                  <button
+                    type="button"
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <EyeSlashIcon className="h-5 w-5" />
+                    ) : (
+                      <EyeIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                }
+              />
+            </div>
+            
+            <div className="flex items-center justify-end">
+              <RouterLink
+                to="/forgot-password"
+                className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              >
                 Forgot Password?
-              </Link>
-              
-              <Stack spacing={6}>
-                <Button
-                  type="submit"
-                  colorScheme="blue"
-                  size="lg"
-                  fontSize="md"
-                  isLoading={isSubmitting || loading}
-                  loadingText="Logging in"
-                  data-testid="login-button"
-                >
-                  Sign in
-                </Button>
-              </Stack>
-            </Stack>
+              </RouterLink>
+            </div>
+            
+            <div>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                isLoading={isSubmitting || loading}
+                loadingText="Logging in"
+                data-testid="login-button"
+              >
+                Sign in
+              </Button>
+            </div>
           </form>
           
-          <Stack pt={6}>
-            <Text align="center">
-              Don't have an account?{' '}
-              <Link as={RouterLink} to="/register" color="blue.400">
-                Register
-              </Link>
-            </Text>
-          </Stack>
+          <div className="mt-6 text-center">
+  <p className="text-sm text-gray-600 dark:text-gray-400">
+    Don't have an account?{' '}
+    <button
+      type="button"
+      onClick={handleRegisterClick}
+      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors underline bg-transparent border-none cursor-pointer"
+    >
+      Register
+    </button>
+  </p>
+</div>
+
           
-          {/* Debug section for development only */}
-          {process.env.NODE_ENV === 'development' && (
-            <Box mt={4} p={3} borderWidth="1px" borderRadius="md" bg="gray.50">
-              <Text fontWeight="bold" fontSize="sm">Debug Info:</Text>
-              <Text fontSize="xs">Auth Status: {isAuthenticated ? 'Authenticated' : 'Not Authenticated'}</Text>
-              <Text fontSize="xs">Token: {localStorage.getItem('authToken') ? 'Present' : 'Missing'}</Text>
-              <Text fontSize="xs">Loading: {loading ? 'True' : 'False'}</Text>
-              <Text fontSize="xs">User: {user ? JSON.stringify(user) : 'null'}</Text>
-            </Box>
-          )}
-        </Stack>
-      </Box>
-    </Container>
+       
+        </Card>
+      </div>
+    </div>
   );
 };
 

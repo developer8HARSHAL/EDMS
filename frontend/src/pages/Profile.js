@@ -1,25 +1,10 @@
-// src/pages/Profile.js - Fixed version
+// src/pages/Profile.js - Migrated to Tailwind CSS
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Container, 
-  Heading, 
-  FormControl, 
-  FormLabel, 
-  Input,
-  Button,
-  useToast,
-  Avatar,
-  VStack,
-  HStack,
-  Text,
-  Divider,
-  useColorModeValue,
-  Alert,
-  AlertIcon,
-  FormErrorMessage
-} from '@chakra-ui/react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
+import {Button} from '../components/ui/Button';
+import {Input} from '../components/ui/Input';
+import {Alert} from '../components/ui/Alert';
+import {Card} from '../components/ui/Card';
 
 const Profile = () => {
   const { user, updateUserProfile, error } = useAuth();
@@ -32,11 +17,7 @@ const Profile = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
-  
-  // Color mode values
-  const boxBg = useColorModeValue('white', 'gray.700');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const [successMessage, setSuccessMessage] = useState('');
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -87,6 +68,9 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Clear previous success message
+    setSuccessMessage('');
+    
     // Validate form
     if (!validateForm()) {
       return;
@@ -109,13 +93,7 @@ const Profile = () => {
       // Call API to update profile
       await updateUserProfile(profileData);
       
-      toast({
-        title: 'Profile updated',
-        description: 'Your profile has been successfully updated',
-        status: 'success',
-        duration: 3000,
-        isClosable: true
-      });
+      setSuccessMessage('Your profile has been successfully updated');
       
       // Reset password fields
       setFormData(prev => ({
@@ -125,127 +103,193 @@ const Profile = () => {
         confirmPassword: ''
       }));
     } catch (error) {
-      // Toast is already handled by context, just log here
+      // Error is already handled by context
       console.error('Profile update failed in component:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Generate initials for avatar
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
   
   return (
-    <Container maxW="container.md" py={8}>
-      <Box 
-        bg={boxBg} 
-        p={6} 
-        borderRadius="lg" 
-        boxShadow="md"
-        borderWidth="1px"
-        borderColor={borderColor}
-      >
-        <VStack spacing={6} align="stretch">
-          <HStack spacing={6}>
-            <Avatar 
-              size="xl" 
-              name={user?.name} 
-              src={user?.avatar} 
-              bg="blue.500"
-            />
-            <Box>
-              <Heading size="lg">Your Profile</Heading>
-              <Text color="gray.500">Manage your account settings</Text>
-            </Box>
-          </HStack>
+    <div className="container mx-auto max-w-4xl py-8 px-4">
+      <Card className="p-6">
+        <div className="space-y-6">
+          {/* Header Section */}
+          <div className="flex items-start space-x-6">
+            <div className="flex-shrink-0">
+              <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-semibold">
+                {user?.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    alt={user.name} 
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  getInitials(user?.name)
+                )}
+              </div>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Your Profile
+              </h1>
+              <p className="text-gray-500 dark:text-gray-400">
+                Manage your account settings
+              </p>
+            </div>
+          </div>
           
-          <Divider />
+          {/* Divider */}
+          <hr className="border-gray-200 dark:border-gray-700" />
           
+          {/* Error Alert */}
           {error && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
+            <Alert variant="error">
               {error}
             </Alert>
           )}
           
-          <form onSubmit={handleSubmit}>
-            <VStack spacing={4} align="stretch">
-              <FormControl id="name" isInvalid={!!formErrors.name}>
-                <FormLabel>Full Name</FormLabel>
-                <Input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                />
-                {formErrors.name && (
-                  <FormErrorMessage>{formErrors.name}</FormErrorMessage>
-                )}
-              </FormControl>
+          {/* Success Alert */}
+          {successMessage && (
+            <Alert variant="success">
+              {successMessage}
+            </Alert>
+          )}
+          
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name Field */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Full Name
+              </label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                error={formErrors.name}
+                className="w-full"
+              />
+              {formErrors.name && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {formErrors.name}
+                </p>
+              )}
+            </div>
+            
+            {/* Email Field (Read-only) */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email Address
+              </label>
+              <Input
+                id="email"
+                name="email"
+                value={formData.email}
+                readOnly
+                className="w-full bg-gray-50 dark:bg-gray-800"
+              />
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Email cannot be changed
+              </p>
+            </div>
+            
+            {/* Password Section */}
+            <div className="pt-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Change Password
+              </h2>
               
-              <FormControl id="email" isReadOnly>
-                <FormLabel>Email Address</FormLabel>
+              {/* Current Password */}
+              <div className="mb-4">
+                <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Current Password
+                </label>
                 <Input
-                  name="email"
-                  value={formData.email}
-                  bg="gray.50"
-                />
-                <Text fontSize="sm" color="gray.500" mt={1}>
-                  Email cannot be changed
-                </Text>
-              </FormControl>
-              
-              <Heading size="md" mt={4}>Change Password</Heading>
-              
-              <FormControl id="currentPassword" isInvalid={!!formErrors.currentPassword}>
-                <FormLabel>Current Password</FormLabel>
-                <Input
+                  id="currentPassword"
                   name="currentPassword"
                   type="password"
                   value={formData.currentPassword}
                   onChange={handleChange}
+                  error={formErrors.currentPassword}
+                  className="w-full"
                 />
                 {formErrors.currentPassword && (
-                  <FormErrorMessage>{formErrors.currentPassword}</FormErrorMessage>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {formErrors.currentPassword}
+                  </p>
                 )}
-              </FormControl>
+              </div>
               
-              <FormControl id="newPassword" isInvalid={!!formErrors.newPassword}>
-                <FormLabel>New Password</FormLabel>
+              {/* New Password */}
+              <div className="mb-4">
+                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  New Password
+                </label>
                 <Input
+                  id="newPassword"
                   name="newPassword"
                   type="password"
                   value={formData.newPassword}
                   onChange={handleChange}
+                  error={formErrors.newPassword}
+                  className="w-full"
                 />
                 {formErrors.newPassword && (
-                  <FormErrorMessage>{formErrors.newPassword}</FormErrorMessage>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {formErrors.newPassword}
+                  </p>
                 )}
-              </FormControl>
+              </div>
               
-              <FormControl id="confirmPassword" isInvalid={!!formErrors.confirmPassword}>
-                <FormLabel>Confirm New Password</FormLabel>
+              {/* Confirm Password */}
+              <div className="mb-4">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Confirm New Password
+                </label>
                 <Input
+                  id="confirmPassword"
                   name="confirmPassword"
                   type="password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  error={formErrors.confirmPassword}
+                  className="w-full"
                 />
                 {formErrors.confirmPassword && (
-                  <FormErrorMessage>{formErrors.confirmPassword}</FormErrorMessage>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {formErrors.confirmPassword}
+                  </p>
                 )}
-              </FormControl>
-              
+              </div>
+            </div>
+            
+            {/* Submit Button */}
+            <div className="pt-6">
               <Button
-                mt={6}
-                colorScheme="blue"
                 type="submit"
-                isLoading={isSubmitting}
-                loadingText="Updating..."
+                disabled={isSubmitting}
+                className="w-full sm:w-auto"
               >
-                Update Profile
+                {isSubmitting ? 'Updating...' : 'Update Profile'}
               </Button>
-            </VStack>
+            </div>
           </form>
-        </VStack>
-      </Box>
-    </Container>
+        </div>
+      </Card>
+    </div>
   );
 };
 

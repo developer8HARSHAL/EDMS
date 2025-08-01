@@ -1,19 +1,19 @@
-// src/components/WithAuth.js
+// src/components/WithAuth.js - FIXED VERSION
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 /**
  * Higher Order Component for protecting routes that require authentication
- * @param {React.Component} Component - The component to render if authenticated
+ * @param {React.Component} component - The component to render if authenticated
  * @returns {React.Component} Either the protected component or redirect to login
  */
 const WithAuth = ({ component: Component, ...props }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, tokenValidated } = useAuth();
   const location = useLocation();
 
-  // Show loading state while checking authentication
-  if (loading) {
+  // Show loading state while checking authentication or validating token
+  if (loading || !tokenValidated) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -33,7 +33,8 @@ const WithAuth = ({ component: Component, ...props }) => {
   }
 
   // Render the protected component if authenticated
-  return <Component {...props} />;
+  // FIXED: Ensure Component is properly instantiated
+  return Component ? <Component {...props} /> : null;
 };
 
 export default WithAuth;

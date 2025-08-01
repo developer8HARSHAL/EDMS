@@ -1,76 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  SimpleGrid, 
-  Stat, 
-  StatLabel, 
-  StatNumber, 
-  StatHelpText, 
-  Container,
-  Icon,
-  Flex,
-  Stack,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Button,
-  Skeleton,
-  Alert,
-  AlertIcon,
-} from '@chakra-ui/react';
-
-import { useColorModeValue } from '@chakra-ui/color-mode';
-import { FiFile, FiUpload, FiUsers, FiClock } from 'react-icons/fi';
 import { Link as RouterLink } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { 
+  DocumentIcon, 
+  CloudArrowUpIcon, 
+  UsersIcon, 
+  ClockIcon,
+  ArrowUpTrayIcon 
+} from '@heroicons/react/24/outline';
+import { useAuth } from '../hooks/useAuth';
 import { documentApi } from '../services/apiService';
-
-const StatCard = ({ title, stat, icon, description, isLoading }) => {
-  return (
-    <Stat
-      px={{ base: 2, md: 4 }}
-      py={5}
-      shadow={'md'}
-      border={'1px solid'}
-      borderColor={useColorModeValue('gray.200', 'gray.700')}
-      rounded={'lg'}
-      bg={useColorModeValue('white', 'gray.700')}
-      transition="all 0.3s"
-      _hover={{ 
-        transform: 'translateY(-2px)', 
-        shadow: 'lg' 
-      }}
-    >
-      <Flex justifyContent="space-between">
-        <Box>
-          <StatLabel fontWeight={'medium'} isTruncated>
-            {title}
-          </StatLabel>
-          {isLoading ? (
-            <Skeleton height="30px" width="60px" mt={2} mb={2} />
-          ) : (
-            <StatNumber fontSize={'2xl'} fontWeight={'medium'}>
-              {stat}
-            </StatNumber>
-          )}
-          <StatHelpText>{description}</StatHelpText>
-        </Box>
-        <Box
-          my={'auto'}
-          color={'blue.500'}
-          alignContent={'center'}
-        >
-          <Icon as={icon} w={8} h={8} />
-        </Box>
-      </Flex>
-    </Stat>
-  );
-};
+import { Button } from '../components/ui/Button';
+import { Card, CardHeader, CardContent } from '../components/ui/Card';
+import { Alert } from '../components/ui/Alert';
+import { StatCard } from '../pages/StatCard'; 
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -82,14 +24,6 @@ const Dashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Move all color mode hooks to the top level
-  const tableHeaderBg = useColorModeValue("gray.50", "gray.700");
-  const tableBorderColor = useColorModeValue("gray.200", "gray.600");
-  const noDocsBg = useColorModeValue("gray.50", "gray.700");
-  const textColor = useColorModeValue("gray.600", "gray.300");
-  const boxBg = useColorModeValue("white", "gray.700");
-  const storageBarBg = useColorModeValue("gray.100", "gray.600");
 
   // Helper function to safely extract documents from API response
   const extractDocumentsFromResponse = (response) => {
@@ -105,12 +39,10 @@ const Dashboard = () => {
     
     // Try to extract from response.data
     if (response.data) {
-      // If data is an array, return it
       if (Array.isArray(response.data)) {
         return response.data;
       }
       
-      // If data.documents exists and is an array, return it
       if (response.data.documents && Array.isArray(response.data.documents)) {
         return response.data.documents;
       }
@@ -122,7 +54,6 @@ const Dashboard = () => {
     }
     
     // Handle the correct API response format based on documentController.js
-    // The controller returns { success: true, data: documents }
     if (response.success && response.data && Array.isArray(response.data)) {
       return response.data;
     }
@@ -149,7 +80,6 @@ const Dashboard = () => {
           allDocs = extractDocumentsFromResponse(allDocsResponse);
         } catch (docError) {
           console.error('Error fetching all documents:', docError);
-          // Continue with empty array instead of throwing
         }
         
         try {
@@ -158,7 +88,6 @@ const Dashboard = () => {
           sharedDocs = extractDocumentsFromResponse(sharedDocsResponse);
         } catch (sharedError) {
           console.error('Error fetching shared documents:', sharedError);
-          // Continue with empty array instead of throwing
         }
         
         // Calculate stats
@@ -181,7 +110,7 @@ const Dashboard = () => {
         
         // Get 5 most recent documents for display
         const recentDocs = [...allDocs]
-          .filter(doc => doc) // Filter out null/undefined entries
+          .filter(doc => doc)
           .sort((a, b) => {
             const dateA = new Date(a.uploadDate || a.createdAt || 0);
             const dateB = new Date(b.uploadDate || b.createdAt || 0);
@@ -198,8 +127,6 @@ const Dashboard = () => {
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError("Failed to load dashboard data. Please try again later.");
-        
-        // Fallback to empty data
         setDocuments([]);
       } finally {
         setIsLoading(false);
@@ -214,7 +141,6 @@ const Dashboard = () => {
       console.log(`Attempting to download document: ${docName} (ID: ${docId})`);
       const response = await documentApi.downloadDocument(docId);
       
-      // Handle different response formats
       const blobData = response.data || response;
       const blob = new Blob([blobData]);
       
@@ -234,249 +160,268 @@ const Dashboard = () => {
   };
 
   return (
-    <Container maxW="container.xl" py={5}>
-      <Box textAlign="left" fontSize="xl" p={5}>
-        <Stack spacing={8}>
-          <Box>
-            <Heading as="h1" size="xl" mb={2}>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Welcome, {user?.name || 'User'}
-            </Heading>
-            <Text color={textColor}>
+            </h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
               Here's an overview of your document management system
-            </Text>
-          </Box>
+            </p>
+          </div>
 
+          {/* Error Alert */}
           {error && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
+            <Alert variant="error">
               {error}
             </Alert>
           )}
 
-          <SimpleGrid columns={{ base: 1, md: 4 }} spacing={{ base: 5, md: 4 }}>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard
               title="Total Documents"
               stat={stats.totalDocs}
-              icon={FiFile}
+              icon={DocumentIcon}
               description="Files in your repository"
               isLoading={isLoading}
             />
             <StatCard
               title="Uploads This Month"
               stat={stats.uploads}
-              icon={FiUpload}
+              icon={CloudArrowUpIcon}
               description="New documents added"
               isLoading={isLoading}
             />
             <StatCard
               title="Shared With Me"
               stat={stats.shared}
-              icon={FiUsers}
+              icon={UsersIcon}
               description="Documents shared by others"
               isLoading={isLoading}
             />
             <StatCard
               title="Recent Activity"
               stat={isLoading ? "0" : documents.length.toString()}
-              icon={FiClock}
+              icon={ClockIcon}
               description="Documents recently accessed"
               isLoading={isLoading}
             />
-          </SimpleGrid>
+          </div>
 
-          <Box>
-            <Flex justify="space-between" align="center" mb={4}>
-              <Heading as="h2" size="lg">
-                Recent Documents
-              </Heading>
-              <Button
-                as={RouterLink}
-                to="/documents"
-                size="sm"
-                colorScheme="blue"
-                leftIcon={<FiFile />}
-              >
-                View All
-              </Button>
-            </Flex>
-
-            {documents.length > 0 ? (
-              <Box
-                border="1px"
-                borderColor={tableBorderColor}
-                borderRadius="md"
-                overflow="hidden"
-              >
-                <Table variant="simple">
-                  <Thead bg={tableHeaderBg}>
-                    <Tr>
-                      <Th>Document Name</Th>
-                      <Th>Type</Th>
-                      <Th>Created</Th>
-                      <Th>Size</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {isLoading ? (
-                      [...Array(5)].map((_, i) => (
-                        <Tr key={i}>
-                          <Td><Skeleton height="20px" /></Td>
-                          <Td><Skeleton height="20px" width="60px" /></Td>
-                          <Td><Skeleton height="20px" width="80px" /></Td>
-                          <Td><Skeleton height="20px" width="40px" /></Td>
-                          <Td><Skeleton height="20px" width="100px" /></Td>
-                        </Tr>
-                      ))
-                    ) : (
-                      documents.map((doc) => {
-                        // Safely get document ID with fallbacks
-                        const docId = doc._id || doc.id;
-                        
-                        // Skip rendering if no valid ID (prevents React key errors)
-                        if (!docId) return null;
-                        
-                        return (
-                          <Tr key={docId}>
-                            <Td fontWeight="medium">{doc.name || 'Unnamed Document'}</Td>
-                            <Td>{doc.type || 'Unknown'}</Td>
-                            <Td>{new Date(doc.uploadDate || doc.createdAt || Date.now()).toLocaleDateString()}</Td>
-                            <Td>{formatFileSize(doc.size)}</Td>
-                            <Td>
-                              <Button
-                                as={RouterLink}
-                                to={`/documents/preview/${docId}`}
-                                size="sm"
-                                colorScheme="blue"
-                                variant="outline"
-                                mr={2}
-                              >
-                                View
-                              </Button>
-                              <Button
-                                size="sm"
-                                colorScheme="green"
-                                variant="outline"
-                                onClick={() => handleDownload(docId, doc.name)}
-                              >
-                                Download
-                              </Button>
-                            </Td>
-                          </Tr>
-                        );
-                      }).filter(Boolean) // Filter out any null entries
-                    )}
-                  </Tbody>
-                </Table>
-              </Box>
-            ) : !isLoading ? (
-              <Box
-                p={10}
-                textAlign="center"
-                bg={noDocsBg}
-                borderRadius="md"
-              >
-                <Text fontSize="lg" mb={4}>
-                  No documents found
-                </Text>
-                <Button
-                  as={RouterLink}
-                  to="/documents/upload"
-                  colorScheme="blue"
-                  leftIcon={<FiUpload />}
-                >
-                  Upload Your First Document
-                </Button>
-              </Box>
-            ) : null}
-          </Box>
-
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-            <Box
-              p={5}
-              shadow="md"
-              borderWidth="1px"
-              borderRadius="md"
-              bg={boxBg}
-            >
-              <Heading as="h3" size="md" mb={4}>
-                Quick Actions
-              </Heading>
-              <Stack spacing={3}>
-                <Button 
-                  as={RouterLink}
-                  to="/documents/upload"
-                  colorScheme="blue" 
-                  leftIcon={<FiUpload />}
-                  size="md"
-                  justifyContent="flex-start"
-                >
-                  Upload New Document
-                </Button>
+          {/* Recent Documents */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Recent Documents
+                </h2>
                 <Button
                   as={RouterLink}
                   to="/documents"
-                  colorScheme="teal"
-                  leftIcon={<FiUsers />}
-                  size="md"
-                  justifyContent="flex-start"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<DocumentIcon className="h-4 w-4" />}
                 >
-                  View Documents
+                  View All
                 </Button>
-                <Button
-                  as={RouterLink}
-                  to="/profile"
-                  colorScheme="purple"
-                  size="md"
-                  justifyContent="flex-start"
-                >
-                  Edit Profile Settings
-                </Button>
-              </Stack>
-            </Box>
-            
-            <Box
-              p={5}
-              shadow="md"
-              borderWidth="1px"
-              borderRadius="md"
-              bg={boxBg}
-            >
-              <Heading as="h3" size="md" mb={4}>
-                Storage Usage
-              </Heading>
-              {isLoading ? (
-                <Skeleton height="100px" />
-              ) : (
-                <Box>
-                  <Text mb={2}>
-                    You are currently using{" "}
-                    <Text as="span" fontWeight="bold">
-                      {calculateStorageUsage(documents)}
-                    </Text>{" "}
-                    of your available storage.
-                  </Text>
-                  <Box
-                    w="100%"
-                    bg={storageBarBg}
-                    borderRadius="full"
-                    h="20px"
-                    overflow="hidden"
+              </div>
+            </CardHeader>
+            <CardContent>
+              {documents.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400 text-sm">
+                          Document Name
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400 text-sm">
+                          Type
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400 text-sm">
+                          Created
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400 text-sm">
+                          Size
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400 text-sm">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoading ? (
+                        [...Array(5)].map((_, i) => (
+                          <tr key={i} className="border-b border-gray-100 dark:border-gray-800">
+                            <td className="py-4 px-4">
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        documents.map((doc) => {
+                          const docId = doc._id || doc.id;
+                          if (!docId) return null;
+                          
+                          return (
+                            <tr key={docId} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                              <td className="py-4 px-4">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {doc.name || 'Unnamed Document'}
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-gray-500 dark:text-gray-400">
+                                {doc.type || 'Unknown'}
+                              </td>
+                              <td className="py-4 px-4 text-gray-500 dark:text-gray-400">
+                                {new Date(doc.uploadDate || doc.createdAt || Date.now()).toLocaleDateString()}
+                              </td>
+                              <td className="py-4 px-4 text-gray-500 dark:text-gray-400">
+                                {formatFileSize(doc.size)}
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex space-x-2">
+                                  <Button
+                                    as={RouterLink}
+                                    to={`/documents/preview/${docId}`}
+                                    size="sm"
+                                    variant="outline"
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDownload(docId, doc.name)}
+                                  >
+                                    Download
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }).filter(Boolean)
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : !isLoading ? (
+                <div className="text-center py-12">
+                  <DocumentIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    No documents found
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">
+                    Get started by uploading your first document
+                  </p>
+                  <Button
+                    as={RouterLink}
+                    to="/documents/upload"
+                    leftIcon={<ArrowUpTrayIcon className="h-4 w-4" />}
                   >
-                    <Box
-                      w={calculateStoragePercentage(documents) + "%"}
-                      bg="blue.400"
-                      h="100%"
-                      transition="width 0.5s"
-                    />
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          </SimpleGrid>
-        </Stack>
-      </Box>
-    </Container>
+                    Upload Your First Document
+                  </Button>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          {/* Bottom Grid - Quick Actions & Storage */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Quick Actions
+                </h3>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Button 
+                    as={RouterLink}
+                    to="/documents/upload"
+                    className="w-full justify-start"
+                    leftIcon={<ArrowUpTrayIcon className="h-4 w-4" />}
+                  >
+                    Upload New Document
+                  </Button>
+                  <Button
+                    as={RouterLink}
+                    to="/documents"
+                    variant="outline"
+                    className="w-full justify-start"
+                    leftIcon={<DocumentIcon className="h-4 w-4" />}
+                  >
+                    View All Documents
+                  </Button>
+                  <Button
+                    as={RouterLink}
+                    to="/profile"
+                    variant="outline"
+                    className="w-full justify-start"
+                    leftIcon={<UsersIcon className="h-4 w-4" />}
+                  >
+                    Edit Profile Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Storage Usage */}
+            <Card>
+              <CardHeader>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Storage Usage
+                </h3>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      You are currently using{" "}
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {calculateStorageUsage(documents)}
+                      </span>{" "}
+                      of your available storage.
+                    </p>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-primary-500 h-3 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${calculateStoragePercentage(documents)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {calculateStoragePercentage(documents).toFixed(1)}% of 1GB used
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -494,11 +439,10 @@ const calculateStorageUsage = (documents) => {
 };
 
 const calculateStoragePercentage = (documents) => {
-  // Assuming a limit of 1GB for this example
   const limit = 1 * 1024 * 1024 * 1024; // 1GB in bytes
   const used = documents.reduce((acc, doc) => acc + (doc.size || 0), 0);
   const percentage = (used / limit) * 100;
-  return Math.min(percentage, 100); // Cap at 100%
+  return Math.min(percentage, 100);
 };
 
 export default Dashboard;

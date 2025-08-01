@@ -1,8 +1,7 @@
 // src/components/ProtectedRoute.js
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import {Spinner, Center } from '@chakra-ui/react';
+import { useAuth } from '../hooks/useAuth';
 
 /**
  * A wrapper component that protects routes requiring authentication
@@ -15,15 +14,10 @@ const ProtectedRoute = ({ children }) => {
   // Show loading spinner while authentication state is being determined
   if (loading) {
     return (
-      <Center h="100vh">
-        <Spinner 
-          thickness="4px"
-          speed="0.65s"
-          emptyColor="gray.200"
-          color="blue.500"
-          size="xl"
-        />
-      </Center>
+    <div className="flex items-center justify-center h-20">
+  <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+</div>
+
     );
   }
 

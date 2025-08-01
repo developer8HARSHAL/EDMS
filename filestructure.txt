@@ -2,7 +2,6 @@
     |-- .env
     |-- .env.local
     |-- .env.production
-    |-- api_test.js
     |-- config
         |-- db.js
     |-- controllers
@@ -19,7 +18,6 @@
         |-- documentRoutes.js
         |-- userRoutes.js
     |-- server.js
-    |-- test_dependencies.json
     |-- uploads
         |-- .gitkeep
         |-- 2687872e-c172-4166-9076-a84e895d584d.txt
@@ -58,32 +56,46 @@
         |-- components
             |-- ApplicationRoutes.js
             |-- AuthStatus.js
+            |-- ErrorBoundary.jsx
             |-- Navbar.js
             |-- NotFound.js
             |-- ProtectedRoute.js
             |-- ui
-                |-- color-mode.jsx
+                |-- Alert.jsx
+                |-- Button.jsx
+                |-- Card.jsx
+                |-- Dropdown.jsx
+                |-- Input.jsx
+                |-- ThemeToggle.jsx
             |-- WithAuth.js
         |-- context
-            |-- AuthContext.js
+            |-- ThemeContext.jsx
+        |-- hooks
+            |-- redux.js
+            |-- useAuth.js
+            |-- useDocuments.js
         |-- index.css
         |-- index.js
-        |-- logo.svg
         |-- pages
-            |-- AuthDebugger.js
             |-- Dashboard.js
             |-- DocumentList.js
             |-- DocumentPreview.js
             |-- Login.js
             |-- Profile.js
             |-- Register.js
+            |-- StatCard.js
             |-- UploadDocument.js
         |-- reportWebVitals.js
         |-- services
             |-- apiService.js
         |-- setupTests.js
+        |-- store
+            |-- index.js
+            |-- slices
+                |-- authSlice.js
+                |-- documentsSlice.js
+                |-- uiSlice.js
         |-- utils
             |-- .gitkeep
             |-- AuthUtils.js
     |-- tailwind.config.js
-    |-- theme.js

@@ -1,7 +1,7 @@
-// src/components/ApplicationRoutes.js
+// src/components/ApplicationRoutes.js - FIXED VERSION
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 // Import pages
 import Login from '../pages/Login';
@@ -11,21 +11,32 @@ import DocumentList from '../pages/DocumentList';
 import UploadDocument from '../pages/UploadDocument';
 import DocumentPreview from '../pages/DocumentPreview';
 import Profile from '../pages/Profile';
-import NotFound from '../components/NotFound';
-import WithAuth from './WithAuth';
-import ProtectedRoute from './ProtectedRoute'; // Added this import
+import NotFound from './NotFound'; // FIXED: Removed '../components/' prefix
+import ProtectedRoute from './ProtectedRoute';
 
 const ApplicationRoutes = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, tokenValidated, loading } = useAuth();
+
+  // Show loading while token validation is in progress
+  if (!tokenValidated || loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Public routes - only show if user is NOT authenticated */}
       <Route 
         path="/login" 
         element={
           isAuthenticated ? (
-            <Navigate to="/" replace />
+            <Navigate to="/dashboard" replace />
           ) : (
             <Login />
           )
@@ -36,20 +47,62 @@ const ApplicationRoutes = () => {
         path="/register" 
         element={
           isAuthenticated ? (
-            <Navigate to="/" replace />
+            <Navigate to="/dashboard" replace />
           ) : (
             <Register />
           )
         } 
       />
 
-      {/* Protected routes */}
-      <Route path="/" element={<WithAuth component={Dashboard} />} />
-      <Route path="/documents" element={<WithAuth component={DocumentList} />} />
-      <Route path="/documents/upload" element={<WithAuth component={UploadDocument} />} />
-      <Route path="/profile" element={<WithAuth component={Profile} />} />
+      {/* Root route redirect */}
+      <Route 
+        path="/" 
+        element={
+          isAuthenticated ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+
+      {/* Protected routes - using ProtectedRoute wrapper */}
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
       
-      {/* Fixed route - using ProtectedRoute correctly */}
+      <Route 
+        path="/documents" 
+        element={
+          <ProtectedRoute>
+            <DocumentList />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/documents/upload" 
+        element={
+          <ProtectedRoute>
+            <UploadDocument />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        } 
+      />
+      
       <Route 
         path="/documents/preview/:documentId" 
         element={

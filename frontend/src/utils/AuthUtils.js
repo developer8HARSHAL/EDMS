@@ -1,7 +1,7 @@
 // src/utils/AuthUtils.js
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 /**
  * Custom hook to require authentication and redirect to login if not authenticated
