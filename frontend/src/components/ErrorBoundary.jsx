@@ -12,9 +12,9 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Log error to monitoring service
-    console.error('App Error:', error, errorInfo);
-  }
+  console.error('App Error:', error);
+  console.log('Component stack trace:', errorInfo.componentStack);
+}
 
   render() {
     if (this.state.hasError) {

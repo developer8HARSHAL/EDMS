@@ -8,26 +8,40 @@ const {
   updateDocument,
   deleteDocument,
   shareDocument,
-  previewDocument
+  previewDocument,
+  getWorkspaceDocuments,
+  getDocumentStats,
+  moveDocument,
+  duplicateDocument,
+  getDocumentVersions,
+  bulkDeleteDocuments,
+  exportDocuments
 } = require('../controllers/documentController');
 
 // Base route: /api/documents
 
-// Upload document
+// General document routes (all user's documents across workspaces)
+router.get('/', protect, getDocuments);
 router.post('/', protect, uploadDocument);
 
-// Get all documents (that user has access to)
-router.get('/', protect, getDocuments);
+// Workspace-specific document routes
+router.get('/workspace/:workspaceId', protect, getWorkspaceDocuments);
+router.get('/workspace/:workspaceId/stats', protect, getDocumentStats);
+router.post('/workspace/:workspaceId/bulk-delete', protect, bulkDeleteDocuments);
+router.get('/workspace/:workspaceId/export', protect, exportDocuments);
 
-// Get, update, delete single document
+// Individual document operations
 router.get('/:id', protect, getDocument);
 router.put('/:id', protect, updateDocument);
 router.delete('/:id', protect, deleteDocument);
 
-// Preview document
+// Document preview and sharing
 router.get('/:id/preview', protect, previewDocument);
-
-// Share document with another user
 router.post('/:id/share', protect, shareDocument);
+
+// Advanced document operations
+router.post('/:id/move', protect, moveDocument);          // Move document to different workspace
+router.post('/:id/duplicate', protect, duplicateDocument); // Duplicate document
+router.get('/:id/versions', protect, getDocumentVersions); // Get document version history
 
 module.exports = router;

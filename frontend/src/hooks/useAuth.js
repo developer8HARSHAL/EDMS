@@ -1,5 +1,5 @@
-// src/hooks/useAuth.js - Custom Authentication Hook (Cleaned)
-import { useEffect } from 'react';
+// src/hooks/useAuth.js - Custom Authentication Hook (Fixed)
+import { useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -15,44 +15,128 @@ import {
   selectIsAuthenticated,
   selectAuthLoading,
   selectAuthError,
-  selectTokenValidated
+  selectTokenValidated,
+  selectAuthInitialized,
+  selectAuthReady
 } from '../store/slices/authSlice';
 
 /**
  * Custom hook for authentication functionality
- * Provides all auth-related state and actions
+ * Provides all auth-related state and actions with proper error handling
  */
 export const useAuth = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Selectors
-  const auth = useSelector(selectAuth);
-  const user = useSelector(selectUser);
-  const isAuthenticated = useSelector(selectIsAuthenticated);
-  const loading = useSelector(selectAuthLoading);
-  const error = useSelector(selectAuthError);
-  const tokenValidated = useSelector(selectTokenValidated);
+  // Safe selectors with comprehensive error handling
+  const authState = useSelector((state) => {
+    try {
+      return selectAuth(state);
+    } catch (error) {
+      console.warn('Auth state selector error:', error);
+      return {
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        loading: false,
+        error: null,
+        tokenValidated: false
+      };
+    }
+  });
 
-  // Initialize token validation on mount
+  const user = useSelector((state) => {
+    try {
+      return selectUser(state);
+    } catch (error) {
+      console.warn('User selector error:', error);
+      return null;
+    }
+  });
+
+  const isAuthenticated = useSelector((state) => {
+    try {
+      return selectIsAuthenticated(state);
+    } catch (error) {
+      console.warn('IsAuthenticated selector error:', error);
+      return false;
+    }
+  });
+
+  const loading = useSelector((state) => {
+    try {
+      return selectAuthLoading(state);
+    } catch (error) {
+      console.warn('Loading selector error:', error);
+      return false;
+    }
+  });
+
+  const error = useSelector((state) => {
+    try {
+      return selectAuthError(state);
+    } catch (error) {
+      console.warn('Error selector error:', error);
+      return null;
+    }
+  });
+
+  const tokenValidated = useSelector((state) => {
+    try {
+      return selectTokenValidated(state);
+    } catch (error) {
+      console.warn('TokenValidated selector error:', error);
+      return false;
+    }
+  });
+
+  const authInitialized = useSelector((state) => {
+    try {
+      return selectAuthInitialized(state);
+    } catch (error) {
+      console.warn('AuthInitialized selector error:', error);
+      return false;
+    }
+  });
+
+  const authReady = useSelector((state) => {
+    try {
+      return selectAuthReady(state);
+    } catch (error) {
+      console.warn('AuthReady selector error:', error);
+      return false;
+    }
+  });
+
+  // Memoized dispatch check to prevent unnecessary calls
+  const isDispatchReady = useMemo(() => {
+    return typeof dispatch === 'function' && authInitialized;
+  }, [dispatch, authInitialized]);
+
+  // Initialize token validation on mount (only once when dispatch is ready)
   useEffect(() => {
-    if (!tokenValidated) {
+    if (isDispatchReady && !tokenValidated) {
       dispatch(validateToken());
     }
-  }, [dispatch, tokenValidated]);
+  }, [isDispatchReady, tokenValidated]); // Stable dependencies
 
   // Handle authentication errors with toast notifications
   useEffect(() => {
     if (error) {
-      toast.error('Authentication error', {
+      toast.error(error, {
         duration: 5000,
       });
     }
   }, [error]);
 
-  // Login function with navigation
-  const handleLogin = async (email, password) => {
+  // Memoized action handlers to prevent re-renders
+  const handleLogin = useCallback(async (email, password) => {
+    if (!isDispatchReady) {
+      console.warn('Dispatch not ready for login');
+      return false;
+    }
+
     try {
       const result = await dispatch(loginUser({ email, password }));
       
@@ -72,10 +156,14 @@ export const useAuth = () => {
       console.error('Login error:', error);
       return false;
     }
-  };
+  }, [isDispatchReady, dispatch, navigate, location.state?.from]);
 
-  // Register function
-  const handleRegister = async (name, email, password) => {
+  const handleRegister = useCallback(async (name, email, password) => {
+    if (!isDispatchReady) {
+      console.warn('Dispatch not ready for register');
+      return false;
+    }
+
     try {
       const result = await dispatch(registerUser({ name, email, password }));
       
@@ -91,10 +179,14 @@ export const useAuth = () => {
       console.error('Registration error:', error);
       return false;
     }
-  };
+  }, [isDispatchReady, dispatch]);
 
-  // Update profile function
-  const handleUpdateProfile = async (profileData) => {
+  const handleUpdateProfile = useCallback(async (profileData) => {
+    if (!isDispatchReady) {
+      console.warn('Dispatch not ready for profile update');
+      return false;
+    }
+
     try {
       const result = await dispatch(updateUserProfile(profileData));
       
@@ -110,34 +202,37 @@ export const useAuth = () => {
       console.error('Profile update error:', error);
       return false;
     }
-  };
+  }, [isDispatchReady, dispatch]);
 
-  // Logout function with navigation
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
+    if (!isDispatchReady) {
+      console.warn('Dispatch not ready for logout');
+      return;
+    }
+
     dispatch(logout());
     toast.success('Successfully logged out', {
       duration: 5000,
     });
     navigate('/login', { replace: true });
-  };
+  }, [isDispatchReady, dispatch, navigate]);
 
-  // Clear error function
-  const handleClearError = () => {
-    dispatch(clearError());
-  };
+  const handleClearError = useCallback(() => {
+    if (isDispatchReady) {
+      dispatch(clearError());
+    }
+  }, [isDispatchReady, dispatch]);
 
-  // Check if user has specific role
-  const hasRole = (role) => {
+  // Utility functions with safe user checks
+  const hasRole = useCallback((role) => {
     return user?.role === role;
-  };
+  }, [user?.role]);
 
-  // Check if user has any of the specified roles
-  const hasAnyRole = (roles) => {
-    return roles.includes(user?.role);
-  };
+  const hasAnyRole = useCallback((roles) => {
+    return Array.isArray(roles) && user?.role && roles.includes(user.role);
+  }, [user?.role]);
 
-  // Check if user can access resource (basic permission check)
-  const canAccess = (resource, action = 'read') => {
+  const canAccess = useCallback((resource, action = 'read') => {
     if (!user) return false;
     
     // Admin can access everything
@@ -154,16 +249,19 @@ export const useAuth = () => {
       default:
         return false;
     }
-  };
+  }, [user]);
 
-  return {
+  // Memoized return object to prevent unnecessary re-renders
+  return useMemo(() => ({
     // State
     user,
     isAuthenticated,
     loading,
     error,
     tokenValidated,
-    auth,
+    authReady,
+    authInitialized,
+    auth: authState,
 
     // Actions
     login: handleLogin,
@@ -179,7 +277,24 @@ export const useAuth = () => {
 
     // For backward compatibility
     isLoading: loading,
-  };
+  }), [
+    user,
+    isAuthenticated,
+    loading,
+    error,
+    tokenValidated,
+    authReady,
+    authInitialized,
+    authState,
+    handleLogin,
+    handleRegister,
+    handleUpdateProfile,
+    handleLogout,
+    handleClearError,
+    hasRole,
+    hasAnyRole,
+    canAccess
+  ]);
 };
 
 /**
@@ -187,21 +302,21 @@ export const useAuth = () => {
  * Redirects to login if not authenticated
  */
 export const useRequireAuth = (redirectPath = '/login') => {
-  const { isAuthenticated, loading, tokenValidated } = useAuth();
+  const { isAuthenticated, loading, tokenValidated, authReady } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     // Only redirect when we're sure the user isn't authenticated (not during loading)
-    if (tokenValidated && !loading && !isAuthenticated) {
+    if (authReady && tokenValidated && !loading && !isAuthenticated) {
       navigate(redirectPath, { 
         state: { from: location.pathname },
         replace: true
       });
     }
-  }, [isAuthenticated, loading, tokenValidated, navigate, redirectPath, location.pathname]);
+  }, [isAuthenticated, loading, tokenValidated, authReady, navigate, redirectPath, location.pathname]);
 
-  return { isAuthenticated, loading, tokenValidated };
+  return { isAuthenticated, loading, tokenValidated, authReady };
 };
 
 /**
@@ -209,16 +324,16 @@ export const useRequireAuth = (redirectPath = '/login') => {
  * Redirects to dashboard if already authenticated
  */
 export const useGuestOnly = (redirectPath = '/dashboard') => {
-  const { isAuthenticated, loading, tokenValidated } = useAuth();
+  const { isAuthenticated, loading, tokenValidated, authReady } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (tokenValidated && !loading && isAuthenticated) {
+    if (authReady && tokenValidated && !loading && isAuthenticated) {
       navigate(redirectPath, { replace: true });
     }
-  }, [isAuthenticated, loading, tokenValidated, navigate, redirectPath]);
+  }, [isAuthenticated, loading, tokenValidated, authReady, navigate, redirectPath]);
 
-  return { isAuthenticated, loading, tokenValidated };
+  return { isAuthenticated, loading, tokenValidated, authReady };
 };
 
 export default useAuth;

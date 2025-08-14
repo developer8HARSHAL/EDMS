@@ -1,81 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchDocument } from '../store/slices/documentsSlice';
+import { fetchWorkspace } from '../store/slices/workspaceSlice';
 import apiService from '../services/apiService';
+import  PermissionGuard  from '../components/permissions/PermissionGuard';
+import Badge from '../components/ui/Badge';
+import  Avatar  from '../components/ui/Avatar';
 
 const DocumentPreview = () => {
-  const { documentId } = useParams();
+  const { documentId, workspaceId } = useParams();
   const navigate = useNavigate();
-  // Removed 'user' since it's not being used
+  const location = useLocation();
+  const dispatch = useDispatch();
   const { isAuthenticated } = useAuth();
-  const [document, setDocument] = useState(null);
   const [previewContent, setPreviewContent] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState(null);
+  const [documentNotFound, setDocumentNotFound] = useState(false);
+
+  // Get document and workspace from Redux store
+  const document = useSelector(state => 
+    state.documents.documents.find(doc => doc._id === documentId)
+  );
+  const workspace = useSelector(state => 
+    workspaceId ? state.workspace.workspaces.find(w => w._id === workspaceId) : null
+  );
+  const documentLoading = useSelector(state => state.documents.loading);
+  const workspaceLoading = useSelector(state => state.workspace.loading);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/documents/preview/${documentId}` } });
+      navigate('/login', { state: { from: location.pathname } });
     }
-  }, [isAuthenticated, navigate, documentId]);
+  }, [isAuthenticated, navigate, location.pathname]);
 
+  // Fetch document and workspace data
   useEffect(() => {
-    const fetchDocumentDetails = async () => {
-      if (!documentId || !isAuthenticated) return;
-      
-      setLoading(true);
-      setError(null);
-      
+    if (!documentId || !isAuthenticated) return;
+    
+    const fetchData = async () => {
       try {
-        console.log('Fetching document with ID:', documentId);
-        
         // Fetch document details
-        const docResponse = await apiService.documentApi.getDocument(documentId);
-        console.log('Document response:', docResponse);
+        await dispatch(fetchDocument(documentId)).unwrap();
         
-        // Check if we have a valid response
-        if (!docResponse) {
-          throw new Error('No response received');
+        // Fetch workspace if in workspace context
+        if (workspaceId) {
+          await dispatch(fetchWorkspace(workspaceId)).unwrap();
         }
-        
-        // Handle different response formats
-        let docData;
-        if (docResponse.data) {
-          docData = docResponse.data;
-        } else if (docResponse.document) {
-          docData = docResponse.document;
-        } else if (typeof docResponse === 'object' && Object.keys(docResponse).length > 0) {
-          docData = docResponse;
-        } else {
-          throw new Error('Invalid document data format');
+      } catch (error) {
+        console.error('Error fetching document or workspace:', error);
+        if (error.status === 404) {
+          setDocumentNotFound(true);
         }
-        
-        console.log('Parsed document data:', docData);
-        setDocument(docData);
-        
-        // Fetch document preview
-        console.log('Fetching document preview for ID:', documentId);
-        try {
-          const previewResponse = await apiService.documentApi.previewDocument(documentId);
-          console.log('Preview response type:', previewResponse.constructor.name);
-          setPreviewContent(previewResponse);
-        } catch (previewErr) {
-          console.error('Preview fetch error:', previewErr);
-          // If preview fails, try to get the document content directly
-          console.log('Falling back to downloading the document instead');
-          const downloadResponse = await apiService.documentApi.downloadDocument(documentId);
-          setPreviewContent(downloadResponse.data || downloadResponse);
-        }
-      } catch (err) {
-        console.error('Error fetching document for preview:', err);
-        setError(err.message || 'Failed to load document preview');
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchDocumentDetails();
-  }, [documentId, isAuthenticated]);
+    fetchData();
+  }, [documentId, workspaceId, isAuthenticated, dispatch]);
+
+  // Fetch document preview
+  useEffect(() => {
+    const fetchDocumentPreview = async () => {
+      if (!documentId || !isAuthenticated || !document) return;
+      
+      setPreviewLoading(true);
+      setPreviewError(null);
+      
+      try {
+        console.log('Fetching document preview for ID:', documentId);
+        const previewResponse = await apiService.documentApi.previewDocument(documentId);
+        console.log('Preview response type:', previewResponse.constructor.name);
+        setPreviewContent(previewResponse);
+      } catch (previewErr) {
+        console.error('Preview fetch error:', previewErr);
+        // If preview fails, try to get the document content directly
+        try {
+          console.log('Falling back to downloading the document instead');
+          const downloadResponse = await apiService.documentApi.downloadDocument(documentId);
+          setPreviewContent(downloadResponse.data || downloadResponse);
+        } catch (downloadErr) {
+          console.error('Download fallback failed:', downloadErr);
+          setPreviewError('Failed to load document preview');
+        }
+      } finally {
+        setPreviewLoading(false);
+      }
+    };
+
+    if (document) {
+      fetchDocumentPreview();
+    }
+  }, [documentId, isAuthenticated, document]);
 
   // Function to render different types of previews based on document type
   const renderPreview = () => {
@@ -92,8 +109,8 @@ const DocumentPreview = () => {
         : new TextDecoder().decode(previewContent);
         
       return (
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-auto h-[600px] font-mono text-sm">
-          <pre>{textContent}</pre>
+        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 overflow-auto h-[600px] font-mono text-sm">
+          <pre className="whitespace-pre-wrap">{textContent}</pre>
         </div>
       );
     }
@@ -129,7 +146,7 @@ const DocumentPreview = () => {
       );
       
       return (
-        <div className="flex justify-center p-4 bg-gray-50 rounded-lg">
+        <div className="flex justify-center p-6 bg-gray-50 rounded-lg">
           <img 
             src={imageUrl} 
             alt={document.name} 
@@ -146,7 +163,7 @@ const DocumentPreview = () => {
     
     // For unsupported file types
     return (
-      <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="text-center py-12 px-6 bg-gray-50 rounded-lg border border-gray-200">
         <i className="fas fa-file-alt text-5xl text-gray-400 mb-4"></i>
         <h3 className="text-xl font-medium text-gray-700 mb-2">Preview not available</h3>
         <p className="text-gray-500 mb-4">
@@ -154,7 +171,7 @@ const DocumentPreview = () => {
         </p>
         <button
           onClick={() => handleDownloadInstead()}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
         >
           <i className="fas fa-download mr-2"></i> 
           Download Instead
@@ -187,7 +204,38 @@ const DocumentPreview = () => {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error downloading document:', err);
-      setError('Failed to download document');
+      setPreviewError('Failed to download document');
+    }
+  };
+
+  const handleBackNavigation = () => {
+    if (workspaceId && workspace) {
+      navigate(`/workspaces/${workspaceId}/documents`);
+    } else {
+      navigate('/documents');
+    }
+  };
+
+  const handleEditDocument = () => {
+    if (workspaceId) {
+      navigate(`/workspaces/${workspaceId}/documents/${documentId}/edit`);
+    } else {
+      navigate(`/documents/${documentId}/edit`);
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!window.confirm(`Are you sure you want to delete "${document.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await apiService.documentApi.deleteDocument(documentId);
+      alert('Document deleted successfully');
+      handleBackNavigation();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('Failed to delete document. Please try again.');
     }
   };
 
@@ -201,87 +249,310 @@ const DocumentPreview = () => {
     );
   }
 
-  return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center">
+  // Show document not found error
+  if (documentNotFound) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-file-times text-6xl text-gray-400 mb-6"></i>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Document Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            The document you're looking for doesn't exist or you don't have permission to view it.
+          </p>
           <button
-            onClick={() => navigate('/documents')}
-            className="mr-4 text-gray-600 hover:text-gray-800 transition-colors"
+            onClick={handleBackNavigation}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <i className="fas fa-arrow-left mr-2"></i>
             Back to Documents
           </button>
-          
-          {document && (
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center">
-              <i className={getFileTypeIcon(document.type) + " mr-3"}></i>
-              {document.name}
-            </h1>
-          )}
         </div>
-        
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
-              <p className="ml-3 text-gray-600">Loading document preview...</p>
-            </div>
-          ) : error ? (
-            <div className="p-6 text-center">
-              <div className="mx-auto mb-4 text-red-500">
-                <i className="fas fa-exclamation-circle text-4xl"></i>
-              </div>
-              <h3 className="text-xl font-medium text-gray-700 mb-2">Preview Error</h3>
-              <p className="text-gray-500 mb-4">{error}</p>
+      </div>
+    );
+  }
+
+  // Permission check for workspace documents
+  if (workspaceId && workspace && document) {
+    return (
+      <PermissionGuard 
+        workspaceId={workspaceId} 
+        requiredPermissions={['read']}
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <i className="fas fa-lock text-4xl text-gray-400 mb-4"></i>
+              <h3 className="text-xl font-medium text-gray-700 mb-2">Access Denied</h3>
+              <p className="text-gray-500 mb-4">You don't have permission to view documents in this workspace.</p>
               <button
-                onClick={() => navigate('/documents')}
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-colors"
+                onClick={() => navigate(`/workspaces/${workspaceId}`)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
-                Return to Document List
+                Back to Workspace
               </button>
             </div>
-          ) : (
-            <>
-              <div className="border-b border-gray-200 bg-gray-50 px-6 py-4 flex justify-between items-center">
-                <div className="flex items-center">
-                  {document && (
-                    <>
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 mr-2">
-                        {document.type || 'Unknown Type'}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {formatFileSize(document.size)}
-                      </span>
-                    </>
-                  )}
+          </div>
+        }
+      >
+        <DocumentPreviewContent />
+      </PermissionGuard>
+    );
+  }
+
+  function DocumentPreviewContent() {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
+          {/* Breadcrumb Navigation */}
+          <div className="mb-6">
+            <div className="flex items-center text-sm text-gray-500 mb-4">
+              <button
+                onClick={handleBackNavigation}
+                className="hover:text-blue-600 transition-colors"
+              >
+                {workspaceId ? 'Workspace' : 'Documents'}
+              </button>
+              
+              {workspaceId && workspace && (
+                <>
+                  <i className="fas fa-chevron-right mx-2"></i>
+                  <button
+                    onClick={() => navigate(`/workspaces/${workspaceId}`)}
+                    className="hover:text-blue-600 transition-colors font-medium"
+                  >
+                    {workspace.name}
+                  </button>
+                  <i className="fas fa-chevron-right mx-2"></i>
+                  <button
+                    onClick={() => navigate(`/workspaces/${workspaceId}/documents`)}
+                    className="hover:text-blue-600 transition-colors"
+                  >
+                    Documents
+                  </button>
+                </>
+              )}
+              
+              <i className="fas fa-chevron-right mx-2"></i>
+              <span className="text-gray-700 font-medium">
+                {document?.name || 'Loading...'}
+              </span>
+            </div>
+          </div>
+
+          {/* Document Header */}
+          {document && (
+            <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-3">
+                      <i className={`${getFileTypeIcon(document.type)} text-2xl mr-3`}></i>
+                      <h1 className="text-2xl font-bold text-gray-800">{document.name}</h1>
+                    </div>
+                    
+                    {document.description && (
+                      <p className="text-gray-600 mb-4">{document.description}</p>
+                    )}
+                    
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <i className="fas fa-file mr-1"></i>
+                        <span>{formatFileSize(document.size)}</span>
+                      </div>
+                      
+                      <div className="flex items-center">
+                        <i className="fas fa-calendar mr-1"></i>
+                        <span>Uploaded {new Date(document.uploadDate || document.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      
+                      {document.uploadedBy && (
+                        <div className="flex items-center">
+                          <Avatar
+                            user={document.uploadedBy}
+                            size="xs"
+                            className="mr-2"
+                          />
+                          <span>by {document.uploadedBy.name || document.uploadedBy.email}</span>
+                        </div>
+                      )}
+                      
+                      {document.lastModified && document.lastModified !== document.createdAt && (
+                        <div className="flex items-center">
+                          <i className="fas fa-edit mr-1"></i>
+                          <span>Modified {new Date(document.lastModified).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 ml-6">
+                    {/* Workspace Badge */}
+                    {workspaceId && workspace && (
+                      <Badge variant="primary" className="mb-2">
+                        <i className="fas fa-users mr-1"></i>
+                        {workspace.name}
+                      </Badge>
+                    )}
+                    
+                    {/* Category Badge */}
+                    {document.category && (
+                      <Badge variant="secondary">
+                        {document.category}
+                      </Badge>
+                    )}
+                    
+                    {/* Public Badge */}
+                    {document.isPublic && (
+                      <Badge variant="success">
+                        <i className="fas fa-globe mr-1"></i>
+                        Public
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
-                <div className="flex space-x-3">
-                  {document && (
-                    <button
-                      onClick={handleDownloadInstead}
-                      className="text-blue-600 hover:text-blue-800 transition-colors flex items-center text-sm"
-                      title="Download"
-                    >
-                      <i className="fas fa-download mr-1"></i> Download
-                    </button>
-                  )}
-                </div>
+                {/* Tags */}
+                {document.tags && document.tags.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <i className="fas fa-tags text-gray-400 mr-2"></i>
+                      {document.tags.map((tag, index) => (
+                        <Badge key={index} variant="outline" size="sm">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
+              {/* Action Bar */}
+              <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={handleBackNavigation}
+                      className="text-gray-600 hover:text-gray-800 transition-colors flex items-center text-sm"
+                    >
+                      <i className="fas fa-arrow-left mr-2"></i>
+                      Back
+                    </button>
+                    
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    
+                    <span className="text-sm text-gray-500 flex items-center">
+                      <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                      {document.type || 'Unknown Type'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleDownloadInstead}
+                      className="text-blue-600 hover:text-blue-800 transition-colors flex items-center text-sm font-medium"
+                      title="Download"
+                    >
+                      <i className="fas fa-download mr-2"></i>
+                      Download
+                    </button>
+                    
+                    {/* Edit and Delete buttons with permission checks */}
+                    <PermissionGuard
+                      workspaceId={workspaceId}
+                      requiredPermissions={['write']}
+                      fallback={null}
+                    >
+                      <button
+                        onClick={handleEditDocument}
+                        className="text-green-600 hover:text-green-800 transition-colors flex items-center text-sm font-medium"
+                        title="Edit"
+                      >
+                        <i className="fas fa-edit mr-2"></i>
+                        Edit
+                      </button>
+                    </PermissionGuard>
+                    
+                    <PermissionGuard
+                      workspaceId={workspaceId}
+                      requiredPermissions={['delete']}
+                      fallback={null}
+                    >
+                      <button
+                        onClick={handleDeleteDocument}
+                        className="text-red-600 hover:text-red-800 transition-colors flex items-center text-sm font-medium"
+                        title="Delete"
+                      >
+                        <i className="fas fa-trash mr-2"></i>
+                        Delete
+                      </button>
+                    </PermissionGuard>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Document Preview */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            {documentLoading || workspaceLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+                <p className="ml-3 text-gray-600">Loading document...</p>
+              </div>
+            ) : previewLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+                <p className="ml-3 text-gray-600">Loading preview...</p>
+              </div>
+            ) : previewError ? (
+              <div className="p-8 text-center">
+                <div className="mx-auto mb-4 text-red-500">
+                  <i className="fas fa-exclamation-circle text-4xl"></i>
+                </div>
+                <h3 className="text-xl font-medium text-gray-700 mb-2">Preview Error</h3>
+                <p className="text-gray-500 mb-6">{previewError}</p>
+                <div className="flex justify-center space-x-4">
+                  <button
+                    onClick={handleDownloadInstead}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <i className="fas fa-download mr-2"></i>
+                    Download Instead
+                  </button>
+                  <button
+                    onClick={handleBackNavigation}
+                    className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Return to Documents
+                  </button>
+                </div>
+              </div>
+            ) : document ? (
               <div className="p-6">
                 {renderPreview()}
               </div>
-            </>
-          )}
+            ) : (
+              <div className="p-8 text-center">
+                <i className="fas fa-file-times text-4xl text-gray-400 mb-4"></i>
+                <h3 className="text-xl font-medium text-gray-700 mb-2">Document Not Found</h3>
+                <p className="text-gray-500 mb-4">The document could not be loaded.</p>
+                <button
+                  onClick={handleBackNavigation}
+                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-colors"
+                >
+                  Return to Documents
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <DocumentPreviewContent />;
 };
 
-// Helper function to get file type icon (copied from DocumentList for consistency)
+// Helper function to get file type icon
 const getFileTypeIcon = (type) => {
   if (!type) return 'far fa-file text-gray-400';
   
@@ -300,7 +571,7 @@ const getFileTypeIcon = (type) => {
   return 'far fa-file text-gray-400';
 };
 
-// Helper function to format file size (copied from DocumentList for consistency)
+// Helper function to format file size
 const formatFileSize = (size) => {
   if (!size) return '0 KB';
   

@@ -1,73 +1,213 @@
-// src/hooks/useDocuments.js - Custom Documents Hook
-import { useEffect, useCallback } from 'react';
+// src/hooks/useDocuments.js - Enhanced Custom Documents Hook with Workspace Integration
+import { useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useToast } from '@chakra-ui/react';
+import { toast } from 'react-hot-toast';
 import {
   fetchDocuments,
+  fetchWorkspaceDocuments,
+  fetchWorkspaceStats,
+  fetchRecentActivity,
+  fetchPopularDocuments,
+  fetchDocumentsByCategory,
+  fetchDocumentsByTag,
+  fetchFavoriteDocuments,
   fetchSharedDocuments,
   fetchDocument,
   uploadDocument,
   deleteDocument,
+  toggleFavorite,
+  moveDocument,
+  duplicateDocument,
+  bulkDeleteDocuments,
+  archiveDocument,
+  searchDocuments,
   previewDocument,
   downloadDocument,
   clearError,
   setCurrentDocument,
   clearCurrentDocument,
+  setCurrentWorkspace,
   updateFilters,
   resetFilters,
   updatePagination,
   selectDocuments,
+  selectCurrentWorkspaceId,
+  selectWorkspaceDocuments,
+  selectCurrentWorkspaceDocuments,
   selectSharedDocuments,
   selectCurrentDocument,
+  selectFavoriteDocuments,
+  selectRecentActivity,
+  selectPopularDocuments,
   selectDocumentsLoading,
   selectUploading,
   selectUploadProgress,
   selectDocumentsError,
   selectFilters,
   selectPagination,
-  selectFilteredDocuments
+  selectBulkOperationLoading,
+  selectWorkspaceStats,
+  selectDocumentsByCategory,
+  selectDocumentsByTag,
+  selectFilteredDocuments,
+  selectDocumentStatistics,
+  selectAvailableTags,
+  selectAvailableCategories
 } from '../store/slices/documentsSlice';
 
 /**
- * Custom hook for document management functionality
- * Provides all document-related state and actions
+ * Enhanced custom hook for document management functionality with workspace integration
+ * Provides all document-related state and actions with workspace context
  */
-export const useDocuments = () => {
+export const useDocuments = (workspaceId = null) => {
   const dispatch = useDispatch();
-  const toast = useToast();
+
+  // Set workspace context
+  useEffect(() => {
+    if (workspaceId) {
+      dispatch(setCurrentWorkspace(workspaceId));
+    }
+  }, [workspaceId, dispatch]);
 
   // Selectors
   const documents = useSelector(selectDocuments);
+  const currentWorkspaceId = useSelector(selectCurrentWorkspaceId);
+  const workspaceDocuments = useSelector(state => 
+    workspaceId ? selectWorkspaceDocuments(state, workspaceId) : selectCurrentWorkspaceDocuments(state)
+  );
   const sharedDocuments = useSelector(selectSharedDocuments);
   const currentDocument = useSelector(selectCurrentDocument);
+  const favorites = useSelector(selectFavoriteDocuments);
+  const recentActivity = useSelector(selectRecentActivity);
+  const popularDocuments = useSelector(selectPopularDocuments);
   const loading = useSelector(selectDocumentsLoading);
   const uploading = useSelector(selectUploading);
   const uploadProgress = useSelector(selectUploadProgress);
   const error = useSelector(selectDocumentsError);
   const filters = useSelector(selectFilters);
   const pagination = useSelector(selectPagination);
+  const bulkOperationLoading = useSelector(selectBulkOperationLoading);
+  const workspaceStats = useSelector(state => 
+    selectWorkspaceStats(state, workspaceId || currentWorkspaceId)
+  );
   const filteredDocuments = useSelector(selectFilteredDocuments);
+  const documentStatistics = useSelector(selectDocumentStatistics);
+  const availableTags = useSelector(selectAvailableTags);
+  const availableCategories = useSelector(selectAvailableCategories);
 
   // Handle document errors with toast notifications
   useEffect(() => {
     if (error) {
-      toast({
-        title: 'Document Error',
-        description: error,
-        status: 'error',
+      toast.error('Document Error',{
         duration: 5000,
-        isClosable: true,
-      });
+    });
     }
   }, [error, toast]);
 
-  // Fetch all documents
-  const handleFetchDocuments = useCallback(async () => {
+  // ===== DOCUMENT FETCHING =====
+
+  // Fetch all documents (user's documents across workspaces)
+  const handleFetchDocuments = useCallback(async (params = {}) => {
     try {
-      const result = await dispatch(fetchDocuments());
+      const result = await dispatch(fetchDocuments(params));
       return fetchDocuments.fulfilled.match(result);
     } catch (error) {
       console.error('Fetch documents error:', error);
+      return false;
+    }
+  }, [dispatch]);
+
+  // NEW: Fetch workspace documents
+  const handleFetchWorkspaceDocuments = useCallback(async (targetWorkspaceId, options = {}) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    if (!wsId) return false;
+
+    try {
+      const result = await dispatch(fetchWorkspaceDocuments({ workspaceId: wsId, options }));
+      return fetchWorkspaceDocuments.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch workspace documents error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
+
+  // NEW: Fetch workspace statistics
+  const handleFetchWorkspaceStats = useCallback(async (targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    if (!wsId) return false;
+
+    try {
+      const result = await dispatch(fetchWorkspaceStats(wsId));
+      return fetchWorkspaceStats.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch workspace stats error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
+
+  // NEW: Fetch recent activity
+  const handleFetchRecentActivity = useCallback(async (targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    if (!wsId) return false;
+
+    try {
+      const result = await dispatch(fetchRecentActivity(wsId));
+      return fetchRecentActivity.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch recent activity error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
+
+  // NEW: Fetch popular documents
+  const handleFetchPopularDocuments = useCallback(async (targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    if (!wsId) return false;
+
+    try {
+      const result = await dispatch(fetchPopularDocuments(wsId));
+      return fetchPopularDocuments.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch popular documents error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
+
+  // NEW: Fetch documents by category
+  const handleFetchDocumentsByCategory = useCallback(async (category, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    if (!wsId) return false;
+
+    try {
+      const result = await dispatch(fetchDocumentsByCategory({ workspaceId: wsId, category }));
+      return fetchDocumentsByCategory.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch documents by category error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
+
+  // NEW: Fetch documents by tag
+  const handleFetchDocumentsByTag = useCallback(async (tag, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    if (!wsId) return false;
+
+    try {
+      const result = await dispatch(fetchDocumentsByTag({ workspaceId: wsId, tag }));
+      return fetchDocumentsByTag.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch documents by tag error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
+
+  // NEW: Fetch favorite documents
+  const handleFetchFavoriteDocuments = useCallback(async () => {
+    try {
+      const result = await dispatch(fetchFavoriteDocuments());
+      return fetchFavoriteDocuments.fulfilled.match(result);
+    } catch (error) {
+      console.error('Fetch favorite documents error:', error);
       return false;
     }
   }, [dispatch]);
@@ -97,19 +237,19 @@ export const useDocuments = () => {
     }
   }, [dispatch]);
 
-  // Upload document
-  const handleUploadDocument = useCallback(async (formData) => {
+  // ===== DOCUMENT OPERATIONS =====
+
+  // Upload document (enhanced with workspace context)
+  const handleUploadDocument = useCallback(async (formData, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    
     try {
-      const result = await dispatch(uploadDocument(formData));
+      const result = await dispatch(uploadDocument({ formData, workspaceId: wsId }));
       
       if (uploadDocument.fulfilled.match(result)) {
-        toast({
-          title: 'Upload Successful',
-          description: 'Document has been uploaded successfully',
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
+        toast.success('upload successful', {
+        duration: 3000,
+      });
         return true;
       }
       return false;
@@ -117,17 +257,60 @@ export const useDocuments = () => {
       console.error('Upload document error:', error);
       return false;
     }
-  }, [dispatch, toast]);
+  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
 
   // Delete document with confirmation
-  const handleDeleteDocument = useCallback(async (documentId, documentName) => {
+  const handleDeleteDocument = useCallback(async (documentId, documentName, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    
     try {
-      const result = await dispatch(deleteDocument(documentId));
+      const result = await dispatch(deleteDocument({ documentId, workspaceId: wsId }));
       
       if (deleteDocument.fulfilled.match(result)) {
-        toast({
-          title: 'Document Deleted',
-          description: `${documentName || 'Document'} has been deleted successfully`,
+         toast.success('document deleted', {
+        duration: 3000,
+      });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Delete document error:', error);
+      return false;
+    }
+  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+
+  // NEW: Toggle favorite document
+  const handleToggleFavorite = useCallback(async (documentId, documentName) => {
+    try {
+      const result = await dispatch(toggleFavorite(documentId));
+      
+      if (toggleFavorite.fulfilled.match(result)) {
+        const isFavorite = result.payload.isFavorite;
+        toast.success({
+          title: isFavorite ? 'Added to Favorites' : 'Removed from Favorites',
+          description: `${documentName || 'Document'} has been ${isFavorite ? 'added to' : 'removed from'} favorites`,
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Toggle favorite error:', error);
+      return false;
+    }
+  }, [dispatch, toast]);
+
+  // NEW: Move document to different workspace
+  const handleMoveDocument = useCallback(async (documentId, fromWorkspaceId, toWorkspaceId, documentName) => {
+    try {
+      const result = await dispatch(moveDocument({ documentId, fromWorkspaceId, toWorkspaceId }));
+      
+      if (moveDocument.fulfilled.match(result)) {
+        toast.success({
+          title: 'Document Moved',
+          description: `${documentName || 'Document'} has been moved successfully`,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -136,10 +319,95 @@ export const useDocuments = () => {
       }
       return false;
     } catch (error) {
-      console.error('Delete document error:', error);
+      console.error('Move document error:', error);
       return false;
     }
   }, [dispatch, toast]);
+
+  // NEW: Duplicate document
+  const handleDuplicateDocument = useCallback(async (documentId, targetWorkspaceId, documentName) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    
+    try {
+      const result = await dispatch(duplicateDocument({ documentId, workspaceId: wsId }));
+      
+      if (duplicateDocument.fulfilled.match(result)) {
+        toast.success({
+          title: 'Document Duplicated',
+          description: `${documentName || 'Document'} has been duplicated successfully`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Duplicate document error:', error);
+      return false;
+    }
+  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+
+  // NEW: Bulk delete documents
+  const handleBulkDeleteDocuments = useCallback(async (documentIds, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    
+    try {
+      const result = await dispatch(bulkDeleteDocuments({ documentIds, workspaceId: wsId }));
+      
+      if (bulkDeleteDocuments.fulfilled.match(result)) {
+        toast.success({
+          title: 'Documents Deleted',
+          description: `${documentIds.length} documents have been deleted successfully`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Bulk delete documents error:', error);
+      return false;
+    }
+  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+
+  // NEW: Archive document
+  const handleArchiveDocument = useCallback(async (documentId, targetWorkspaceId, documentName) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    
+    try {
+      const result = await dispatch(archiveDocument({ documentId, workspaceId: wsId }));
+      
+      if (archiveDocument.fulfilled.match(result)) {
+        toast.success({
+          title: 'Document Archived',
+          description: `${documentName || 'Document'} has been archived successfully`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Archive document error:', error);
+      return false;
+    }
+  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+
+  // NEW: Search documents
+  const handleSearchDocuments = useCallback(async (query, searchFilters = {}, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    
+    try {
+      const result = await dispatch(searchDocuments({ query, workspaceId: wsId, filters: searchFilters }));
+      return searchDocuments.fulfilled.match(result);
+    } catch (error) {
+      console.error('Search documents error:', error);
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId]);
 
   // Preview document
   const handlePreviewDocument = useCallback(async (documentId) => {
@@ -162,7 +430,7 @@ export const useDocuments = () => {
       const result = await dispatch(downloadDocument({ documentId, filename }));
       
       if (downloadDocument.fulfilled.match(result)) {
-        toast({
+        toast.success({
           title: 'Download Started',
           description: `Downloading ${filename || 'document'}...`,
           status: 'info',
@@ -178,6 +446,8 @@ export const useDocuments = () => {
     }
   }, [dispatch, toast]);
 
+  // ===== STATE MANAGEMENT =====
+
   // Set current document
   const handleSetCurrentDocument = useCallback((document) => {
     dispatch(setCurrentDocument(document));
@@ -186,6 +456,11 @@ export const useDocuments = () => {
   // Clear current document
   const handleClearCurrentDocument = useCallback(() => {
     dispatch(clearCurrentDocument());
+  }, [dispatch]);
+
+  // Set current workspace
+  const handleSetCurrentWorkspace = useCallback((newWorkspaceId) => {
+    dispatch(setCurrentWorkspace(newWorkspaceId));
   }, [dispatch]);
 
   // Update filters
@@ -208,7 +483,9 @@ export const useDocuments = () => {
     dispatch(clearError());
   }, [dispatch]);
 
-  // Search documents
+  // ===== UTILITY FUNCTIONS =====
+
+  // Search documents locally
   const handleSearch = useCallback((searchTerm) => {
     dispatch(updateFilters({ searchTerm }));
   }, [dispatch]);
@@ -218,73 +495,184 @@ export const useDocuments = () => {
     dispatch(updateFilters({ fileType }));
   }, [dispatch]);
 
+  // Filter by category
+  const handleFilterByCategory = useCallback((category) => {
+    dispatch(updateFilters({ category }));
+  }, [dispatch]);
+
+  // Filter by tags
+  const handleFilterByTags = useCallback((tags) => {
+    dispatch(updateFilters({ tags }));
+  }, [dispatch]);
+
+  // Filter by favorites
+  const handleFilterFavorites = useCallback((favoritesOnly = true) => {
+    dispatch(updateFilters({ favoritesOnly }));
+  }, [dispatch]);
+
+  // Filter by status
+  const handleFilterByStatus = useCallback((status) => {
+    dispatch(updateFilters({ status }));
+  }, [dispatch]);
+
   // Sort documents
   const handleSort = useCallback((sortBy, sortOrder = 'desc') => {
     dispatch(updateFilters({ sortBy, sortOrder }));
   }, [dispatch]);
 
   // Paginate documents
-  const getPaginatedDocuments = useCallback((documents, page = 1, perPage = 10) => {
+  const getPaginatedDocuments = useCallback((docs, page = 1, perPage = 10) => {
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    return documents.slice(startIndex, endIndex);
+    return docs.slice(startIndex, endIndex);
   }, []);
 
   // Get documents by type
-  const getDocumentsByType = useCallback((type) => {
-    return documents.filter(doc => 
-      doc.mimeType?.includes(type) || 
+  const getDocumentsByType = useCallback((type, docs = workspaceDocuments) => {
+    return docs.filter(doc => 
+      doc.type?.includes(type) || 
       doc.originalName?.toLowerCase().endsWith(`.${type.toLowerCase()}`)
     );
-  }, [documents]);
+  }, [workspaceDocuments]);
 
   // Get recent documents
-  const getRecentDocuments = useCallback((count = 5) => {
-    return [...documents]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const getRecentDocuments = useCallback((count = 5, docs = workspaceDocuments) => {
+    return [...docs]
+      .sort((a, b) => new Date(b.lastModified || b.uploadDate) - new Date(a.lastModified || a.uploadDate))
       .slice(0, count);
-  }, [documents]);
+  }, [workspaceDocuments]);
 
-  // Get document statistics
+  // NEW: Get documents by size range
+  const getDocumentsBySizeRange = useCallback((minSize, maxSize, docs = workspaceDocuments) => {
+    return docs.filter(doc => {
+      const size = doc.size || 0;
+      return size >= minSize && size <= maxSize;
+    });
+  }, [workspaceDocuments]);
+
+  // NEW: Get documents by date range
+  const getDocumentsByDateRange = useCallback((startDate, endDate, docs = workspaceDocuments) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    return docs.filter(doc => {
+      const docDate = new Date(doc.uploadDate);
+      return docDate >= start && docDate <= end;
+    });
+  }, [workspaceDocuments]);
+
+  // Enhanced document statistics
   const getDocumentStats = useCallback(() => {
-    const totalSize = documents.reduce((sum, doc) => sum + (doc.size || 0), 0);
-    const typeStats = documents.reduce((stats, doc) => {
-      const type = doc.mimeType?.split('/')[0] || 'unknown';
+    const docs = workspaceDocuments;
+    const totalSize = docs.reduce((sum, doc) => sum + (doc.size || 0), 0);
+    const typeStats = docs.reduce((stats, doc) => {
+      const type = doc.type?.split('/')[0] || 'unknown';
       stats[type] = (stats[type] || 0) + 1;
+      return stats;
+    }, {});
+    
+    const categoryStats = docs.reduce((stats, doc) => {
+      const category = doc.category || 'other';
+      stats[category] = (stats[category] || 0) + 1;
       return stats;
     }, {});
 
     return {
-      total: documents.length,
+      total: docs.length,
       totalSize,
       typeStats,
-      shared: sharedDocuments.length
+      categoryStats,
+      shared: sharedDocuments.length,
+      favorites: favorites.length,
+      recent: getRecentDocuments(10).length,
+      archived: docs.filter(doc => doc.status === 'archived').length
     };
-  }, [documents, sharedDocuments]);
+  }, [workspaceDocuments, sharedDocuments, favorites, getRecentDocuments]);
+
+  // NEW: Validate file before upload
+  const validateFile = useCallback((file, maxSize = 50 * 1024 * 1024, allowedTypes = []) => {
+    const errors = [];
+    
+    if (file.size > maxSize) {
+      errors.push(`File size exceeds ${maxSize / (1024 * 1024)}MB limit`);
+    }
+    
+    if (allowedTypes.length > 0 && !allowedTypes.includes(file.type)) {
+      errors.push(`File type ${file.type} is not allowed`);
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }, []);
+
+  // NEW: Format file size
+  const formatFileSize = useCallback((bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }, []);
+
+  // Memoized values for performance
+  const contextualDocuments = useMemo(() => {
+    return workspaceId ? workspaceDocuments : documents;
+  }, [workspaceId, workspaceDocuments, documents]);
 
   return {
     // State
-    documents,
+    documents: contextualDocuments,
+    allDocuments: documents,
+    workspaceDocuments,
     sharedDocuments,
     currentDocument,
+    favorites,
+    recentActivity,
+    popularDocuments,
     loading,
     uploading,
     uploadProgress,
     error,
     filters,
     pagination,
+    bulkOperationLoading,
+    workspaceStats,
     filteredDocuments,
+    documentStatistics,
+    availableTags,
+    availableCategories,
+    currentWorkspaceId,
 
-    // Actions
+    // Fetching actions
     fetchDocuments: handleFetchDocuments,
+    fetchWorkspaceDocuments: handleFetchWorkspaceDocuments,
+    fetchWorkspaceStats: handleFetchWorkspaceStats,
+    fetchRecentActivity: handleFetchRecentActivity,
+    fetchPopularDocuments: handleFetchPopularDocuments,
+    fetchDocumentsByCategory: handleFetchDocumentsByCategory,
+    fetchDocumentsByTag: handleFetchDocumentsByTag,
+    fetchFavoriteDocuments: handleFetchFavoriteDocuments,
     fetchSharedDocuments: handleFetchSharedDocuments,
     fetchDocument: handleFetchDocument,
+
+    // Document operations
     uploadDocument: handleUploadDocument,
     deleteDocument: handleDeleteDocument,
+    toggleFavorite: handleToggleFavorite,
+    moveDocument: handleMoveDocument,
+    duplicateDocument: handleDuplicateDocument,
+    bulkDeleteDocuments: handleBulkDeleteDocuments,
+    archiveDocument: handleArchiveDocument,
+    searchDocuments: handleSearchDocuments,
     previewDocument: handlePreviewDocument,
     downloadDocument: handleDownloadDocument,
+
+    // State management
     setCurrentDocument: handleSetCurrentDocument,
     clearCurrentDocument: handleClearCurrentDocument,
+    setCurrentWorkspace: handleSetCurrentWorkspace,
     updateFilters: handleUpdateFilters,
     resetFilters: handleResetFilters,
     updatePagination: handleUpdatePagination,
@@ -293,11 +681,19 @@ export const useDocuments = () => {
     // Utility functions
     search: handleSearch,
     filterByType: handleFilterByType,
+    filterByCategory: handleFilterByCategory,
+    filterByTags: handleFilterByTags,
+    filterFavorites: handleFilterFavorites,
+    filterByStatus: handleFilterByStatus,
     sort: handleSort,
     getPaginatedDocuments,
     getDocumentsByType,
     getRecentDocuments,
+    getDocumentsBySizeRange,
+    getDocumentsByDateRange,
     getDocumentStats,
+    validateFile,
+    formatFileSize,
 
     // For backward compatibility
     isLoading: loading,
@@ -306,26 +702,30 @@ export const useDocuments = () => {
 };
 
 /**
- * Hook for document list management
+ * Hook for document list management with workspace context
  * Automatically fetches documents on mount
  */
-export const useDocumentList = (autoFetch = true) => {
-  const documentsHook = useDocuments();
-  const { fetchDocuments, documents, loading } = documentsHook;
+export const useDocumentList = (workspaceId = null, autoFetch = true) => {
+  const documentsHook = useDocuments(workspaceId);
+  const { fetchDocuments, fetchWorkspaceDocuments, documents, loading } = documentsHook;
 
   useEffect(() => {
     if (autoFetch && documents.length === 0 && !loading) {
-      fetchDocuments();
+      if (workspaceId) {
+        fetchWorkspaceDocuments(workspaceId);
+      } else {
+        fetchDocuments();
+      }
     }
-  }, [autoFetch, documents.length, loading, fetchDocuments]);
+  }, [autoFetch, documents.length, loading, workspaceId, fetchDocuments, fetchWorkspaceDocuments]);
 
   return documentsHook;
 };
 
 /**
- * Hook for single document management
+ * Hook for single document management with workspace context
  */
-export const useDocument = (documentId) => {
+export const useDocument = (documentId, workspaceId = null) => {
   const {
     currentDocument,
     fetchDocument,
@@ -333,7 +733,7 @@ export const useDocument = (documentId) => {
     clearCurrentDocument,
     loading,
     error
-  } = useDocuments();
+  } = useDocuments(workspaceId);
 
   useEffect(() => {
     if (documentId) {
@@ -352,6 +752,107 @@ export const useDocument = (documentId) => {
     setDocument: setCurrentDocument,
     clearDocument: clearCurrentDocument,
     refetch: () => documentId && fetchDocument(documentId)
+  };
+};
+
+/**
+ * Hook for workspace document analytics
+ */
+export const useWorkspaceDocumentAnalytics = (workspaceId) => {
+  const {
+    workspaceStats,
+    recentActivity,
+    popularDocuments,
+    documentStatistics,
+    fetchWorkspaceStats,
+    fetchRecentActivity,
+    fetchPopularDocuments,
+    loading
+  } = useDocuments(workspaceId);
+
+  useEffect(() => {
+    if (workspaceId) {
+      fetchWorkspaceStats(workspaceId);
+      fetchRecentActivity(workspaceId);
+      fetchPopularDocuments(workspaceId);
+    }
+  }, [workspaceId, fetchWorkspaceStats, fetchRecentActivity, fetchPopularDocuments]);
+
+  return {
+    stats: workspaceStats,
+    recentActivity,
+    popularDocuments,
+    statistics: documentStatistics,
+    loading,
+    refresh: () => {
+      if (workspaceId) {
+        fetchWorkspaceStats(workspaceId);
+        fetchRecentActivity(workspaceId);
+        fetchPopularDocuments(workspaceId);
+      }
+    }
+  };
+};
+
+/**
+ * Hook for document search and filtering
+ */
+export const useDocumentSearch = (workspaceId = null) => {
+  const {
+    searchDocuments,
+    filteredDocuments,
+    availableTags,
+    availableCategories,
+    filters,
+    updateFilters,
+    resetFilters,
+    loading
+  } = useDocuments(workspaceId);
+
+  const performSearch = useCallback(async (query, searchFilters = {}) => {
+    if (query.trim()) {
+      return await searchDocuments(query, searchFilters, workspaceId);
+    } else {
+      // If no query, just update local filters
+      updateFilters(searchFilters);
+      return true;
+    }
+  }, [searchDocuments, updateFilters, workspaceId]);
+
+  return {
+    searchResults: filteredDocuments,
+    availableTags,
+    availableCategories,
+    currentFilters: filters,
+    loading,
+    search: performSearch,
+    updateFilters,
+    resetFilters
+  };
+};
+
+/**
+ * Hook for bulk document operations
+ */
+export const useBulkDocumentOperations = (workspaceId = null) => {
+  const {
+    bulkDeleteDocuments,
+    bulkOperationLoading,
+    fetchWorkspaceDocuments
+  } = useDocuments(workspaceId);
+
+  const performBulkDelete = useCallback(async (documentIds) => {
+    const success = await bulkDeleteDocuments(documentIds, workspaceId);
+    if (success && workspaceId) {
+      // Refresh the workspace documents
+      await fetchWorkspaceDocuments(workspaceId);
+    }
+    return success;
+  }, [bulkDeleteDocuments, fetchWorkspaceDocuments, workspaceId]);
+
+  return {
+    bulkDelete: performBulkDelete,
+    loading: bulkOperationLoading
   };
 };
 

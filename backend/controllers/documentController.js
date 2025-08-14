@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Document = require('../models/documentModel');
 const User = require('../models/userModel');
+const Workspace = require('../models/workspaceModel');
 const path = require('path');
 const { ObjectId } = mongoose.Types;
 
@@ -67,6 +68,7 @@ exports.uploadDocument = async (req, res) => {
       size: file.size,
       type: file.mimetype,
       owner: req.user.id,
+      workspace: req.body.workspaceId, // Add workspace if provided
       // Add the owner to the permissions array with write access
       permissions: [
         {
@@ -113,6 +115,145 @@ exports.getDocuments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Could not retrieve documents',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get workspace documents
+// @route   GET /api/documents/workspace/:workspaceId
+// @access  Private
+exports.getWorkspaceDocuments = async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    
+    // Find documents in the specific workspace
+    const documents = await Document.find({
+      workspace: workspaceId,
+      $or: [
+        { owner: req.user.id },
+        { 'permissions.user': req.user.id }
+      ]
+    })
+    .populate('owner', 'name email')
+    .populate('uploadedBy', 'name email')
+    .select('-__v')
+    .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: documents.length,
+      data: documents
+    });
+  } catch (error) {
+    console.error('Error getting workspace documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve workspace documents',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get document statistics for workspace
+// @route   GET /api/documents/workspace/:workspaceId/stats
+// @access  Private
+exports.getDocumentStats = async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    
+    // Aggregate document statistics
+    const stats = await Document.aggregate([
+      {
+        $match: {
+          workspace: new ObjectId(workspaceId),
+          $or: [
+            { owner: new ObjectId(req.user.id) },
+            { 'permissions.user': new ObjectId(req.user.id) }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalDocuments: { $sum: 1 },
+          totalSize: { $sum: '$size' },
+          avgSize: { $avg: '$size' },
+          documentsThisMonth: {
+            $sum: {
+              $cond: [
+                {
+                  $gte: [
+                    '$createdAt',
+                    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          documentsThisWeek: {
+            $sum: {
+              $cond: [
+                {
+                  $gte: [
+                    '$createdAt',
+                    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    const result = stats[0] || {
+      totalDocuments: 0,
+      totalSize: 0,
+      avgSize: 0,
+      documentsThisMonth: 0,
+      documentsThisWeek: 0
+    };
+
+    // Get document type breakdown
+    const typeBreakdown = await Document.aggregate([
+      {
+        $match: {
+          workspace: new ObjectId(workspaceId),
+          $or: [
+            { owner: new ObjectId(req.user.id) },
+            { 'permissions.user': new ObjectId(req.user.id) }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: '$type',
+          count: { $sum: 1 },
+          totalSize: { $sum: '$size' }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...result,
+        typeBreakdown
+      }
+    });
+  } catch (error) {
+    console.error('Error getting document stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve document statistics',
       error: error.message
     });
   }
@@ -426,6 +567,287 @@ exports.shareDocument = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Could not share document',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Move document to different workspace
+// @route   POST /api/documents/:id/move
+// @access  Private
+exports.moveDocument = async (req, res) => {
+  try {
+    const { workspaceId } = req.body;
+    
+    if (!workspaceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide target workspace ID'
+      });
+    }
+
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check if user is owner
+    if (document.owner.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to move this document'
+      });
+    }
+
+    // Update workspace
+    document.workspace = workspaceId;
+    await document.save();
+
+    res.status(200).json({
+      success: true,
+      data: document
+    });
+  } catch (error) {
+    console.error('Error moving document:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not move document',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Duplicate document
+// @route   POST /api/documents/:id/duplicate
+// @access  Private
+exports.duplicateDocument = async (req, res) => {
+  try {
+    const originalDoc = await Document.findById(req.params.id);
+    if (!originalDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check access permissions
+    const isOwner = originalDoc.owner.toString() === req.user.id;
+    const hasPermission = originalDoc.permissions.some(
+      permission => permission.user.toString() === req.user.id
+    );
+
+    if (!isOwner && !hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to duplicate this document'
+      });
+    }
+
+    // Create duplicate with new name
+    const duplicateDoc = await Document.create({
+      name: `${originalDoc.name} (Copy)`,
+      originalName: originalDoc.originalName,
+      path: originalDoc.path, // Same file in GridFS
+      size: originalDoc.size,
+      type: originalDoc.type,
+      owner: req.user.id,
+      workspace: req.body.workspaceId || originalDoc.workspace,
+      permissions: [
+        {
+          user: req.user.id,
+          access: 'write'
+        }
+      ]
+    });
+
+    res.status(201).json({
+      success: true,
+      data: duplicateDoc
+    });
+  } catch (error) {
+    console.error('Error duplicating document:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not duplicate document',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get document versions/history
+// @route   GET /api/documents/:id/versions
+// @access  Private
+exports.getDocumentVersions = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check access permissions
+    const isOwner = document.owner.toString() === req.user.id;
+    const hasPermission = document.permissions.some(
+      permission => permission.user.toString() === req.user.id
+    );
+
+    if (!isOwner && !hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access document versions'
+      });
+    }
+
+    // For now, return the document itself as the only version
+    // In a full implementation, you'd track version history
+    res.status(200).json({
+      success: true,
+      data: [
+        {
+          id: document._id,
+          version: '1.0',
+          createdAt: document.createdAt,
+          createdBy: document.owner,
+          size: document.size,
+          isCurrent: true
+        }
+      ]
+    });
+  } catch (error) {
+    console.error('Error getting document versions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve document versions',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Bulk delete documents
+// @route   POST /api/documents/workspace/:workspaceId/bulk-delete
+// @access  Private
+exports.bulkDeleteDocuments = async (req, res) => {
+  try {
+    const { documentIds } = req.body;
+    const { workspaceId } = req.params;
+    
+    if (!documentIds || !Array.isArray(documentIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of document IDs'
+      });
+    }
+
+    // Find documents to delete
+    const documents = await Document.find({
+      _id: { $in: documentIds },
+      workspace: workspaceId,
+      owner: req.user.id // Only owner can bulk delete
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No documents found or not authorized'
+      });
+    }
+
+    // Delete files from GridFS
+    for (const doc of documents) {
+      try {
+        const fileId = new ObjectId(doc.path);
+        await gfs.delete(fileId);
+      } catch (fileError) {
+        console.error(`Error deleting file ${doc.path} from GridFS:`, fileError);
+      }
+    }
+
+    // Delete documents from database
+    const result = await Document.deleteMany({
+      _id: { $in: documentIds },
+      workspace: workspaceId,
+      owner: req.user.id
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} documents deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error bulk deleting documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not delete documents',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Export documents
+// @route   GET /api/documents/workspace/:workspaceId/export
+// @access  Private
+exports.exportDocuments = async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { format = 'json' } = req.query;
+
+    // Get documents from workspace
+    const documents = await Document.find({
+      workspace: workspaceId,
+      $or: [
+        { owner: req.user.id },
+        { 'permissions.user': req.user.id }
+      ]
+    })
+    .populate('owner', 'name email')
+    .select('-__v');
+
+    if (format === 'csv') {
+      // Export as CSV
+      const csv = documents.map(doc => ({
+        name: doc.name,
+        originalName: doc.originalName,
+        size: doc.size,
+        type: doc.type,
+        owner: doc.owner.name,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt
+      }));
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="workspace-${workspaceId}-documents.csv"`);
+      
+      // Simple CSV conversion (in production, use a proper CSV library)
+      const csvString = [
+        Object.keys(csv[0] || {}).join(','),
+        ...csv.map(row => Object.values(row).join(','))
+      ].join('\n');
+      
+      res.send(csvString);
+    } else {
+      // Export as JSON
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="workspace-${workspaceId}-documents.json"`);
+      
+      res.status(200).json({
+        success: true,
+        workspace: workspaceId,
+        exportedAt: new Date(),
+        count: documents.length,
+        data: documents
+      });
+    }
+  } catch (error) {
+    console.error('Error exporting documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not export documents',
       error: error.message
     });
   }

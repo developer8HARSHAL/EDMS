@@ -1,22 +1,41 @@
-// src/store/slices/documentsSlice.js - Documents Redux Slice
+// src/store/slices/documentsSlice.js - Enhanced Documents Redux Slice with Workspace Integration
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { documentApi } from '../../services/apiService';
+import workspaceService from '../../services/workspaceService';
 
 // Initial state
 const initialState = {
   documents: [],
+  workspaceDocuments: {}, // Documents organized by workspace ID
   sharedDocuments: [],
   currentDocument: null,
+  favorites: [],
+  recentActivity: [],
+  popularDocuments: [],
+  analytics: {},
   loading: false,
   uploading: false,
   error: null,
   uploadProgress: 0,
+  // NEW: Workspace-specific state
+  currentWorkspaceId: null,
+  workspaceStats: {},
+  documentsByCategory: {},
+  documentsByTag: {},
+  bulkOperationLoading: false,
   filters: {
     searchTerm: '',
     dateRange: null,
     fileType: '',
-    sortBy: 'createdAt',
-    sortOrder: 'desc'
+    category: '',
+    tags: [],
+    status: 'active',
+    sortBy: 'lastModified',
+    sortOrder: 'desc',
+    // NEW: Workspace filters
+    workspaceId: null,
+    favoritesOnly: false,
+    sizeRange: { min: null, max: null }
   },
   pagination: {
     currentPage: 1,
@@ -26,17 +45,115 @@ const initialState = {
   }
 };
 
-// Async thunks for API calls
+// ===== ASYNC THUNKS =====
 
-// Fetch all documents
+// Fetch all documents (user's documents across workspaces)
 export const fetchDocuments = createAsyncThunk(
   'documents/fetchDocuments',
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await documentApi.getAllDocuments();
+      const response = await documentApi.getAllDocuments(params);
       return response.data || response;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch documents';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch workspace documents
+export const fetchWorkspaceDocuments = createAsyncThunk(
+  'documents/fetchWorkspaceDocuments',
+  async ({ workspaceId, options = {} }, { rejectWithValue }) => {
+    try {
+      const response = await workspaceService.getWorkspaceDocuments(workspaceId, options);
+      return { workspaceId, documents: response.data || response, options };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch workspace documents';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch workspace document statistics
+export const fetchWorkspaceStats = createAsyncThunk(
+  'documents/fetchWorkspaceStats',
+  async (workspaceId, { rejectWithValue }) => {
+    try {
+      const response = await workspaceService.getWorkspaceStats(workspaceId);
+      return { workspaceId, stats: response.data || response };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch workspace stats';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch recent activity
+export const fetchRecentActivity = createAsyncThunk(
+  'documents/fetchRecentActivity',
+  async (workspaceId, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.getRecentActivity(workspaceId);
+      return response.data || response;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch recent activity';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch popular documents
+export const fetchPopularDocuments = createAsyncThunk(
+  'documents/fetchPopularDocuments',
+  async (workspaceId, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.getPopularDocuments(workspaceId);
+      return response.data || response;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch popular documents';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch documents by category
+export const fetchDocumentsByCategory = createAsyncThunk(
+  'documents/fetchDocumentsByCategory',
+  async ({ workspaceId, category }, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.getDocumentsByCategory(workspaceId, category);
+      return { category, documents: response.data || response };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch documents by category';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch documents by tag
+export const fetchDocumentsByTag = createAsyncThunk(
+  'documents/fetchDocumentsByTag',
+  async ({ workspaceId, tag }, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.getDocumentsByTag(workspaceId, tag);
+      return { tag, documents: response.data || response };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch documents by tag';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Fetch user favorites
+export const fetchFavoriteDocuments = createAsyncThunk(
+  'documents/fetchFavoriteDocuments',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.getFavoriteDocuments();
+      return response.data || response;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch favorite documents';
       return rejectWithValue(message);
     }
   }
@@ -70,20 +187,28 @@ export const fetchDocument = createAsyncThunk(
   }
 );
 
-// Upload document
+// Upload document (enhanced with workspace context)
 export const uploadDocument = createAsyncThunk(
   'documents/uploadDocument',
-  async (formData, { rejectWithValue, dispatch }) => {
+  async ({ formData, workspaceId }, { rejectWithValue, dispatch }) => {
     try {
-      // You can add upload progress tracking here if needed
       dispatch(setUploadProgress(0));
+      
+      // Add workspace ID to form data if provided
+      if (workspaceId) {
+        formData.append('workspaceId', workspaceId);
+      }
       
       const response = await documentApi.uploadDocument(formData);
       
       dispatch(setUploadProgress(100));
       
-      // Refresh documents list after successful upload
-      dispatch(fetchDocuments());
+      // Refresh appropriate document lists
+      if (workspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId }));
+      } else {
+        dispatch(fetchDocuments());
+      }
       
       return response.data || response;
     } catch (error) {
@@ -97,16 +222,131 @@ export const uploadDocument = createAsyncThunk(
 // Delete document
 export const deleteDocument = createAsyncThunk(
   'documents/deleteDocument',
-  async (documentId, { rejectWithValue, dispatch }) => {
+  async ({ documentId, workspaceId }, { rejectWithValue, dispatch }) => {
     try {
       await documentApi.deleteDocument(documentId);
       
-      // Refresh documents list after successful deletion
-      dispatch(fetchDocuments());
+      // Refresh appropriate document lists
+      if (workspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId }));
+      } else {
+        dispatch(fetchDocuments());
+      }
       
       return documentId;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to delete document';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Toggle favorite document
+export const toggleFavorite = createAsyncThunk(
+  'documents/toggleFavorite',
+  async (documentId, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.toggleFavorite(documentId);
+      return { documentId, isFavorite: response.data?.isFavorite };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to toggle favorite';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Move document to different workspace
+export const moveDocument = createAsyncThunk(
+  'documents/moveDocument',
+  async ({ documentId, fromWorkspaceId, toWorkspaceId }, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await documentApi.moveDocument(documentId, toWorkspaceId);
+      
+      // Refresh both workspace document lists
+      if (fromWorkspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId: fromWorkspaceId }));
+      }
+      if (toWorkspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId: toWorkspaceId }));
+      }
+      
+      return response.data || response;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to move document';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Duplicate document
+export const duplicateDocument = createAsyncThunk(
+  'documents/duplicateDocument',
+  async ({ documentId, workspaceId }, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await documentApi.duplicateDocument(documentId);
+      
+      // Refresh workspace documents
+      if (workspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId }));
+      }
+      
+      return response.data || response;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to duplicate document';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Bulk delete documents
+export const bulkDeleteDocuments = createAsyncThunk(
+  'documents/bulkDeleteDocuments',
+  async ({ documentIds, workspaceId }, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await documentApi.bulkDeleteDocuments(workspaceId, documentIds);
+      
+      // Refresh workspace documents
+      if (workspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId }));
+      }
+      
+      return { documentIds, workspaceId };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to delete documents';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Archive document
+export const archiveDocument = createAsyncThunk(
+  'documents/archiveDocument',
+  async ({ documentId, workspaceId }, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await documentApi.archiveDocument(documentId);
+      
+      // Refresh workspace documents
+      if (workspaceId) {
+        dispatch(fetchWorkspaceDocuments({ workspaceId }));
+      }
+      
+      return { documentId, workspaceId };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to archive document';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// NEW: Search documents
+export const searchDocuments = createAsyncThunk(
+  'documents/searchDocuments',
+  async ({ query, workspaceId, filters = {} }, { rejectWithValue }) => {
+    try {
+      const response = await documentApi.searchDocuments(query, workspaceId, filters);
+      return { workspaceId, documents: response.data || response, query, filters };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to search documents';
       return rejectWithValue(message);
     }
   }
@@ -176,6 +416,12 @@ const documentsSlice = createSlice({
       state.uploadProgress = action.payload;
     },
     
+    // NEW: Set current workspace
+    setCurrentWorkspace: (state, action) => {
+      state.currentWorkspaceId = action.payload;
+      state.filters.workspaceId = action.payload;
+    },
+    
     // Update filters
     updateFilters: (state, action) => {
       state.filters = { ...state.filters, ...action.payload };
@@ -183,7 +429,7 @@ const documentsSlice = createSlice({
     
     // Reset filters
     resetFilters: (state) => {
-      state.filters = initialState.filters;
+      state.filters = { ...initialState.filters, workspaceId: state.currentWorkspaceId };
     },
     
     // Update pagination
@@ -193,22 +439,86 @@ const documentsSlice = createSlice({
     
     // Add document to list (for real-time updates)
     addDocument: (state, action) => {
-      state.documents.unshift(action.payload);
+      const document = action.payload;
+      state.documents.unshift(document);
+      
+      // Add to workspace documents if workspace context exists
+      if (document.workspace && state.workspaceDocuments[document.workspace]) {
+        state.workspaceDocuments[document.workspace].unshift(document);
+      }
+      
       state.pagination.totalDocuments += 1;
     },
     
     // Update document in list
     updateDocument: (state, action) => {
-      const index = state.documents.findIndex(doc => doc._id === action.payload._id);
+      const updatedDoc = action.payload;
+      
+      // Update in main documents list
+      const index = state.documents.findIndex(doc => doc._id === updatedDoc._id);
       if (index !== -1) {
-        state.documents[index] = { ...state.documents[index], ...action.payload };
+        state.documents[index] = { ...state.documents[index], ...updatedDoc };
+      }
+      
+      // Update in workspace documents
+      if (updatedDoc.workspace && state.workspaceDocuments[updatedDoc.workspace]) {
+        const wsIndex = state.workspaceDocuments[updatedDoc.workspace]
+          .findIndex(doc => doc._id === updatedDoc._id);
+        if (wsIndex !== -1) {
+          state.workspaceDocuments[updatedDoc.workspace][wsIndex] = 
+            { ...state.workspaceDocuments[updatedDoc.workspace][wsIndex], ...updatedDoc };
+        }
+      }
+      
+      // Update current document if it's the same
+      if (state.currentDocument?._id === updatedDoc._id) {
+        state.currentDocument = { ...state.currentDocument, ...updatedDoc };
       }
     },
     
     // Remove document from list
     removeDocument: (state, action) => {
-      state.documents = state.documents.filter(doc => doc._id !== action.payload);
+      const documentId = action.payload;
+      
+      // Remove from main documents list
+      state.documents = state.documents.filter(doc => doc._id !== documentId);
+      
+      // Remove from workspace documents
+      Object.keys(state.workspaceDocuments).forEach(workspaceId => {
+        state.workspaceDocuments[workspaceId] = state.workspaceDocuments[workspaceId]
+          .filter(doc => doc._id !== documentId);
+      });
+      
+      // Clear current document if it's the same
+      if (state.currentDocument?._id === documentId) {
+        state.currentDocument = null;
+      }
+      
       state.pagination.totalDocuments -= 1;
+    },
+    
+    // NEW: Update document favorite status
+    updateDocumentFavorite: (state, action) => {
+      const { documentId, isFavorite } = action.payload;
+      
+      // Update in all relevant lists
+      [state.documents, ...Object.values(state.workspaceDocuments), state.favorites]
+        .flat()
+        .forEach(doc => {
+          if (doc._id === documentId) {
+            doc.isFavorite = isFavorite;
+          }
+        });
+      
+      // Update favorites list
+      if (isFavorite) {
+        const document = state.documents.find(doc => doc._id === documentId);
+        if (document && !state.favorites.find(fav => fav._id === documentId)) {
+          state.favorites.push(document);
+        }
+      } else {
+        state.favorites = state.favorites.filter(doc => doc._id !== documentId);
+      }
     }
   },
   extraReducers: (builder) => {
@@ -227,6 +537,62 @@ const documentsSlice = createSlice({
       .addCase(fetchDocuments.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      });
+
+    // NEW: Fetch workspace documents
+    builder
+      .addCase(fetchWorkspaceDocuments.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchWorkspaceDocuments.fulfilled, (state, action) => {
+        state.loading = false;
+        const { workspaceId, documents } = action.payload;
+        state.workspaceDocuments[workspaceId] = Array.isArray(documents) ? documents : [];
+        state.error = null;
+      })
+      .addCase(fetchWorkspaceDocuments.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // NEW: Fetch workspace stats
+    builder
+      .addCase(fetchWorkspaceStats.fulfilled, (state, action) => {
+        const { workspaceId, stats } = action.payload;
+        state.workspaceStats[workspaceId] = stats;
+      });
+
+    // NEW: Fetch recent activity
+    builder
+      .addCase(fetchRecentActivity.fulfilled, (state, action) => {
+        state.recentActivity = action.payload;
+      });
+
+    // NEW: Fetch popular documents
+    builder
+      .addCase(fetchPopularDocuments.fulfilled, (state, action) => {
+        state.popularDocuments = action.payload;
+      });
+
+    // NEW: Fetch documents by category
+    builder
+      .addCase(fetchDocumentsByCategory.fulfilled, (state, action) => {
+        const { category, documents } = action.payload;
+        state.documentsByCategory[category] = documents;
+      });
+
+    // NEW: Fetch documents by tag
+    builder
+      .addCase(fetchDocumentsByTag.fulfilled, (state, action) => {
+        const { tag, documents } = action.payload;
+        state.documentsByTag[tag] = documents;
+      });
+
+    // NEW: Fetch favorites
+    builder
+      .addCase(fetchFavoriteDocuments.fulfilled, (state, action) => {
+        state.favorites = action.payload;
       });
 
     // Fetch shared documents
@@ -293,6 +659,26 @@ const documentsSlice = createSlice({
         state.error = action.payload;
       });
 
+    // NEW: Toggle favorite
+    builder
+      .addCase(toggleFavorite.fulfilled, (state, action) => {
+        const { documentId, isFavorite } = action.payload;
+        documentsSlice.caseReducers.updateDocumentFavorite(state, { payload: { documentId, isFavorite } });
+      });
+
+    // NEW: Bulk operations
+    builder
+      .addCase(bulkDeleteDocuments.pending, (state) => {
+        state.bulkOperationLoading = true;
+      })
+      .addCase(bulkDeleteDocuments.fulfilled, (state) => {
+        state.bulkOperationLoading = false;
+      })
+      .addCase(bulkDeleteDocuments.rejected, (state, action) => {
+        state.bulkOperationLoading = false;
+        state.error = action.payload;
+      });
+
     // Preview document
     builder
       .addCase(previewDocument.pending, (state) => {
@@ -331,46 +717,107 @@ export const {
   setCurrentDocument,
   clearCurrentDocument,
   setUploadProgress,
+  setCurrentWorkspace,
   updateFilters,
   resetFilters,
   updatePagination,
   addDocument,
   updateDocument,
-  removeDocument
+  removeDocument,
+  updateDocumentFavorite
 } = documentsSlice.actions;
 
-// Selectors
+// ===== SELECTORS =====
+
+// Basic selectors
 export const selectDocuments = (state) => state.documents.documents;
+export const selectCurrentWorkspaceId = (state) => state.documents.currentWorkspaceId;
+export const selectWorkspaceDocuments = (state, workspaceId) => 
+  state.documents.workspaceDocuments[workspaceId] || [];
+export const selectCurrentWorkspaceDocuments = (state) => 
+  state.documents.currentWorkspaceId ? 
+    state.documents.workspaceDocuments[state.documents.currentWorkspaceId] || [] : 
+    state.documents.documents;
 export const selectSharedDocuments = (state) => state.documents.sharedDocuments;
 export const selectCurrentDocument = (state) => state.documents.currentDocument;
+export const selectFavoriteDocuments = (state) => state.documents.favorites;
+export const selectRecentActivity = (state) => state.documents.recentActivity;
+export const selectPopularDocuments = (state) => state.documents.popularDocuments;
 export const selectDocumentsLoading = (state) => state.documents.loading;
 export const selectUploading = (state) => state.documents.uploading;
 export const selectUploadProgress = (state) => state.documents.uploadProgress;
 export const selectDocumentsError = (state) => state.documents.error;
 export const selectFilters = (state) => state.documents.filters;
 export const selectPagination = (state) => state.documents.pagination;
+export const selectBulkOperationLoading = (state) => state.documents.bulkOperationLoading;
+export const selectWorkspaceStats = (state, workspaceId) => 
+  state.documents.workspaceStats[workspaceId] || {};
+export const selectDocumentsByCategory = (state, category) => 
+  state.documents.documentsByCategory[category] || [];
+export const selectDocumentsByTag = (state, tag) => 
+  state.documents.documentsByTag[tag] || [];
 
 // Complex selectors
 export const selectFilteredDocuments = (state) => {
-  const { documents, filters } = state.documents;
-  const { searchTerm, fileType, sortBy, sortOrder } = filters;
+  const { filters, currentWorkspaceId } = state.documents;
+  const { searchTerm, fileType, category, tags, status, sortBy, sortOrder, favoritesOnly, sizeRange } = filters;
+  
+  // Get documents based on context (workspace or all)
+  let documents = currentWorkspaceId ? 
+    state.documents.workspaceDocuments[currentWorkspaceId] || [] : 
+    state.documents.documents;
   
   let filtered = [...documents];
   
+  // Filter by favorites
+  if (favoritesOnly) {
+    filtered = filtered.filter(doc => doc.isFavorite);
+  }
+  
+  // Filter by status
+  if (status && status !== 'all') {
+    filtered = filtered.filter(doc => doc.status === status);
+  }
+  
   // Filter by search term
   if (searchTerm) {
+    const term = searchTerm.toLowerCase();
     filtered = filtered.filter(doc => 
-      doc.originalName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      doc.name?.toLowerCase().includes(term) ||
+      doc.originalName?.toLowerCase().includes(term) ||
+      doc.description?.toLowerCase().includes(term) ||
+      doc.tags?.some(tag => tag.toLowerCase().includes(term))
     );
   }
   
   // Filter by file type
   if (fileType) {
     filtered = filtered.filter(doc => 
-      doc.mimeType?.includes(fileType) || 
+      doc.type?.includes(fileType) || 
       doc.originalName?.toLowerCase().endsWith(fileType.toLowerCase())
     );
+  }
+  
+  // Filter by category
+  if (category) {
+    filtered = filtered.filter(doc => doc.category === category);
+  }
+  
+  // Filter by tags
+  if (tags && tags.length > 0) {
+    filtered = filtered.filter(doc => 
+      doc.tags && tags.some(tag => doc.tags.includes(tag))
+    );
+  }
+  
+  // Filter by size range
+  if (sizeRange.min !== null || sizeRange.max !== null) {
+    filtered = filtered.filter(doc => {
+      const size = doc.size || 0;
+      if (sizeRange.min !== null && size < sizeRange.min) return false;
+      if (sizeRange.max !== null && size > sizeRange.max) return false;
+      return true;
+    });
   }
   
   // Sort documents
@@ -378,7 +825,7 @@ export const selectFilteredDocuments = (state) => {
     let aValue = a[sortBy];
     let bValue = b[sortBy];
     
-    if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
+    if (sortBy === 'uploadDate' || sortBy === 'lastModified') {
       aValue = new Date(aValue);
       bValue = new Date(bValue);
     }
@@ -391,6 +838,55 @@ export const selectFilteredDocuments = (state) => {
   });
   
   return filtered;
+};
+
+// NEW: Selector for document statistics
+export const selectDocumentStatistics = (state) => {
+  const documents = selectCurrentWorkspaceDocuments(state);
+  const totalSize = documents.reduce((sum, doc) => sum + (doc.size || 0), 0);
+  const categoryStats = documents.reduce((stats, doc) => {
+    const category = doc.category || 'other';
+    stats[category] = (stats[category] || 0) + 1;
+    return stats;
+  }, {});
+  const typeStats = documents.reduce((stats, doc) => {
+    const type = doc.type?.split('/')[0] || 'unknown';
+    stats[type] = (stats[type] || 0) + 1;
+    return stats;
+  }, {});
+
+  return {
+    total: documents.length,
+    totalSize,
+    categoryStats,
+    typeStats,
+    favorites: documents.filter(doc => doc.isFavorite).length,
+    archived: documents.filter(doc => doc.status === 'archived').length
+  };
+};
+
+// NEW: Selector for available tags
+export const selectAvailableTags = (state) => {
+  const documents = selectCurrentWorkspaceDocuments(state);
+  const tags = new Set();
+  documents.forEach(doc => {
+    if (doc.tags) {
+      doc.tags.forEach(tag => tags.add(tag));
+    }
+  });
+  return Array.from(tags).sort();
+};
+
+// NEW: Selector for available categories
+export const selectAvailableCategories = (state) => {
+  const documents = selectCurrentWorkspaceDocuments(state);
+  const categories = new Set();
+  documents.forEach(doc => {
+    if (doc.category) {
+      categories.add(doc.category);
+    }
+  });
+  return Array.from(categories).sort();
 };
 
 export default documentsSlice.reducer;

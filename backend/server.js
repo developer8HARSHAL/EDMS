@@ -3,11 +3,14 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fileUpload = require('express-fileupload');
+const mongoose = require('mongoose'); // ✅ ADDED: Missing import for health check
 const connectDB = require('./config/db'); // Import the DB connection function
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+const workspaceRoutes = require('./routes/workspaceRoutes');
+const invitationRoutes = require('./routes/invitationRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -55,9 +58,11 @@ connectDB()
     // We're not exiting the process here because connectDB already handles that
   });
 
-// Routes
+// Routes - Order matters for middleware
 app.use('/api/users', userRoutes);
+app.use('/api/workspaces', workspaceRoutes); // ✅ FIXED: Moved before documents for proper middleware order
 app.use('/api/documents', documentRoutes);
+app.use('/api/invitations', invitationRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {
@@ -69,7 +74,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     env: process.env.NODE_ENV,
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', // ✅ FIXED: Now mongoose is imported
+    timestamp: new Date().toISOString()
   });
 });
 

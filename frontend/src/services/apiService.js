@@ -1,4 +1,4 @@
-// apiService.js - Centralized API service with document and user endpoints
+// apiService.js - Centralized API service with document, user, workspace, and invitation endpoints
 import axios from 'axios';
 
 // Base URL for API requests
@@ -72,6 +72,78 @@ export const documentApi = {
       throw error;
     }
   },
+
+  // Get documents by workspace
+  getWorkspaceDocuments: async (workspaceId, filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.category) params.append('category', filters.category);
+      if (filters.tags) params.append('tags', filters.tags.join(','));
+      if (filters.search) params.append('search', filters.search);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.page) params.append('page', filters.page);
+      if (filters.limit) params.append('limit', filters.limit);
+
+      const queryString = params.toString();
+      const url = `${API_URL}/documents/workspace/${workspaceId}${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch workspace documents for ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Get workspace document statistics
+  getWorkspaceDocumentStats: async (workspaceId) => {
+    try {
+      const response = await axios.get(`${API_URL}/documents/workspace/${workspaceId}/stats`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch workspace document stats for ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Move document between workspaces
+  moveDocument: async (documentId, targetWorkspaceId) => {
+    try {
+      const response = await axios.post(`${API_URL}/documents/${documentId}/move`, {
+        targetWorkspaceId
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to move document ${documentId}:`, error);
+      throw error;
+    }
+  },
+
+  // Duplicate document
+  duplicateDocument: async (documentId, targetWorkspaceId = null) => {
+    try {
+      const response = await axios.post(`${API_URL}/documents/${documentId}/duplicate`, {
+        targetWorkspaceId
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to duplicate document ${documentId}:`, error);
+      throw error;
+    }
+  },
+
+  // Bulk delete documents
+  bulkDeleteDocuments: async (workspaceId, documentIds) => {
+    try {
+      const response = await axios.post(`${API_URL}/documents/workspace/${workspaceId}/bulk-delete`, {
+        documentIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to bulk delete documents in workspace ${workspaceId}:`, error);
+      throw error;
+    }
+  },
   
   // Get single document details
   getDocument: async (id) => {
@@ -85,31 +157,31 @@ export const documentApi = {
   },
 
   // Updated previewDocument function for apiService.js
-previewDocument: async (id) => {
-  try {
-    console.log(`Attempting to preview document with ID ${id}`);
-    const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
-      responseType: 'blob'
-    });
-    console.log('Preview response received:', response.status);
-    return response.data;
-  } catch (error) {
-    console.error(`Failed to preview document with ID ${id}:`, error);
-    
-    // Log more detailed error info
-    if (error.response) {
-      console.error('Error status:', error.response.status);
-      console.error('Error data:', error.response.data);
-      // If we got a 404, it means the preview endpoint might not be implemented
-      if (error.response.status === 404) {
-        console.warn('Preview endpoint returned 404 - falling back to document download');
-        // We could implement a fallback here, but we'll let the component handle this
+  previewDocument: async (id) => {
+    try {
+      console.log(`Attempting to preview document with ID ${id}`);
+      const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
+        responseType: 'blob'
+      });
+      console.log('Preview response received:', response.status);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to preview document with ID ${id}:`, error);
+      
+      // Log more detailed error info
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+        // If we got a 404, it means the preview endpoint might not be implemented
+        if (error.response.status === 404) {
+          console.warn('Preview endpoint returned 404 - falling back to document download');
+          // We could implement a fallback here, but we'll let the component handle this
+        }
       }
+      
+      throw error;
     }
-    
-    throw error;
-  }
-},
+  },
   
   // Upload a new document
   uploadDocument: async (formData) => {
@@ -126,24 +198,39 @@ previewDocument: async (id) => {
     }
   },
   
+  // Upload document to specific workspace
+  uploadDocumentToWorkspace: async (workspaceId, formData) => {
+    try {
+      // Add workspace ID to form data
+      formData.append('workspaceId', workspaceId);
+      
+      const response = await axios.post(`${API_URL}/documents`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to upload document to workspace:', error);
+      throw error;
+    }
+  },
+  
   // Download a document
- // Updated downloadDocument function for apiService.js
-  // Download a document
- // Updated downloadDocument function for apiService.js
-downloadDocument: async (id) => {
-  try {
-    console.log(`Attempting to download document with ID ${id}`);
-    // This should point to the /preview endpoint which serves the file content
-    const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
-      responseType: 'blob'
-    });
-    console.log('Download response received:', response.status);
-    return response;
-  } catch (error) {
-    console.error(`Failed to download document with ID ${id}:`, error);
-    throw error;
-  }
-},
+  downloadDocument: async (id) => {
+    try {
+      console.log(`Attempting to download document with ID ${id}`);
+      // This should point to the /preview endpoint which serves the file content
+      const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
+        responseType: 'blob'
+      });
+      console.log('Download response received:', response.status);
+      return response;
+    } catch (error) {
+      console.error(`Failed to download document with ID ${id}:`, error);
+      throw error;
+    }
+  },
   
   // Delete a document
   deleteDocument: async (id) => {
@@ -300,7 +387,252 @@ export const userApi = {
   }
 };
 
-// Export both APIs as a combined object
-const apiService = { documentApi, userApi };
+// ✅ UPDATED: Workspace-related API functions with proper error handling
+export const workspaceApi = {
+  // Get all user's workspaces
+  getWorkspaces: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.search) params.append('search', filters.search);
+      if (filters.page) params.append('page', filters.page);
+      if (filters.limit) params.append('limit', filters.limit);
+      if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+
+      const queryString = params.toString();
+      const url = `${API_URL}/workspaces${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch workspaces:', error);
+      throw error;
+    }
+  },
+
+  // Get single workspace
+  getWorkspace: async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/workspaces/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch workspace with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Create new workspace
+  createWorkspace: async (workspaceData) => {
+    try {
+      const response = await axios.post(`${API_URL}/workspaces`, workspaceData);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create workspace:', error);
+      throw error;
+    }
+  },
+
+  // Update workspace
+  updateWorkspace: async (id, workspaceData) => {
+    try {
+      const response = await axios.put(`${API_URL}/workspaces/${id}`, workspaceData);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to update workspace with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Delete workspace
+  deleteWorkspace: async (id) => {
+    try {
+      const response = await axios.delete(`${API_URL}/workspaces/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to delete workspace with ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // ✅ ADDED: Get workspace statistics
+  getWorkspaceStats: async (id) => {
+    try {
+      const response = await axios.get(`${API_URL}/workspaces/${id}/stats`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch workspace stats for ID ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Add member to workspace
+  addMember: async (workspaceId, memberData) => {
+    try {
+      const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/members`, memberData);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to add member to workspace ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Remove member from workspace
+  removeMember: async (workspaceId, memberId) => {
+    try {
+      const response = await axios.delete(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to remove member ${memberId} from workspace ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Update member role/permissions
+  updateMemberRole: async (workspaceId, memberId, roleData) => {
+    try {
+      const response = await axios.put(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, roleData);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to update member ${memberId} role in workspace ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Leave workspace
+  leaveWorkspace: async (workspaceId) => {
+    try {
+      const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/leave`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to leave workspace ${workspaceId}:`, error);
+      throw error;
+    }
+  }
+};
+
+// NEW: Invitation-related API functions
+export const invitationApi = {
+  // Send invitation
+  sendInvitation: async (invitationData) => {
+    try {
+      const response = await axios.post(`${API_URL}/invitations/send`, invitationData);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to send invitation:', error);
+      throw error;
+    }
+  },
+
+  // Get invitation details by token (public endpoint)
+  getInvitationDetails: async (token) => {
+    try {
+      const response = await axios.get(`${API_URL}/invitations/${token}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch invitation details for token ${token}:`, error);
+      throw error;
+    }
+  },
+
+  // Accept invitation (public endpoint)
+  acceptInvitation: async (token) => {
+    try {
+      const response = await axios.post(`${API_URL}/invitations/${token}/accept`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to accept invitation with token ${token}:`, error);
+      throw error;
+    }
+  },
+
+  // Reject invitation (public endpoint)
+  rejectInvitation: async (token) => {
+    try {
+      const response = await axios.post(`${API_URL}/invitations/${token}/reject`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to reject invitation with token ${token}:`, error);
+      throw error;
+    }
+  },
+
+  // Get user's pending invitations
+  getPendingInvitations: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/invitations/pending`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch pending invitations:', error);
+      throw error;
+    }
+  },
+
+  // Get workspace invitations (admin view)
+  getWorkspaceInvitations: async (workspaceId) => {
+    try {
+      const response = await axios.get(`${API_URL}/invitations/workspace/${workspaceId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch workspace invitations for ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Cancel invitation
+  cancelInvitation: async (invitationId) => {
+    try {
+      const response = await axios.delete(`${API_URL}/invitations/${invitationId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to cancel invitation ${invitationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Resend invitation
+  resendInvitation: async (invitationId) => {
+    try {
+      const response = await axios.post(`${API_URL}/invitations/${invitationId}/resend`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to resend invitation ${invitationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Bulk invite (send multiple invitations)
+  bulkInvite: async (workspaceId, invitations) => {
+    try {
+      const bulkData = {
+        workspaceId,
+        invitations
+      };
+      const response = await axios.post(`${API_URL}/invitations/bulk`, bulkData);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to send bulk invitations to workspace ${workspaceId}:`, error);
+      throw error;
+    }
+  },
+
+  // Admin: Cleanup expired invitations
+  cleanupExpiredInvitations: async () => {
+    try {
+      const response = await axios.post(`${API_URL}/invitations/cleanup`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to cleanup expired invitations:', error);
+      throw error;
+    }
+  }
+};
+
+// Export all APIs as a combined object with backwards compatibility
+const apiService = { 
+  documentApi, 
+  userApi, 
+  workspaceApi, 
+  invitationApi 
+};
 
 export default apiService;

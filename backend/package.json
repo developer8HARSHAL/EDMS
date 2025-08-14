@@ -17,6 +17,8 @@
     "form-data": "^4.0.2",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.3",
+    "mongoose-paginate-v2": "^1.9.1",
+    "nodemailer": "^7.0.5",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

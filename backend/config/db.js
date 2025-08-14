@@ -22,6 +22,10 @@ const connectDB = async () => {
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+
+    // Call createIndexes after successful connection
+    await createIndexes();
+
     return conn;
   } catch (error) {
     console.error(`MongoDB Connection Error: ${error}`);
@@ -30,14 +34,27 @@ const connectDB = async () => {
     if (error.name === "MongooseServerSelectionError") {
       console.error("Connection details:", JSON.stringify(error.reason, null, 2));
     }
-    
-    // Exit with failure in production, but don't crash in development
+
     if (process.env.NODE_ENV === 'production') {
       process.exit(1);
     }
-    
+
     throw error;
   }
 };
+
+// Add to backend/config/db.js or create separate script
+async function createIndexes() {
+  const Workspace = require('../models/workspaceModel');
+  
+  await Workspace.collection.createIndexes([
+    { key: { owner: 1 } },
+    { key: { 'members.user': 1 } },
+    { key: { name: 'text', description: 'text' } },
+    { key: { createdAt: -1 } }
+  ]);
+
+  console.log('✅ Database indexes created');
+}
 
 module.exports = connectDB;

@@ -1,10 +1,10 @@
-// src/store/slices/authSlice.js - Authentication Redux Slice
+// src/store/slices/authSlice.js - Authentication Redux Slice (Fixed)
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import jwt_decode from 'jwt-decode';
 import axios from 'axios';
 import { userApi } from '../../services/apiService';
 
-// Initial state
+// Initial state with proper structure
 const initialState = {
   user: null,
   token: null,
@@ -80,6 +80,10 @@ export const loginUser = createAsyncThunk(
       if (!data || !data.token) {
         return rejectWithValue('No authentication token received');
       }
+
+      // Store token
+      localStorage.setItem('authToken', data.token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
 
       // Decode token to get user data
       const decoded = jwt_decode(data.token);
@@ -206,6 +210,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
+        state.tokenValidated = true; // Set tokenValidated to true after successful login
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -256,12 +261,79 @@ const authSlice = createSlice({
 // Export actions
 export const { clearError, logout, setLoading, updateUser } = authSlice.actions;
 
-// Selectors
-export const selectAuth = (state) => state.auth;
-export const selectUser = (state) => state.auth.user;
-export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
-export const selectAuthLoading = (state) => state.auth.loading;
-export const selectAuthError = (state) => state.auth.error;
-export const selectTokenValidated = (state) => state.auth.tokenValidated;
+// FIXED: Safe selectors with proper error handling and fallbacks
+export const selectAuth = (state) => {
+  try {
+    return state?.auth || initialState;
+  } catch (error) {
+    console.warn('Auth selector error:', error);
+    return initialState;
+  }
+};
+
+export const selectUser = (state) => {
+  try {
+    return state?.auth?.user || null;
+  } catch (error) {
+    console.warn('User selector error:', error);
+    return null;
+  }
+};
+
+export const selectIsAuthenticated = (state) => {
+  try {
+    return state?.auth?.isAuthenticated || false;
+  } catch (error) {
+    console.warn('IsAuthenticated selector error:', error);
+    return false;
+  }
+};
+
+export const selectAuthLoading = (state) => {
+  try {
+    return state?.auth?.loading || false;
+  } catch (error) {
+    console.warn('Loading selector error:', error);
+    return false;
+  }
+};
+
+export const selectAuthError = (state) => {
+  try {
+    return state?.auth?.error || null;
+  } catch (error) {
+    console.warn('Error selector error:', error);
+    return null;
+  }
+};
+
+export const selectTokenValidated = (state) => {
+  try {
+    return state?.auth?.tokenValidated || false;
+  } catch (error) {
+    console.warn('TokenValidated selector error:', error);
+    return false;
+  }
+};
+
+// Additional utility selectors
+export const selectAuthInitialized = (state) => {
+  try {
+    return state?.auth !== undefined;
+  } catch (error) {
+    console.warn('AuthInitialized selector error:', error);
+    return false;
+  }
+};
+
+export const selectAuthReady = (state) => {
+  try {
+    const auth = state?.auth;
+    return auth && auth.tokenValidated !== undefined;
+  } catch (error) {
+    console.warn('AuthReady selector error:', error);
+    return false;
+  }
+};
 
 export default authSlice.reducer;

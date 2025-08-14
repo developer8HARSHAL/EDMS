@@ -1,41 +1,43 @@
-// src/store/index.js - Fixed Redux Store Configuration
 import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import { combineReducers } from '@reduxjs/toolkit';
 
-// Import slices
 import authSlice from './slices/authSlice';
 import documentsSlice from './slices/documentsSlice';
 import uiSlice from './slices/uiSlice';
+import workspaceReducer from './slices/workspaceSlice';  // ✅ Added
+import invitationReducer from './slices/invitationSlice';  // ✅ Added
 
-// Auth persist configuration - more specific
+// Auth persist configuration
 const authPersistConfig = {
   key: 'auth',
   storage,
-  whitelist: ['user', 'token', 'isAuthenticated'], // Only persist essential auth data
-  blacklist: ['loading', 'error'] // Don't persist loading states
+  whitelist: ['user', 'token', 'isAuthenticated'],
+  blacklist: ['loading', 'error']
 };
 
-// Root reducer with proper structure
+// Root reducer with all slices
 const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authSlice),
   documents: documentsSlice,
   ui: uiSlice,
+  workspaces: workspaceReducer,  // ✅ Added
+  invitations: invitationReducer  // ✅ Added
 });
 
 // Main persist configuration
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['auth'], // Only persist auth state
-  blacklist: ['documents', 'ui'] // Don't persist documents and UI state
+  whitelist: ['auth'],
+  blacklist: ['documents', 'ui', 'workspaces', 'invitations']  // You can persist more if needed
 };
 
 // Create persisted reducer
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
-// Configure store with middleware
+// Configure store
 export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
@@ -55,10 +57,6 @@ export const store = configureStore({
   devTools: process.env.NODE_ENV !== 'production',
 });
 
-// Create persistor
 export const persistor = persistStore(store);
-
-// Export types for better type checking
 export const selectRootState = (state) => state;
-
 export default store;
