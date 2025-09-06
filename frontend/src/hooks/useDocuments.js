@@ -63,13 +63,19 @@ export const useDocuments = (workspaceId = null) => {
   const dispatch = useDispatch();
 
   // Set workspace context
+// Add this AFTER the useCallback definitions
+// Add this useEffect to ensure data is fetched
 useEffect(() => {
-  if (!workspaceId) {
-    fetchDocuments();
+  console.log('Fetching data for:', { workspaceId, currentWorkspaceId });
+  
+  if (workspaceId) {
+    // Workspace context
+    dispatch(fetchWorkspaceDocuments({ workspaceId }));
   } else {
-    fetchWorkspaceDocuments(workspaceId);
+    // General documents context
+    dispatch(fetchDocuments());
   }
-}, [workspaceId, fetchDocuments, fetchWorkspaceDocuments]);
+}, [dispatch, workspaceId]);
 
 
 
@@ -79,27 +85,8 @@ useEffect(() => {
    // 🔧 FIXED: Simplified workspace documents selector
 // Inside the workspaceDocuments selector
 const workspaceDocuments = useSelector(state => {
-  console.log("----Selector check:", {
-    workspaceId,
-    currentWorkspaceId: state.documents.currentWorkspaceId,
-    allDocuments: state.documents.documents,
-    workspaceDocuments: state.documents.workspaceDocuments
-  });
-
-  if (workspaceId && state.documents.workspaceDocuments) {
-    const docs = state.documents.workspaceDocuments[workspaceId];
-    console.log("----Found docs for workspaceId:", workspaceId, docs);
-    return Array.isArray(docs) ? docs : [];
-  }
-  
-  if (state.documents.currentWorkspaceId && state.documents.workspaceDocuments) {
-    const docs = state.documents.workspaceDocuments[state.documents.currentWorkspaceId];
-    console.log("----Found docs for currentWorkspaceId:", state.documents.currentWorkspaceId, docs);
-    return Array.isArray(docs) ? docs : [];
-  }
-
-  console.log("----Returning global documents:", state.documents.documents);
-  return Array.isArray(state.documents.documents) ? state.documents.documents : [];
+  if (!workspaceId) return state.documents.documents || [];
+  return state.documents.workspaceDocuments?.[workspaceId] || [];
 });
 
   const sharedDocuments = useSelector(selectSharedDocuments);
@@ -145,15 +132,18 @@ useEffect(() => {
   // ===== DOCUMENT FETCHING =====
 
   // Fetch all documents (user's documents across workspaces)
-  const handleFetchDocuments = useCallback(async (params = {}) => {
-    try {
-      const result = await dispatch(fetchDocuments(params));
-      return fetchDocuments.fulfilled.match(result);
-    } catch (error) {
-      console.error('Fetch documents error:', error);
-      return false;
-    }
-  }, [dispatch]);
+// Make sure this function actually dispatches the action
+const handleFetchDocuments = useCallback(async (params = {}) => {
+  try {
+    console.log('Actually dispatching fetchDocuments...');
+    const result = await dispatch(fetchDocuments(params));
+    console.log('Fetch result:', result);
+    return fetchDocuments.fulfilled.match(result);
+  } catch (error) {
+    console.error('Fetch documents error:', error);
+    return false;
+  }
+}, [dispatch]);
 
  // 🔧 FIXED: Enhanced workspace documents fetching
   const handleFetchWorkspaceDocuments = useCallback(async (targetWorkspaceId, options = {}) => {

@@ -4,9 +4,9 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
-import  Avatar  from '../components/ui/Avatar';
-import  WorkspaceSelector  from '../components/workspace/WorkspaceSelector';
-import  PermissionGuard  from '../components/permissions/PermissionGuard';
+import Avatar from '../components/ui/Avatar';
+import WorkspaceSelector from '../components/workspace/WorkspaceSelector';
+import PermissionGuard from '../components/permissions/PermissionGuard';
 import { useAuth } from '../hooks/useAuth';
 import { useDocuments } from '../hooks/useDocuments';
 import { useWorkspaces } from '../hooks/useWorkspaces';
@@ -30,6 +30,11 @@ import {
   AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+// Add this right at the top of your DocumentList component
+
+
+
+
 
 const DocumentList = () => {
   const { workspaceId } = useParams();
@@ -69,25 +74,25 @@ const DocumentList = () => {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Initialize filters from URL params
-  
- useEffect(() => {
-  const category = searchParams.get('category') || '';
-  const tag = searchParams.get('tag') || '';
-  const type = searchParams.get('type') || '';
-  const favorite = searchParams.get('favorite') === 'true';
 
-  setDocumentFilters(prev => {
-    if (
-      prev.category === category &&
-      prev.tag === tag &&
-      prev.type === type &&
-      prev.favorite === favorite
-    ) {
-      return prev; // No change, skip update
-    }
-    return { ...prev, category, tag, type, favorite };
-  });
-}, [searchParams]);
+  useEffect(() => {
+    const category = searchParams.get('category') || '';
+    const tag = searchParams.get('tag') || '';
+    const type = searchParams.get('type') || '';
+    const favorite = searchParams.get('favorite') === 'true';
+
+    setDocumentFilters(prev => {
+      if (
+        prev.category === category &&
+        prev.tag === tag &&
+        prev.type === type &&
+        prev.favorite === favorite
+      ) {
+        return prev; // No change, skip update
+      }
+      return { ...prev, category, tag, type, favorite };
+    });
+  }, [searchParams]);
 
 
   // Redirect unauthenticated users to login
@@ -98,18 +103,20 @@ const DocumentList = () => {
   }, [isAuthenticated, navigate, workspaceId]);
 
   // Load data based on context (workspace or all documents)
-useEffect(() => {
-  if (workspaceId) {
-    fetchWorkspaceDocuments(workspaceId);
-  } else {
-    fetchDocuments();   // <-- fetch all documents when no workspaceId
-  }
-}, [workspaceId, fetchWorkspaceDocuments, fetchDocuments]);
+  useEffect(() => {
+    if (workspaceId) {
+      fetchWorkspaceDocuments(workspaceId);
+    } else {
+      fetchDocuments();   // <-- fetch all documents when no workspaceId
+    }
+  }, [workspaceId, fetchWorkspaceDocuments, fetchDocuments]);
 
-const handleSearch = (term) => {
-  setSearchQuery(term);
-  setDocumentFilters({ ...documentFilters, searchTerm: term });
-};
+
+  
+  const handleSearch = (term) => {
+    setSearchQuery(term);
+    setDocumentFilters({ ...documentFilters, searchTerm: term });
+  };
   // Get current document list based on context
   const currentDocuments = workspaceId ? workspaceDocuments : documents;
   const isLoading = documentsLoading || workspacesLoading;
@@ -123,21 +130,21 @@ const handleSearch = (term) => {
       if (!doc) return false;
 
       // Search query filter
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         doc.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // Category filter
-      const matchesCategory = !documentFilters.category || 
+      const matchesCategory = !documentFilters.category ||
         doc.category === documentFilters.category;
 
       // Tag filter
-      const matchesTag = !documentFilters.tag || 
+      const matchesTag = !documentFilters.tag ||
         doc.tags?.includes(documentFilters.tag);
 
       // File type filter
-      const matchesType = !documentFilters.type || 
+      const matchesType = !documentFilters.type ||
         doc.mimeType?.includes(documentFilters.type) ||
         doc.fileType?.includes(documentFilters.type);
 
@@ -147,16 +154,25 @@ const handleSearch = (term) => {
       // Date range filter
       const matchesDateRange = !documentFilters.dateFrom || !documentFilters.dateTo ||
         (new Date(doc.uploadDate) >= new Date(documentFilters.dateFrom) &&
-         new Date(doc.uploadDate) <= new Date(documentFilters.dateTo));
+          new Date(doc.uploadDate) <= new Date(documentFilters.dateTo));
 
       // Size filter
       const matchesSize = !documentFilters.minSize || !documentFilters.maxSize ||
         (doc.size >= documentFilters.minSize && doc.size <= documentFilters.maxSize);
 
-      return matchesSearch && matchesCategory && matchesTag && 
-             matchesType && matchesFavorite && matchesDateRange && matchesSize;
+      return matchesSearch && matchesCategory && matchesTag &&
+        matchesType && matchesFavorite && matchesDateRange && matchesSize;
     });
   }, [currentDocuments, searchQuery, documentFilters]);
+
+
+console.log('Route params:', { 
+  workspaceId, 
+  pathname: window.location.pathname,
+  searchParams: Object.fromEntries(searchParams)
+});
+
+
 
   // Get unique values for filter options
   const filterOptions = React.useMemo(() => {
@@ -164,7 +180,7 @@ const handleSearch = (term) => {
 
     const categories = [...new Set(currentDocuments.map(doc => doc.category).filter(Boolean))];
     const tags = [...new Set(currentDocuments.flatMap(doc => doc.tags || []))];
-    const types = [...new Set(currentDocuments.map(doc => 
+    const types = [...new Set(currentDocuments.map(doc =>
       doc.mimeType || doc.fileType || 'Unknown'
     ).filter(Boolean))];
 
@@ -188,7 +204,7 @@ const handleSearch = (term) => {
       const response = await apiService.documentApi.downloadDocument(documentId);
       const blobData = response.data || response;
       const blob = blobData instanceof Blob ? blobData : new Blob([blobData]);
-      
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -213,7 +229,7 @@ const handleSearch = (term) => {
 
   // Bulk actions
   const handleSelectDocument = (documentId) => {
-    setSelectedDocuments(prev => 
+    setSelectedDocuments(prev =>
       prev.includes(documentId)
         ? prev.filter(id => id !== documentId)
         : [...prev, documentId]
@@ -230,7 +246,7 @@ const handleSearch = (term) => {
 
   const handleBulkDelete = async () => {
     if (selectedDocuments.length === 0) return;
-    
+
     if (window.confirm(`Are you sure you want to delete ${selectedDocuments.length} documents?`)) {
       setBulkActionLoading(true);
       try {
@@ -256,7 +272,7 @@ const handleSearch = (term) => {
   const getFileTypeIcon = (type) => {
     if (!type) return 'text-gray-400';
     const fileType = type.toLowerCase();
-    
+
     if (fileType.includes('pdf')) return 'text-red-500';
     if (fileType.includes('doc') || fileType.includes('word')) return 'text-blue-500';
     if (fileType.includes('xls') || fileType.includes('sheet')) return 'text-green-500';
@@ -264,7 +280,7 @@ const handleSearch = (term) => {
     if (fileType.includes('image')) return 'text-purple-500';
     if (fileType.includes('zip') || fileType.includes('rar')) return 'text-yellow-600';
     if (fileType.includes('txt')) return 'text-gray-500';
-    
+
     return 'text-gray-400';
   };
 
@@ -282,6 +298,39 @@ const handleSearch = (term) => {
     return docOwner === userId;
   };
 
+
+useEffect(() => {
+  console.log('DocumentList Debug:', {
+    workspaceId,
+    documents: documents?.length || 0,
+    workspaceDocuments: workspaceDocuments?.length || 0,
+    currentDocuments: currentDocuments?.length || 0,
+    isLoading,
+    error
+  });
+}, [workspaceId, documents, workspaceDocuments, currentDocuments, isLoading, error]);
+
+
+
+// In DocumentList.js, add this useEffect
+useEffect(() => {
+  console.log('Full Redux State:', {
+    documents: documents,
+    workspaceDocuments: workspaceDocuments,
+    error: error
+  });
+}, [documents, workspaceDocuments, error]);
+
+
+// Add this right after your hooks in DocumentList
+useEffect(() => {
+  if (!isLoading && documents.length === 0 && !error) {
+    console.log('Force fetching documents...');
+    fetchDocuments();
+  }
+}, [isLoading, documents.length, error, fetchDocuments]);
+
+
   // If not authenticated, don't render anything (will redirect via useEffect)
   if (!isAuthenticated) {
     return (
@@ -296,6 +345,29 @@ const handleSearch = (term) => {
     <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
+
+
+         <div>
+              // Add this temporarily for testing
+<button onClick={async () => {
+  try {
+    console.log('Testing direct API call...');
+    const result = await fetch('/api/documents', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}` // or however you handle auth
+      }
+    });
+    const data = await result.json();
+    console.log('Direct API result:', data);
+  } catch (err) {
+    console.error('Direct API error:', err);
+  }
+}}>
+  Test Direct API
+</button>
+            </div>
+
+            
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 space-y-4 lg:space-y-0">
           <div>
             <div className="flex items-center space-x-3 mb-2">
@@ -303,7 +375,7 @@ const handleSearch = (term) => {
                 <BuildingOfficeIcon className="h-6 w-6 text-gray-500 dark:text-gray-400" />
               )}
               <h1 className="text-3xl font-bold text-gray-800 dark:text-white">
-                {workspaceId && currentWorkspace 
+                {workspaceId && currentWorkspace
                   ? `${currentWorkspace.name} Documents`
                   : 'Document Library'
                 }
@@ -322,7 +394,10 @@ const handleSearch = (term) => {
                 </span>
               )}
             </div>
+           
           </div>
+
+
 
           <div className="flex items-center space-x-3">
             {/* Workspace Selector (only show when not in workspace context) */}
@@ -340,35 +415,33 @@ const handleSearch = (term) => {
             <div className="flex rounded-lg border border-gray-300 dark:border-gray-600">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 ${
-                  viewMode === 'grid'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                } rounded-l-lg border-r border-gray-300 dark:border-gray-600`}
+                className={`p-2 ${viewMode === 'grid'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  } rounded-l-lg border-r border-gray-300 dark:border-gray-600`}
               >
                 <Squares2X2Icon className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 ${
-                  viewMode === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                } rounded-r-lg`}
+                className={`p-2 ${viewMode === 'list'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  } rounded-r-lg`}
               >
                 <Bars3Icon className="h-4 w-4" />
               </button>
             </div>
 
             {/* Upload Button */}
-            <PermissionGuard 
-              permissions={['write']} 
+            <PermissionGuard
+              permissions={['write']}
               workspaceId={workspaceId}
               fallback={!workspaceId}
             >
               <Button
                 onClick={() => navigate(
-                  workspaceId 
+                  workspaceId
                     ? `/workspaces/${workspaceId}/upload`
                     : '/documents/upload'
                 )}
@@ -388,18 +461,13 @@ const handleSearch = (term) => {
               {/* Search */}
               <div className="flex-1 relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                 <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        placeholder="Search documents..."
-      />
-      {documentsLoading && <p>Loading documents...</p>}
-      <ul>
-        {(workspaceDocuments || []).map(doc => (
-          <li key={doc.id}>{doc.name}</li>
-        ))}
-      </ul>
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search documents..."
+                  className="pl-10"
+                />
               </div>
 
               {/* Filter Toggle */}
@@ -570,19 +638,19 @@ const handleSearch = (term) => {
                   No documents yet
                 </h3>
                 <p className="text-gray-600 dark:text-gray-300 mb-4">
-                  {workspaceId 
+                  {workspaceId
                     ? 'Get started by uploading your first document to this workspace.'
                     : 'Upload your first document to get started.'
                   }
                 </p>
-                <PermissionGuard 
-                  permissions={['write']} 
+                <PermissionGuard
+                  permissions={['write']}
                   workspaceId={workspaceId}
                   fallback={!workspaceId}
                 >
                   <Button
                     onClick={() => navigate(
-                      workspaceId 
+                      workspaceId
                         ? `/workspaces/${workspaceId}/upload`
                         : '/documents/upload'
                     )}
@@ -692,7 +760,7 @@ const handleSearch = (term) => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => navigate(
-                        workspaceId 
+                        workspaceId
                           ? `/workspaces/${workspaceId}/documents/${doc._id}`
                           : `/documents/preview/${doc._id}`
                       )}
@@ -708,8 +776,8 @@ const handleSearch = (term) => {
                     >
                       <ArrowDownTrayIcon className="h-4 w-4" />
                     </button>
-                    <PermissionGuard 
-                      permissions={['write']} 
+                    <PermissionGuard
+                      permissions={['write']}
                       workspaceId={workspaceId}
                       fallback={isOwner(doc)}
                     >
@@ -722,8 +790,8 @@ const handleSearch = (term) => {
                       </button>
                     </PermissionGuard>
                   </div>
-                  <Badge 
-                    variant={doc.isPublic ? 'success' : 'gray'} 
+                  <Badge
+                    variant={doc.isPublic ? 'success' : 'gray'}
                     size="sm"
                   >
                     {doc.isPublic ? 'Public' : 'Private'}
@@ -856,7 +924,7 @@ const handleSearch = (term) => {
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             onClick={() => navigate(
-                              workspaceId 
+                              workspaceId
                                 ? `/workspaces/${workspaceId}/documents/${doc._id}`
                                 : `/documents/preview/${doc._id}`
                             )}
@@ -872,8 +940,8 @@ const handleSearch = (term) => {
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
                           </button>
-                          <PermissionGuard 
-                            permissions={['write']} 
+                          <PermissionGuard
+                            permissions={['write']}
                             workspaceId={workspaceId}
                             fallback={isOwner(doc)}
                           >

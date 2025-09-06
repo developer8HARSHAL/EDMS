@@ -567,13 +567,19 @@ builder
     state.loading = true;
     state.error = null;
   })
-  .addCase(fetchDocuments.fulfilled, (state, action) => {
-    state.loading = false;
-    // 🔧 FIXED: Only handle general documents, not workspace-specific
-    state.documents = Array.isArray(action.payload) ? action.payload : [];
-    state.pagination.totalDocuments = state.documents.length || 0;
-    state.error = null;
-  })
+.addCase(fetchDocuments.fulfilled, (state, action) => {
+  state.loading = false;
+  
+  // Handle the actual API response structure
+  const documents = action.payload.data || action.payload || [];
+  state.documents = Array.isArray(documents) ? documents : [];
+  
+  // Update pagination
+  state.pagination.totalDocuments = action.payload.count || state.documents.length;
+  
+  console.log(`Stored ${state.documents.length} documents in Redux`);
+  state.error = null;
+})
   .addCase(fetchDocuments.rejected, (state, action) => {
     state.loading = false;
     state.error = action.payload;
