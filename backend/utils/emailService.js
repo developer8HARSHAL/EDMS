@@ -7,7 +7,16 @@ const nodemailer = require('nodemailer');
 class EmailService {
   constructor() {
     this.transporter = null;
-    this.initializeTransporter();
+    this.initialized = false; // ✅ ADD: Flag to track initialization
+    // ✅ REMOVE: this.initializeTransporter(); - Don't run immediately
+  }
+
+  // ✅ ADD: New lazy initialization method
+  ensureInitialized() {
+    if (!this.initialized) {
+      this.initializeTransporter();
+      this.initialized = true;
+    }
   }
 
   /**
@@ -15,24 +24,60 @@ class EmailService {
    */
   initializeTransporter() {
     try {
-      this.transporter = nodemailer.createTransporter({
-        service: process.env.EMAIL_SERVICE || 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
+      // 🔥 IMPROVED VALIDATION - More robust checking
+      const emailUser = process.env.EMAIL_USER?.trim();
+      const emailPass = process.env.EMAIL_PASS?.trim();
+      
+      console.log('🔍 Email Service Debug:', {
+        EMAIL_USER: emailUser ? `${emailUser.substring(0, 5)}***@${emailUser.split('@')[1] || 'unknown'}` : 'MISSING',
+        EMAIL_PASS_LENGTH: emailPass ? emailPass.length : 0,
+        EMAIL_PASS_EXISTS: !!emailPass,
+        EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail'
       });
+
+      if (!emailUser || emailUser.length === 0) {
+        console.error('❌ EMAIL_USER is missing or empty');
+        console.error('Current EMAIL_USER value:', JSON.stringify(process.env.EMAIL_USER));
+        return;
+      }
+
+      if (!emailPass || emailPass.length === 0) {
+        console.error('❌ EMAIL_PASS is missing or empty');
+        console.error('EMAIL_PASS exists in env?', 'EMAIL_PASS' in process.env);
+        console.error('EMAIL_PASS length:', process.env.EMAIL_PASS?.length || 0);
+        return;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailUser)) {
+        console.error('❌ EMAIL_USER is not a valid email format:', emailUser);
+        return;
+      }
+
+      console.log('✅ Email credentials validation passed');
+
+    this.transporter = nodemailer.createTransport({  // ✅ REMOVE the 'er' - it's createTransport, not createTransporter
+  service: process.env.EMAIL_SERVICE || 'gmail',
+  auth: {
+    user: emailUser,
+    pass: emailPass
+  }
+});
 
       // Verify connection
       this.transporter.verify((error, success) => {
         if (error) {
-          console.error('Email service connection failed:', error);
+          console.error('❌ Email service connection failed:', error.message);
+          console.error('Full error:', error);
         } else {
-          console.log('Email service ready');
+          console.log('✅ Email service ready and verified');
         }
       });
+
     } catch (error) {
-      console.error('Failed to initialize email service:', error);
+      console.error('❌ Failed to initialize email service:', error);
+      console.error('Stack trace:', error.stack);
     }
   }
 
@@ -283,10 +328,12 @@ class EmailService {
    * Send workspace invitation email
    */
   async sendInvitationEmail(invitationData) {
-    try {
-      if (!this.transporter) {
-        throw new Error('Email service not initialized');
-      }
+  try {
+    this.ensureInitialized(); // ✅ ADD: Ensure initialization before use
+    
+    if (!this.transporter) {
+      throw new Error('Email service not initialized - check your EMAIL_USER and EMAIL_PASS environment variables');
+    }
 
       const {
         recipientEmail,
@@ -315,7 +362,6 @@ class EmailService {
         to: recipientEmail,
         subject: `🎉 You're invited to join "${workspaceName}" workspace`,
         html: htmlContent,
-        // Plain text fallback
         text: `
 Hi there!
 
@@ -335,10 +381,11 @@ ${process.env.APP_NAME || 'Document Management System'}
 
       const result = await this.transporter.sendMail(mailOptions);
       
-      console.log('Invitation email sent successfully:', {
+      console.log('✅ Invitation email sent successfully:', {
         messageId: result.messageId,
         recipient: recipientEmail,
-        workspace: workspaceName
+        workspace: workspaceName,
+        acceptUrl: acceptUrl
       });
 
       return {
@@ -346,7 +393,7 @@ ${process.env.APP_NAME || 'Document Management System'}
         messageId: result.messageId
       };
     } catch (error) {
-      console.error('Failed to send invitation email:', error);
+      console.error('❌ Failed to send invitation email:', error);
       throw error;
     }
   }
@@ -354,14 +401,15 @@ ${process.env.APP_NAME || 'Document Management System'}
   /**
    * Send invitation reminder email
    */
-  async sendReminderEmail(invitationData) {
-    try {
-      const modifiedData = {
-        ...invitationData,
-        isReminder: true
-      };
+ async sendReminderEmail(invitationData) {
+  try {
+    this.ensureInitialized(); // ✅ ADD: Ensure initialization before use
+    
+    const modifiedData = {
+      ...invitationData,
+      isReminder: true
+    };
 
-      // Modify the template slightly for reminders
       const originalSubject = `🎉 You're invited to join "${invitationData.workspaceName}" workspace`;
       const reminderSubject = `🔔 Reminder: ${originalSubject}`;
 
@@ -402,7 +450,7 @@ This invitation expires on ${new Date(invitationData.expiresAt).toLocaleDateStri
         messageId: result.messageId
       };
     } catch (error) {
-      console.error('Failed to send reminder email:', error);
+      console.error('❌ Failed to send reminder email:', error);
       throw error;
     }
   }
@@ -410,16 +458,18 @@ This invitation expires on ${new Date(invitationData.expiresAt).toLocaleDateStri
   /**
    * Test email service connection
    */
-  async testConnection() {
-    try {
-      if (!this.transporter) {
-        throw new Error('Email service not initialized');
-      }
+ async testConnection() {
+  try {
+    this.ensureInitialized(); // ✅ ADD: Ensure initialization before use
+    
+    if (!this.transporter) {
+      throw new Error('Email service not initialized - check your EMAIL_USER and EMAIL_PASS environment variables');
+    }
 
       await this.transporter.verify();
       return { success: true, message: 'Email service connection successful' };
     } catch (error) {
-      console.error('Email service test failed:', error);
+      console.error('❌ Email service test failed:', error);
       return { success: false, error: error.message };
     }
   }

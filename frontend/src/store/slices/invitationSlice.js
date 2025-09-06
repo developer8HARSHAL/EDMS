@@ -1,5 +1,7 @@
+// ✅ FIXED: Complete invitationSlice.js with enhanced logging and error handling
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { invitationApi } from '../../services/apiService'; // ✅ FIXED: Use invitationApi instead of generic apiService
+import { invitationApi } from '../../services/apiService';
 
 // Initial state - FIXED: Ensure all properties are defined
 const initialState = {
@@ -33,9 +35,41 @@ const initialState = {
   }
 };
 
-// ✅ FIXED: Updated async thunks to use invitationApi
+// ✅ ENHANCED: acceptInvitation thunk with improved logging
+export const acceptInvitation = createAsyncThunk(
+  'invitations/acceptInvitation',
+  async (token, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Redux thunk: Accepting invitation with token:', token);
+      const response = await invitationApi.acceptInvitation(token);
+      console.log('✅ Redux thunk: Invitation accepted successfully:', response);
+      return { token, data: response };
+    } catch (error) {
+      console.error('❌ Redux thunk: Accept invitation failed:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to accept invitation';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
 
-// Send invitation
+// ✅ ENHANCED: rejectInvitation thunk with improved logging
+export const rejectInvitation = createAsyncThunk(
+  'invitations/rejectInvitation',
+  async (token, { rejectWithValue }) => {
+    try {
+      console.log('🔄 Redux thunk: Rejecting invitation with token:', token);
+      const response = await invitationApi.rejectInvitation(token);
+      console.log('✅ Redux thunk: Invitation rejected successfully:', response);
+      return { token, data: response };
+    } catch (error) {
+      console.error('❌ Redux thunk: Reject invitation failed:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to reject invitation';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+// Other thunks remain the same...
 export const sendInvitation = createAsyncThunk(
   'invitations/sendInvitation',
   async (invitationData, { rejectWithValue }) => {
@@ -48,7 +82,6 @@ export const sendInvitation = createAsyncThunk(
   }
 );
 
-// Get user's pending invitations
 export const fetchPendingInvitations = createAsyncThunk(
   'invitations/fetchPendingInvitations',
   async (_, { rejectWithValue }) => {
@@ -61,7 +94,6 @@ export const fetchPendingInvitations = createAsyncThunk(
   }
 );
 
-// Get workspace invitations
 export const fetchWorkspaceInvitations = createAsyncThunk(
   'invitations/fetchWorkspaceInvitations',
   async ({ workspaceId, status, page = 1, limit = 10 }, { rejectWithValue }) => {
@@ -74,7 +106,6 @@ export const fetchWorkspaceInvitations = createAsyncThunk(
   }
 );
 
-// Get invitation details by token (for invitation page)
 export const fetchInvitationDetails = createAsyncThunk(
   'invitations/fetchInvitationDetails',
   async (token, { rejectWithValue }) => {
@@ -87,33 +118,6 @@ export const fetchInvitationDetails = createAsyncThunk(
   }
 );
 
-// Accept invitation
-export const acceptInvitation = createAsyncThunk(
-  'invitations/acceptInvitation',
-  async (token, { rejectWithValue }) => {
-    try {
-      const response = await invitationApi.acceptInvitation(token);
-      return { token, data: response };
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to accept invitation');
-    }
-  }
-);
-
-// Reject invitation
-export const rejectInvitation = createAsyncThunk(
-  'invitations/rejectInvitation',
-  async (token, { rejectWithValue }) => {
-    try {
-      const response = await invitationApi.rejectInvitation(token);
-      return { token, data: response };
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to reject invitation');
-    }
-  }
-);
-
-// Cancel invitation (by inviter/admin)
 export const cancelInvitation = createAsyncThunk(
   'invitations/cancelInvitation',
   async (invitationId, { rejectWithValue }) => {
@@ -126,7 +130,6 @@ export const cancelInvitation = createAsyncThunk(
   }
 );
 
-// Resend invitation
 export const resendInvitation = createAsyncThunk(
   'invitations/resendInvitation',
   async (invitationId, { rejectWithValue }) => {
@@ -139,7 +142,6 @@ export const resendInvitation = createAsyncThunk(
   }
 );
 
-// Cleanup expired invitations (admin only)
 export const cleanupExpiredInvitations = createAsyncThunk(
   'invitations/cleanupExpiredInvitations',
   async (_, { rejectWithValue }) => {
@@ -152,7 +154,7 @@ export const cleanupExpiredInvitations = createAsyncThunk(
   }
 );
 
-// Invitation slice
+// ✅ ENHANCED: Slice with improved extraReducers
 const invitationSlice = createSlice({
   name: 'invitations',
   initialState,
@@ -227,8 +229,6 @@ const invitationSlice = createSlice({
       })
       .addCase(sendInvitation.fulfilled, (state, action) => {
         state.sendingInvitation = false;
-        // Add to workspace invitations if we're viewing them
-        // This would typically be handled by refetching workspace invitations
       })
       .addCase(sendInvitation.rejected, (state, action) => {
         state.sendingInvitation = false;
@@ -242,7 +242,6 @@ const invitationSlice = createSlice({
       })
       .addCase(fetchPendingInvitations.fulfilled, (state, action) => {
         state.loading = false;
-        // ✅ FIXED: Handle different response structures safely
         state.pendingInvitations = action.payload.data || action.payload || [];
       })
       .addCase(fetchPendingInvitations.rejected, (state, action) => {
@@ -258,7 +257,6 @@ const invitationSlice = createSlice({
       })
       .addCase(fetchWorkspaceInvitations.fulfilled, (state, action) => {
         state.loading = false;
-        // ✅ FIXED: Handle different response structures safely
         const responseData = action.payload.data || action.payload;
         state.workspaceInvitations = responseData.invitations || responseData || [];
         state.pagination = {
@@ -280,7 +278,6 @@ const invitationSlice = createSlice({
       })
       .addCase(fetchInvitationDetails.fulfilled, (state, action) => {
         state.loading = false;
-        // ✅ FIXED: Handle different response structures safely
         state.currentInvitation = action.payload.data || action.payload;
       })
       .addCase(fetchInvitationDetails.rejected, (state, action) => {
@@ -289,36 +286,46 @@ const invitationSlice = createSlice({
         state.currentInvitation = null;
       })
       
-      // Accept invitation
+      // ✅ ENHANCED: Accept invitation with improved logging
       .addCase(acceptInvitation.pending, (state) => {
         state.processingInvitation = true;
         state.error = null;
+        console.log('🔄 Redux: Accept invitation pending');
       })
       .addCase(acceptInvitation.fulfilled, (state, action) => {
         state.processingInvitation = false;
-        const { token } = action.payload;
+        const { token, data } = action.payload;
+        
+        console.log('✅ Redux: Invitation accepted, updating state');
         
         // Remove from pending invitations
         state.pendingInvitations = state.pendingInvitations.filter(
           invitation => invitation.token !== token
         );
         
-        // Clear current invitation
+        // Clear current invitation to prevent re-processing
         state.currentInvitation = null;
+        
+        // Clear any errors
+        state.error = null;
       })
       .addCase(acceptInvitation.rejected, (state, action) => {
         state.processingInvitation = false;
         state.error = action.payload;
+        console.error('❌ Redux: Accept invitation rejected:', action.payload);
       })
       
-      // Reject invitation
+      // ✅ ENHANCED: Reject invitation with improved logging
       .addCase(rejectInvitation.pending, (state) => {
         state.processingInvitation = true;
         state.error = null;
+        console.log('🔄 Redux: Reject invitation pending');
       })
       .addCase(rejectInvitation.fulfilled, (state, action) => {
         state.processingInvitation = false;
-        const { token } = action.payload;
+        const { token, data } = action.payload;
+        
+        console.log('✅ Redux: Invitation rejected, updating state');
         
         // Remove from pending invitations
         state.pendingInvitations = state.pendingInvitations.filter(
@@ -327,10 +334,14 @@ const invitationSlice = createSlice({
         
         // Clear current invitation
         state.currentInvitation = null;
+        
+        // Clear any errors
+        state.error = null;
       })
       .addCase(rejectInvitation.rejected, (state, action) => {
         state.processingInvitation = false;
         state.error = action.payload;
+        console.error('❌ Redux: Reject invitation rejected:', action.payload);
       })
       
       // Cancel invitation
@@ -380,7 +391,6 @@ const invitationSlice = createSlice({
       .addCase(cleanupExpiredInvitations.fulfilled, (state, action) => {
         state.loading = false;
         // Could show a success message with cleanup results
-        // action.payload.data contains { expired: number, cleaned: number }
       })
       .addCase(cleanupExpiredInvitations.rejected, (state, action) => {
         state.loading = false;
@@ -402,7 +412,7 @@ export const {
   updateInvitationExpiry
 } = invitationSlice.actions;
 
-// ✅ FIXED: Safe selectors with proper error handling and fallbacks
+// ✅ SAFE: Selectors with proper error handling
 export const selectInvitationsState = (state) => {
   try {
     return state?.invitations || initialState;
@@ -430,11 +440,11 @@ export const selectWorkspaceInvitations = (state) => {
   }
 };
 
-export const selectCurrentInvitation = (state) => {
+export const selectInvitationDetails = (state) => {
   try {
     return state?.invitations?.currentInvitation || null;
   } catch (error) {
-    console.warn('CurrentInvitation selector error:', error);
+    console.warn('InvitationDetails selector error:', error);
     return null;
   }
 };
@@ -493,7 +503,6 @@ export const selectInvitationsFilters = (state) => {
   }
 };
 
-// Complex selectors with error handling
 export const selectPendingInvitationsCount = (state) => {
   try {
     return state?.invitations?.pendingInvitations?.length || 0;
@@ -537,17 +546,6 @@ export const selectInvitationById = (state, invitationId) => {
   }
 };
 
-// FIXED: Safe selector for invitation details
-export const selectInvitationDetails = (state) => {
-  try {
-    return state?.invitations?.currentInvitation || null;
-  } catch (error) {
-    console.warn('InvitationDetails selector error:', error);
-    return null;
-  }
-};
-
-// Helper selector to check if user has pending invitations
 export const selectHasPendingInvitations = (state) => {
   try {
     const invitations = state?.invitations?.pendingInvitations || [];
@@ -558,7 +556,6 @@ export const selectHasPendingInvitations = (state) => {
   }
 };
 
-// Helper selector to get invitation statistics
 export const selectInvitationStats = (state) => {
   try {
     const invitations = state?.invitations?.workspaceInvitations || [];

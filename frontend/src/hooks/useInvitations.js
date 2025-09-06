@@ -39,18 +39,18 @@ const INVITATION_STATUS = {
 /**
  * Custom hook for invitation operations
  * Provides a comprehensive API for managing workspace invitations
- * FIXED: Proper error handling and safe hook usage
+ * ✅ FIXED: Proper error handling and safe hook usage with correct auth properties
  */
 export const useInvitations = () => {
   const dispatch = useDispatch();
   
-  // FIXED: Safe useAuth call with error handling
+  // ✅ FIXED: Safe useAuth call with correct property names
   const authHook = useAuth();
   const user = authHook?.user || null;
   const isAuthenticated = authHook?.isAuthenticated || false;
-  const authReady = authHook?.authReady || false;
+  const authReady = authHook?.isAuthReady || false;  // ✅ CRITICAL FIX: Use isAuthReady instead of authReady
 
-  // FIXED: Safe selectors with error handling
+  // ✅ FIXED: Safe selectors with error handling
   const pendingInvitations = useSelector((state) => {
     try {
       return selectPendingInvitations(state) || [];
@@ -141,19 +141,33 @@ export const useInvitations = () => {
     }
   });
 
-  // FIXED: Check if dispatch is ready
+  // ✅ FIXED: Check if dispatch is ready with correct auth property
   const isDispatchReady = useMemo(() => {
-    return typeof dispatch === 'function' && authReady;
-  }, [dispatch, authReady]);
+    return typeof dispatch === 'function' && authReady && isAuthenticated;
+  }, [dispatch, authReady, isAuthenticated]);  // ✅ CRITICAL FIX: Use authReady (which now comes from isAuthReady)
 
-  // Core invitation operations - FIXED: Stable useCallback dependencies
+  // Core invitation operations - ✅ FIXED: Stable useCallback dependencies
   const sendInvitationAction = useCallback((invitationData) => {
-    if (!isDispatchReady) {
-      console.warn('Dispatch not ready for sendInvitation');
-      return Promise.reject(new Error('Store not ready'));
-    }
-    return dispatch(sendInvitation(invitationData));
-  }, [dispatch, isDispatchReady]);
+  if (!isDispatchReady) {
+    console.warn('Dispatch not ready for sendInvitation');
+    return Promise.reject(new Error('Store not ready'));
+  }
+  
+  // 🚨 ENHANCED DEBUG LOGGING
+  console.log('🎯 HOOK: Received invitation data:', JSON.stringify(invitationData, null, 2));
+  console.log('🔍 HOOK: workspaceId value:', invitationData.workspaceId);
+  console.log('🔍 HOOK: workspaceId type:', typeof invitationData.workspaceId);
+  console.log('🔍 HOOK: All data keys:', Object.keys(invitationData || {}));
+  
+  if (!invitationData.workspaceId) {
+    console.error('❌ HOOK: workspaceId is missing in hook!');
+    console.error('❌ HOOK: This means the modal did not pass workspaceId correctly');
+  }
+  
+  console.log('🚀 HOOK: About to dispatch to Redux with data:', invitationData);
+  
+  return dispatch(sendInvitation(invitationData));
+}, [dispatch, isDispatchReady]);
 
   const sendBulkInvitations = useCallback(async (invitationsData) => {
     if (!isDispatchReady) {
@@ -170,7 +184,7 @@ export const useInvitations = () => {
   const fetchPendingInvitationsAction = useCallback((params) => {
     if (!isDispatchReady) {
       console.warn('Dispatch not ready for fetchPendingInvitations');
-      return Promise.reject(new Error('Store not ready'));
+      return Promise.resolve([]); // return empty instead of throwing
     }
     return dispatch(fetchPendingInvitations(params));
   }, [dispatch, isDispatchReady]);
@@ -191,19 +205,27 @@ export const useInvitations = () => {
     return dispatch(fetchInvitationDetails(token));
   }, [dispatch, isDispatchReady]);
 
+  // ✅ FIXED: acceptInvitation returns Redux Toolkit thunk for .unwrap() usage
   const acceptInvitationAction = useCallback((token, userData = null) => {
     if (!isDispatchReady) {
       console.warn('Dispatch not ready for acceptInvitation');
       return Promise.reject(new Error('Store not ready'));
     }
+    
+    console.log('🔄 Hook: Dispatching acceptInvitation with token:', token);
+    // ✅ FIXED: Return the thunk result directly for .unwrap() usage
     return dispatch(acceptInvitation(token));
   }, [dispatch, isDispatchReady]);
 
+  // ✅ FIXED: rejectInvitation returns Redux Toolkit thunk for .unwrap() usage
   const rejectInvitationAction = useCallback((token, reason = null) => {
     if (!isDispatchReady) {
       console.warn('Dispatch not ready for rejectInvitation');
       return Promise.reject(new Error('Store not ready'));
     }
+    
+    console.log('🔄 Hook: Dispatching rejectInvitation with token:', token);
+    // ✅ FIXED: Return the thunk result directly for .unwrap() usage
     return dispatch(rejectInvitation(token));
   }, [dispatch, isDispatchReady]);
 
@@ -249,7 +271,7 @@ export const useInvitations = () => {
     }
   }, [dispatch, isDispatchReady]);
 
-  // Helper functions - FIXED: Stable dependencies
+  // Helper functions - ✅ FIXED: Stable dependencies
   const validateEmail = useCallback((email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -479,7 +501,7 @@ export const useInvitations = () => {
     return recommendations;
   }, [workspaceInvitations, getInvitationStatistics]);
 
-  // Computed states using useMemo - FIXED: Stable dependencies
+  // ✅ FIXED: Update the computedStates dependency to use correct auth property
   const computedStates = useMemo(() => ({
     isLoading: loading,
     isSendingInvitation: sendingInvitation,
@@ -493,7 +515,7 @@ export const useInvitations = () => {
     pendingCount: pendingInvitations.length,
     canSendInvitations: user?.permissions?.invite !== false,
     canManageInvitations: user?.role === 'admin' || user?.permissions?.manage,
-    isReady: isDispatchReady && authReady
+    isReady: isDispatchReady && authReady  // ✅ CRITICAL FIX: Use authReady (which now comes from isAuthReady)
   }), [
     loading,
     sendingInvitation,
@@ -505,7 +527,7 @@ export const useInvitations = () => {
     user?.permissions?.manage,
     user?.role,
     isDispatchReady,
-    authReady
+    authReady  // ✅ CRITICAL FIX: Use authReady consistently (which now comes from isAuthReady)
   ]);
 
   // Memoized helper functions that don't use hooks
@@ -523,7 +545,7 @@ export const useInvitations = () => {
     }
   }), [workspaceInvitations]);
 
-  // FIXED: Memoized return object to prevent unnecessary re-renders
+  // ✅ FIXED: Memoized return object to prevent unnecessary re-renders
   return useMemo(() => ({
     // Data
     pendingInvitations,

@@ -36,7 +36,7 @@ const DocumentList = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
-  
+
   const {
     documents,
     workspaceDocuments,
@@ -44,13 +44,13 @@ const DocumentList = () => {
     error: documentsError,
     searchQuery,
     setSearchQuery,
-    documentFilters,
-    setDocumentFilters,
-    fetchUserDocuments,
+    filters: documentFilters,
+    updateFilters: setDocumentFilters, // renamed for convenience
+    fetchDocuments,
     fetchWorkspaceDocuments,
     toggleFavorite,
     deleteDocument
-  } = useDocuments();
+  } = useDocuments(workspaceId); // pass workspaceId here
 
   const {
     workspaces,
@@ -69,22 +69,26 @@ const DocumentList = () => {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Initialize filters from URL params
-  useEffect(() => {
-    const category = searchParams.get('category');
-    const tag = searchParams.get('tag');
-    const type = searchParams.get('type');
-    const favorite = searchParams.get('favorite');
-    
-    if (category || tag || type || favorite) {
-      setDocumentFilters({
-        category: category || '',
-        tag: tag || '',
-        type: type || '',
-        favorite: favorite === 'true',
-        ...documentFilters
-      });
+  
+ useEffect(() => {
+  const category = searchParams.get('category') || '';
+  const tag = searchParams.get('tag') || '';
+  const type = searchParams.get('type') || '';
+  const favorite = searchParams.get('favorite') === 'true';
+
+  setDocumentFilters(prev => {
+    if (
+      prev.category === category &&
+      prev.tag === tag &&
+      prev.type === type &&
+      prev.favorite === favorite
+    ) {
+      return prev; // No change, skip update
     }
-  }, [searchParams]);
+    return { ...prev, category, tag, type, favorite };
+  });
+}, [searchParams]);
+
 
   // Redirect unauthenticated users to login
   useEffect(() => {
@@ -94,20 +98,18 @@ const DocumentList = () => {
   }, [isAuthenticated, navigate, workspaceId]);
 
   // Load data based on context (workspace or all documents)
-  useEffect(() => {
-    if (!isAuthenticated) return;
+useEffect(() => {
+  if (workspaceId) {
+    fetchWorkspaceDocuments(workspaceId);
+  } else {
+    fetchDocuments();   // <-- fetch all documents when no workspaceId
+  }
+}, [workspaceId, fetchWorkspaceDocuments, fetchDocuments]);
 
-    if (workspaceId) {
-      // Workspace context - load workspace and its documents
-      fetchWorkspace(workspaceId);
-      fetchWorkspaceDocuments(workspaceId);
-    } else {
-      // All documents context
-      fetchUserDocuments();
-      fetchWorkspaces(); // For workspace selector
-    }
-  }, [workspaceId, isAuthenticated]);
-
+const handleSearch = (term) => {
+  setSearchQuery(term);
+  setDocumentFilters({ ...documentFilters, searchTerm: term });
+};
   // Get current document list based on context
   const currentDocuments = workspaceId ? workspaceDocuments : documents;
   const isLoading = documentsLoading || workspacesLoading;
@@ -386,13 +388,18 @@ const DocumentList = () => {
               {/* Search */}
               <div className="flex-1 relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="text"
-                  placeholder="Search documents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+                 <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => handleSearch(e.target.value)}
+        placeholder="Search documents..."
+      />
+      {documentsLoading && <p>Loading documents...</p>}
+      <ul>
+        {(workspaceDocuments || []).map(doc => (
+          <li key={doc.id}>{doc.name}</li>
+        ))}
+      </ul>
               </div>
 
               {/* Filter Toggle */}
@@ -403,7 +410,7 @@ const DocumentList = () => {
               >
                 <AdjustmentsHorizontalIcon className="h-4 w-4 mr-2" />
                 Filters
-                {Object.values(documentFilters).some(Boolean) && (
+                {Object.values(documentFilters || {}).some(Boolean) && (
                   <Badge variant="primary" size="sm" className="ml-2">
                     Active
                   </Badge>

@@ -1,4 +1,4 @@
-// src/App.js - Fixed version without Chakra UI
+// App.js - FIXED: Proper Authentication Initialization (Updated for your setup)
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import ApplicationRoutes from './components/ApplicationRoutes';
@@ -6,6 +6,7 @@ import Navbar from './components/Navbar';
 import ErrorBoundary from './components/ErrorBoundary';
 import { validateToken } from './store/slices/authSlice';
 import { selectTokenValidated, selectAuthLoading } from './store/slices/authSlice';
+import { store } from './store';
 
 // Enhanced loading component with Tailwind
 const GlobalLoader = () => (
@@ -32,9 +33,16 @@ function App() {
   const tokenValidated = useSelector(selectTokenValidated);
   const authLoading = useSelector(selectAuthLoading);
 
-  // Initialize authentication on app startup
+  // ✅ CRITICAL FIX: Make store available globally for interceptors
+  useEffect(() => {
+    window.store = store;
+    console.log('🔧 Store made available globally for API interceptors');
+  }, []);
+
+  // ✅ FIXED: Initialize authentication on app startup
   useEffect(() => {
     if (!tokenValidated) {
+      console.log('🚀 Initializing authentication...');
       dispatch(validateToken());
     }
   }, [dispatch, tokenValidated]);

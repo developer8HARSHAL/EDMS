@@ -1,11 +1,13 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
+import { useParams } from 'react-router-dom';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
 
 const PermissionGuard = ({
   children,
   workspaceId,
   requiredRole = null,
+  workspaceIdParam,
   requiredPermissions = [],
   allowedRoles = [],
   fallback = null,
@@ -19,6 +21,20 @@ const PermissionGuard = ({
 }) => {
   const { user: currentUser } = useSelector(state => state.auth);
   const { getUserRole, getUserPermissions, canPerformAction } = useWorkspaces();
+  const routeParams = useParams();
+
+   const actualWorkspaceId = workspaceId || (workspaceIdParam ? routeParams[workspaceIdParam] : null);
+
+
+    console.log('🔐 PermissionGuard Debug:', {
+    workspaceId,
+    workspaceIdParam, 
+    routeParams,
+    actualWorkspaceId,
+    requiredPermissions,
+    allowedRoles
+  });
+
   
   // Get workspace and user data
   const workspace = useSelector(state => 
@@ -46,22 +62,75 @@ const PermissionGuard = ({
     return true;
   };
 
-  const checkPermissions = () => {
-    if (requiredPermissions.length === 0) return true;
-    if (!userPermissions || userPermissions.length === 0) return false;
+  // Replace your checkPermissions function in PermissionGuard with this:
+
+const checkPermissions = () => {
+  if (requiredPermissions.length === 0) return true;
+  
+  console.log('🔐 PermissionGuard checkPermissions debug:');
+  console.log('- requiredPermissions:', requiredPermissions);
+  console.log('- userPermissions:', userPermissions);
+  console.log('- userPermissions type:', typeof userPermissions);
+  
+  // NEW: Handle object-based permissions (your actual format)
+  if (userPermissions && typeof userPermissions === 'object' && !Array.isArray(userPermissions)) {
+    console.log('📋 Using object-based permission checking');
+    
+    // Map permission names to object properties
+    const permissionMap = {
+      'read': 'canView',
+      'view': 'canView', 
+      'write': 'canEdit',
+      'edit': 'canEdit',
+      'add': 'canAdd',
+      'create': 'canAdd',
+      'delete': 'canDelete',
+      'remove': 'canDelete',
+      'invite': 'canInvite',
+      'manage': 'canInvite'
+    };
     
     if (requireAnyPermission) {
       // OR logic - user needs at least one of the required permissions
+      const result = requiredPermissions.some(permission => {
+        const objectKey = permissionMap[permission] || permission;
+        const hasPermission = userPermissions[objectKey] === true;
+        console.log(`- Checking permission '${permission}' -> '${objectKey}':`, hasPermission);
+        return hasPermission;
+      });
+      console.log('🔍 OR logic result:', result);
+      return result;
+    } else {
+      // AND logic - user needs all required permissions  
+      const result = requiredPermissions.every(permission => {
+        const objectKey = permissionMap[permission] || permission;
+        const hasPermission = userPermissions[objectKey] === true;
+        console.log(`- Checking permission '${permission}' -> '${objectKey}':`, hasPermission);
+        return hasPermission;
+      });
+      console.log('🔍 AND logic result:', result);
+      return result;
+    }
+  }
+  
+  // FALLBACK: Handle array-based permissions (if you ever use them)
+  if (Array.isArray(userPermissions)) {
+    console.log('📋 Using array-based permission checking');
+    
+    if (requireAnyPermission) {
       return requiredPermissions.some(permission => 
         userPermissions.includes(permission)
       );
     } else {
-      // AND logic - user needs all required permissions
       return requiredPermissions.every(permission => 
         userPermissions.includes(permission)
       );
     }
-  };
+  }
+  
+  console.log('❌ No valid permissions format found');
+  return false;
+};
 
   const checkOwnership = () => {
     if (!requireOwnership) return true;

@@ -40,10 +40,10 @@ const createWorkspace = async (req, res) => {
     await workspace.populate('members.user', 'name email');
 
     res.status(201).json({
-      success: true,
-      message: 'Workspace created successfully',
-      data: workspace
-    });
+  success: true,
+  message: 'Workspace created successfully',
+  data: workspace
+});
 
   } catch (error) {
     console.error('Create workspace error:', error);
@@ -96,27 +96,42 @@ const getWorkspaces = async (req, res) => {
       ]
     };
 
-    const workspaces = await Workspace.paginate(query, options);
+// ⚠️ Make sure you fetch workspaces first
+const workspaces = await Workspace.paginate(query, options);
 
-    // Add user role for each workspace
-    const workspacesWithRoles = workspaces.docs.map(workspace => {
-      const workspaceObj = workspace.toObject();
-      workspaceObj.userRole = workspace.getUserRole(userId);
-      workspaceObj.userPermissions = workspace.getUserPermissions(userId);
-      return workspaceObj;
-    });
+// Add user role and permissions for each workspace
+const workspacesWithRoles = workspaces.docs.map(workspace => {
+  const workspaceObj = workspace.toObject();
 
-    res.status(200).json({
-      success: true,
-      data: {
-        workspaces: workspacesWithRoles,
-        totalDocs: workspaces.totalDocs,
-        totalPages: workspaces.totalPages,
-        currentPage: workspaces.page,
-        hasNextPage: workspaces.hasNextPage,
-        hasPrevPage: workspaces.hasPrevPage
-      }
-    });
+  if (workspace.owner._id.toString() === userId.toString()) {
+    workspaceObj.userRole = 'owner';
+    workspaceObj.userPermissions = {
+      canView: true,
+      canEdit: true,
+      canAdd: true,
+      canDelete: true,
+      canInvite: true
+    };
+  } else {
+    workspaceObj.userRole = workspace.getUserRole(userId);
+    workspaceObj.userPermissions = workspace.getUserPermissions(userId);
+  }
+
+  return workspaceObj;
+});
+
+res.status(200).json({
+  success: true,
+  data: {
+    workspaces: workspacesWithRoles,
+    totalDocs: workspaces.totalDocs,
+    totalPages: workspaces.totalPages,
+    currentPage: workspaces.page,
+    hasNextPage: workspaces.hasNextPage,
+    hasPrevPage: workspaces.hasPrevPage
+  }
+});
+
 
   } catch (error) {
     console.error('Get workspaces error:', error);
@@ -135,20 +150,21 @@ const getWorkspaces = async (req, res) => {
 const getWorkspace = async (req, res) => {
   try {
     const userId = req.user.id;
-    // Workspace is already attached by middleware
     const workspace = req.workspace;
 
     await workspace.populate('owner', 'name email');
     await workspace.populate('members.user', 'name email');
 
-    // Add user role and permissions to response
     const workspaceObj = workspace.toObject();
     workspaceObj.userRole = workspace.getUserRole(userId);
     workspaceObj.userPermissions = workspace.getUserPermissions(userId);
 
+    // ✅ Wrap workspace to match frontend expectations
     res.status(200).json({
       success: true,
-      data: workspaceObj
+      data: {
+        workspace: workspaceObj
+      }
     });
 
   } catch (error) {
@@ -160,6 +176,7 @@ const getWorkspace = async (req, res) => {
     });
   }
 };
+
 
 // ✅ FIXED: Update workspace - Middleware handles permission check
 // @desc    Update workspace
@@ -204,10 +221,12 @@ const updateWorkspace = async (req, res) => {
      .populate('members.user', 'name email');
 
     res.status(200).json({
-      success: true,
-      message: 'Workspace updated successfully',
-      data: updatedWorkspace
-    });
+  success: true,
+  message: 'Workspace updated successfully',
+  data: {
+    workspace: updatedWorkspace
+  }
+});
 
   } catch (error) {
     console.error('Update workspace error:', error);
@@ -376,11 +395,13 @@ const updateMemberRole = async (req, res) => {
     await workspace.save();
     await workspace.populate('members.user', 'name email');
 
-    res.status(200).json({
-      success: true,
-      message: 'Member role updated successfully',
-      data: workspace
-    });
+   res.status(200).json({
+  success: true,
+  message: 'Member role updated successfully',
+  data: {
+    workspace: workspace
+  }
+});
 
   } catch (error) {
     console.error('Update member role error:', error);

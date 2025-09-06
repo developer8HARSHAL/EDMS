@@ -63,18 +63,45 @@ export const useDocuments = (workspaceId = null) => {
   const dispatch = useDispatch();
 
   // Set workspace context
-  useEffect(() => {
-    if (workspaceId) {
-      dispatch(setCurrentWorkspace(workspaceId));
-    }
-  }, [workspaceId, dispatch]);
+useEffect(() => {
+  if (!workspaceId) {
+    fetchDocuments();
+  } else {
+    fetchWorkspaceDocuments(workspaceId);
+  }
+}, [workspaceId, fetchDocuments, fetchWorkspaceDocuments]);
+
+
 
   // Selectors
   const documents = useSelector(selectDocuments);
   const currentWorkspaceId = useSelector(selectCurrentWorkspaceId);
-  const workspaceDocuments = useSelector(state => 
-    workspaceId ? selectWorkspaceDocuments(state, workspaceId) : selectCurrentWorkspaceDocuments(state)
-  );
+   // 🔧 FIXED: Simplified workspace documents selector
+// Inside the workspaceDocuments selector
+const workspaceDocuments = useSelector(state => {
+  console.log("----Selector check:", {
+    workspaceId,
+    currentWorkspaceId: state.documents.currentWorkspaceId,
+    allDocuments: state.documents.documents,
+    workspaceDocuments: state.documents.workspaceDocuments
+  });
+
+  if (workspaceId && state.documents.workspaceDocuments) {
+    const docs = state.documents.workspaceDocuments[workspaceId];
+    console.log("----Found docs for workspaceId:", workspaceId, docs);
+    return Array.isArray(docs) ? docs : [];
+  }
+  
+  if (state.documents.currentWorkspaceId && state.documents.workspaceDocuments) {
+    const docs = state.documents.workspaceDocuments[state.documents.currentWorkspaceId];
+    console.log("----Found docs for currentWorkspaceId:", state.documents.currentWorkspaceId, docs);
+    return Array.isArray(docs) ? docs : [];
+  }
+
+  console.log("----Returning global documents:", state.documents.documents);
+  return Array.isArray(state.documents.documents) ? state.documents.documents : [];
+});
+
   const sharedDocuments = useSelector(selectSharedDocuments);
   const currentDocument = useSelector(selectCurrentDocument);
   const favorites = useSelector(selectFavoriteDocuments);
@@ -94,6 +121,17 @@ export const useDocuments = (workspaceId = null) => {
   const documentStatistics = useSelector(selectDocumentStatistics);
   const availableTags = useSelector(selectAvailableTags);
   const availableCategories = useSelector(selectAvailableCategories);
+
+
+  
+useEffect(() => {
+  if (workspaceId) {
+    fetchWorkspaceDocuments(workspaceId).then((res) => {
+      console.log('Fetched documents:', workspaceDocuments);
+    });
+  }
+}, [workspaceId]);
+
 
   // Handle document errors with toast notifications
   useEffect(() => {
@@ -117,19 +155,31 @@ export const useDocuments = (workspaceId = null) => {
     }
   }, [dispatch]);
 
-  // NEW: Fetch workspace documents
+ // 🔧 FIXED: Enhanced workspace documents fetching
   const handleFetchWorkspaceDocuments = useCallback(async (targetWorkspaceId, options = {}) => {
     const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
-    if (!wsId) return false;
+    if (!wsId) {
+      console.error('❌ No workspace ID provided for fetching documents');
+      return false;
+    }
 
     try {
+      console.log('🚀 Fetching workspace documents for:', wsId);
       const result = await dispatch(fetchWorkspaceDocuments({ workspaceId: wsId, options }));
-      return fetchWorkspaceDocuments.fulfilled.match(result);
+      
+      if (fetchWorkspaceDocuments.fulfilled.match(result)) {
+        console.log('✅ Workspace documents fetched successfully:', result.payload);
+        return true;
+      } else {
+        console.error('❌ Failed to fetch workspace documents:', result.error);
+        return false;
+      }
     } catch (error) {
-      console.error('Fetch workspace documents error:', error);
+      console.error('❌ Fetch workspace documents error:', error);
       return false;
     }
   }, [dispatch, workspaceId, currentWorkspaceId]);
+
 
   // NEW: Fetch workspace statistics
   const handleFetchWorkspaceStats = useCallback(async (targetWorkspaceId) => {
@@ -239,7 +289,7 @@ export const useDocuments = (workspaceId = null) => {
 
   // ===== DOCUMENT OPERATIONS =====
 
-  // Upload document (enhanced with workspace context)
+   // 🔧 FIXED: Enhanced upload with workspace refresh
   const handleUploadDocument = useCallback(async (formData, targetWorkspaceId) => {
     const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
     
@@ -247,9 +297,17 @@ export const useDocuments = (workspaceId = null) => {
       const result = await dispatch(uploadDocument({ formData, workspaceId: wsId }));
       
       if (uploadDocument.fulfilled.match(result)) {
-        toast.success('upload successful', {
-        duration: 3000,
-      });
+        toast.success('Upload successful', {
+          duration: 3000,
+        });
+        
+        // 🔧 FIXED: Force refresh workspace documents after upload
+        if (wsId) {
+          setTimeout(() => {
+            handleFetchWorkspaceDocuments(wsId);
+          }, 1000);
+        }
+        
         return true;
       }
       return false;
@@ -257,7 +315,8 @@ export const useDocuments = (workspaceId = null) => {
       console.error('Upload document error:', error);
       return false;
     }
-  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+  }, [dispatch, workspaceId, currentWorkspaceId, handleFetchWorkspaceDocuments]);
+
 
   // Delete document with confirmation
   const handleDeleteDocument = useCallback(async (documentId, documentName, targetWorkspaceId) => {
@@ -705,19 +764,27 @@ export const useDocuments = (workspaceId = null) => {
  * Hook for document list management with workspace context
  * Automatically fetches documents on mount
  */
+// 🔧 FIXED: Enhanced useDocumentList hook
 export const useDocumentList = (workspaceId = null, autoFetch = true) => {
   const documentsHook = useDocuments(workspaceId);
-  const { fetchDocuments, fetchWorkspaceDocuments, documents, loading } = documentsHook;
+  const { fetchWorkspaceDocuments, workspaceDocuments, loading } = documentsHook;
 
   useEffect(() => {
-    if (autoFetch && documents.length === 0 && !loading) {
-      if (workspaceId) {
-        fetchWorkspaceDocuments(workspaceId);
-      } else {
-        fetchDocuments();
-      }
+    if (autoFetch && workspaceId) {
+      console.log('🔄 Auto-fetching documents for workspace:', workspaceId);
+      fetchWorkspaceDocuments(workspaceId);
     }
-  }, [autoFetch, documents.length, loading, workspaceId, fetchDocuments, fetchWorkspaceDocuments]);
+  }, [autoFetch, workspaceId, fetchWorkspaceDocuments]);
+
+  // 🔧 FIXED: Add debug logging
+  useEffect(() => {
+    console.log('📊 useDocumentList Debug:', {
+      workspaceId,
+      documentsCount: workspaceDocuments?.length || 0,
+      loading,
+      autoFetch
+    });
+  }, [workspaceId, workspaceDocuments, loading, autoFetch]);
 
   return documentsHook;
 };

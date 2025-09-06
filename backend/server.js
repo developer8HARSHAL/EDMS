@@ -1,6 +1,7 @@
+const dotenv = require('dotenv');
+dotenv.config();
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const path = require('path');
 const fileUpload = require('express-fileupload');
 const mongoose = require('mongoose'); // ✅ ADDED: Missing import for health check
@@ -13,7 +14,8 @@ const workspaceRoutes = require('./routes/workspaceRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
 
 // Load environment variables
-dotenv.config();
+console.log("EMAIL_USER from env:", process.env.EMAIL_USER);
+console.log("EMAIL_PASS exists?", !!process.env.EMAIL_PASS);
 
 // Initialize express app
 const app = express();

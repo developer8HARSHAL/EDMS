@@ -9,6 +9,23 @@ const UserSchema = new mongoose.Schema({
     required: [true, 'Please provide a name'],
     trim: true,
   },
+  // Add to userModel.js
+workspaces: [{
+  workspace: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Workspace',
+    required: true
+  },
+  role: {
+    type: String,
+    enum: ['admin', 'editor', 'viewer'],
+    required: true
+  },
+  joinedAt: {
+    type: Date,
+    default: Date.now
+  }
+}],
   email: {
     type: String,
     required: [true, 'Please provide an email'],

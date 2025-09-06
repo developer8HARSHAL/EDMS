@@ -68,6 +68,7 @@ exports.uploadDocument = async (req, res) => {
       size: file.size,
       type: file.mimetype,
       owner: req.user.id,
+      uploadedBy: req.user.id,
       workspace: req.body.workspaceId, // Add workspace if provided
       // Add the owner to the permissions array with write access
       permissions: [
@@ -402,6 +403,9 @@ exports.deleteDocument = async (req, res) => {
 // @desc    Get document content for preview
 // @route   GET /api/documents/:id/preview
 // @access  Private
+// @desc    Get document content for preview
+// @route   GET /api/documents/:id/preview
+// @access  Private
 exports.previewDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id);
@@ -440,24 +444,33 @@ exports.previewDocument = async (req, res) => {
         });
       }
 
-      // Set appropriate content type
-      res.setHeader('Content-Type', document.type);
-      
-      // Set content disposition to inline for browser preview
+      // Set appropriate headers BEFORE streaming
+      res.setHeader('Content-Type', document.type || 'application/octet-stream');
+      res.setHeader('Content-Length', files.length);
       res.setHeader('Content-Disposition', `inline; filename="${document.originalName || document.name}"`);
       
-      // Stream the file from GridFS
+      // Create download stream
       const downloadStream = gfs.openDownloadStream(fileId);
+      
+      // Handle stream errors properly
+      downloadStream.on('error', (err) => {
+        console.error('GridFS stream error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            message: 'Error streaming file'
+          });
+        }
+      });
+
+      // Handle successful stream end
+      downloadStream.on('end', () => {
+        console.log('File streamed successfully');
+      });
+
+      // Pipe the stream to response
       downloadStream.pipe(res);
       
-      // Handle errors in the stream
-      downloadStream.on('error', (err) => {
-        console.error('Error streaming file:', err);
-        res.status(500).json({
-          success: false,
-          message: 'Error streaming file'
-        });
-      });
     } catch (error) {
       console.error('Error accessing file in GridFS:', error);
       res.status(500).json({

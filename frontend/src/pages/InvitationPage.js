@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import  Avatar  from '../components/ui/Avatar';
+import Avatar from '../components/ui/Avatar';
 import { Alert } from '../components/ui/Alert';
 import { useInvitations } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
@@ -19,7 +19,6 @@ import {
   ShieldCheckIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon,
   UserPlusIcon
 } from '@heroicons/react/24/outline';
 import {
@@ -30,8 +29,9 @@ import {
 const InvitationPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
-  
+
   const {
     invitationDetails,
     isLoading,
@@ -44,55 +44,118 @@ const InvitationPage = () => {
   // Local state
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
-  const [actionResult, setActionResult] = useState(null); // 'accepted', 'rejected', 'error'
+  const [actionResult, setActionResult] = useState(null);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [autoAcceptAttempted, setAutoAcceptAttempted] = useState(false);
+
+  // Check URL parameters
+  const urlAction = searchParams.get('action');
+  const isAutoAccept = urlAction === 'accept';
 
   // Load invitation details on component mount
   useEffect(() => {
     if (token) {
+      console.log('📄 Loading invitation details for token:', token);
       fetchInvitationDetails(token);
     }
-  }, [token]);
+  }, [token, fetchInvitationDetails]);
 
-  // Check if user needs to login
+  // Handle authentication status and show login prompt
   useEffect(() => {
-    if (invitationDetails && !isAuthenticated) {
+    if (invitationDetails && !isAuthenticated && !actionResult) {
+      console.log('👤 User not authenticated, showing login prompt');
       setShowLoginPrompt(true);
     }
-  }, [invitationDetails, isAuthenticated]);
+  }, [invitationDetails, isAuthenticated, actionResult]);
 
-  // Handle invitation acceptance
+  // Auto-accept invitation logic
+  const handleAutoAccept = useCallback(async () => {
+    if (autoAcceptAttempted || !isAutoAccept || !isAuthenticated || !invitationDetails || actionResult) {
+      return;
+    }
+
+    console.log('🚀 Auto-accepting invitation after authentication');
+    setAutoAcceptAttempted(true);
+    
+    // Check if user email matches invitation
+    if (user?.email?.toLowerCase() !== invitationDetails.email?.toLowerCase()) {
+      console.warn('⚠️ User email does not match invitation email');
+      setActionResult('error');
+      return;
+    }
+
+    await handleAcceptInvitation();
+  }, [isAutoAccept, isAuthenticated, invitationDetails, actionResult, autoAcceptAttempted, user?.email]);
+
+  // Trigger auto-accept when conditions are met
+  useEffect(() => {
+    if (isAuthenticated && invitationDetails && isAutoAccept && !autoAcceptAttempted) {
+      console.log('✅ Conditions met for auto-accept, triggering...');
+      handleAutoAccept();
+    }
+  }, [isAuthenticated, invitationDetails, isAutoAccept, autoAcceptAttempted, handleAutoAccept]);
+
+  // ✅ FIXED: Handle invitation acceptance - updated to use unwrapped result
   const handleAcceptInvitation = async () => {
     if (!isAuthenticated) {
+      console.log('❌ User not authenticated for accept action');
       setShowLoginPrompt(true);
+      return;
+    }
+
+    // Verify user email matches invitation
+    if (user?.email?.toLowerCase() !== invitationDetails?.email?.toLowerCase()) {
+      console.error('❌ Email mismatch:', {
+        userEmail: user?.email,
+        invitationEmail: invitationDetails?.email
+      });
+      setActionResult('error');
       return;
     }
 
     setIsAccepting(true);
     try {
-      await acceptInvitation(token);
-      setActionResult('accepted');
+      console.log('🔨 Accepting invitation with token:', token);
       
-      // Redirect to workspace after a short delay
+      // ✅ FIXED: Use unwrapped result from Redux Toolkit
+      const result = await acceptInvitation(token).unwrap();
+      
+      console.log('✅ Invitation accepted successfully:', result);
+      setActionResult('accepted');
+
+      // Redirect to workspace after success message
       setTimeout(() => {
-        navigate(`/workspaces/${invitationDetails.workspace._id}`);
-      }, 3000);
+        const workspaceId = invitationDetails?.workspace?._id;
+        if (workspaceId) {
+          console.log('📄 Redirecting to workspace:', workspaceId);
+          navigate(`/workspaces/${workspaceId}`);
+        } else {
+          navigate('/dashboard');
+        }
+      }, 2000);
+      
     } catch (error) {
-      console.error('Failed to accept invitation:', error);
+      console.error('❌ Accept invitation error:', error);
       setActionResult('error');
     } finally {
       setIsAccepting(false);
     }
   };
 
-  // Handle invitation rejection
+  // ✅ FIXED: Handle invitation rejection - updated to use unwrapped result
   const handleRejectInvitation = async () => {
     setIsRejecting(true);
     try {
-      await rejectInvitation(token);
+      console.log('❌ Rejecting invitation with token:', token);
+      
+      // ✅ FIXED: Use unwrapped result from Redux Toolkit
+      await rejectInvitation(token).unwrap();
+      
+      console.log('✅ Invitation rejected successfully');
       setActionResult('rejected');
+      
     } catch (error) {
-      console.error('Failed to reject invitation:', error);
+      console.error('❌ Reject invitation error:', error);
       setActionResult('error');
     } finally {
       setIsRejecting(false);
@@ -113,18 +176,6 @@ const InvitationPage = () => {
   // Get role permissions description
   const getRolePermissions = (role) => {
     const permissions = {
-      owner: {
-        icon: ShieldCheckIcon,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-100',
-        permissions: [
-          'Full workspace access',
-          'Manage all members and settings',
-          'Upload, edit, and delete any documents',
-          'Invite and remove members',
-          'Delete workspace'
-        ]
-      },
       admin: {
         icon: ShieldCheckIcon,
         color: 'text-red-600',
@@ -205,9 +256,9 @@ const InvitationPage = () => {
                 Sign In
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/')} 
+            <Button
+              variant="outline"
+              onClick={() => navigate('/')}
               className="w-full"
             >
               Go Home
@@ -218,7 +269,7 @@ const InvitationPage = () => {
     );
   }
 
-  // Success/Rejection result states
+  // Success state
   if (actionResult === 'accepted') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -230,8 +281,8 @@ const InvitationPage = () => {
             Welcome to the team!
           </h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
-            You've successfully joined "{invitationDetails.workspace.name}". 
-            Redirecting you to the workspace...
+            You've successfully joined "{invitationDetails.workspace.name}".
+            Redirecting to workspace...
           </p>
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
@@ -242,6 +293,7 @@ const InvitationPage = () => {
     );
   }
 
+  // Rejection state
   if (actionResult === 'rejected') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -265,19 +317,13 @@ const InvitationPage = () => {
                 Sign In
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/')} 
-              className="w-full"
-            >
-              Go Home
-            </Button>
           </div>
         </Card>
       </div>
     );
   }
 
+  // Error state
   if (actionResult === 'error') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -289,11 +335,25 @@ const InvitationPage = () => {
             Something Went Wrong
           </h2>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
-            We couldn't process your invitation response. Please try again.
+            {user?.email?.toLowerCase() !== invitationDetails?.email?.toLowerCase() 
+              ? `This invitation is for ${invitationDetails?.email}, but you're logged in as ${user?.email}.`
+              : "We couldn't process your invitation response. Please try again."
+            }
           </p>
-          <Button onClick={() => setActionResult(null)} className="w-full">
-            Try Again
-          </Button>
+          <div className="space-y-3">
+            <Button onClick={() => setActionResult(null)} className="w-full">
+              Try Again
+            </Button>
+            {user?.email?.toLowerCase() !== invitationDetails?.email?.toLowerCase() && (
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/login')} 
+                className="w-full"
+              >
+                Sign in with correct email
+              </Button>
+            )}
+          </div>
         </Card>
       </div>
     );
@@ -317,6 +377,22 @@ const InvitationPage = () => {
           </p>
         </div>
 
+        {/* Auto-accept info */}
+        {isAutoAccept && !actionResult && (
+          <Alert variant="info" className="mb-6">
+            <CheckCircleIcon className="h-4 w-4" />
+            <div>
+              <p className="font-medium">Auto-accepting invitation</p>
+              <p className="text-sm mt-1">
+                {isAuthenticated 
+                  ? "Processing your invitation acceptance..."
+                  : "Please sign in to automatically accept this invitation."
+                }
+              </p>
+            </div>
+          </Alert>
+        )}
+
         {/* Login Prompt Alert */}
         {showLoginPrompt && !isAuthenticated && (
           <Alert variant="info" className="mb-6">
@@ -325,13 +401,19 @@ const InvitationPage = () => {
               <p className="font-medium">Sign in required</p>
               <p className="text-sm mt-1">
                 You need to be signed in to accept this invitation.{' '}
-                <Link to="/login" className="underline hover:no-underline">
+                <Link
+                  to={`/login?invitation=${token}&action=${urlAction || 'view'}&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+                  className="underline hover:no-underline"
+                >
                   Sign in now
-                </Link>{' '}
-                or{' '}
-                <Link to="/register" className="underline hover:no-underline">
+                </Link>
+                {' '}or{' '}
+                <Link
+                  to={`/register?invitation=${token}&action=${urlAction || 'view'}&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+                  className="underline hover:no-underline"
+                >
                   create an account
-                </Link>.
+                </Link>
               </p>
             </div>
           </Alert>
@@ -344,7 +426,7 @@ const InvitationPage = () => {
             <div>
               <p className="font-medium">Invitation Expired</p>
               <p className="text-sm mt-1">
-                This invitation expired on {formatDate(invitationDetails.expiresAt)}. 
+                This invitation expired on {formatDate(invitationDetails.expiresAt)}.
                 Please contact the workspace owner for a new invitation.
               </p>
             </div>
@@ -487,13 +569,13 @@ const InvitationPage = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
-                  to="/login"
+                  to={`/login?invitation=${token}&action=${urlAction || 'view'}&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
                   className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-center hover:bg-blue-700 transition-colors"
                 >
                   Sign In
                 </Link>
                 <Link
-                  to="/register"
+                  to={`/register?invitation=${token}&action=${urlAction || 'view'}&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
                   className="flex-1 border border-gray-300 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Create Account
@@ -506,7 +588,7 @@ const InvitationPage = () => {
         {/* Additional Info */}
         <div className="text-center text-xs text-gray-500 dark:text-gray-400">
           <p>
-            This invitation was sent to {invitationDetails.email}. 
+            This invitation was sent to {invitationDetails.email}.
             If you have any questions, please contact the workspace owner.
           </p>
         </div>

@@ -131,9 +131,27 @@ const InviteMemberModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-// Replace the handleSubmit function with:
+// In your InviteMemberModal.jsx, replace the handleSubmit function:
+
 const handleSubmit = async () => {
   if (!validateForm()) {
+    return;
+  }
+
+  // ✅ FIX: Access the nested workspace object
+  const workspaceData = workspace?.workspace || workspace;
+  
+  console.log('🏢 MODAL: Extracted workspace data:', workspaceData);
+  console.log('🎯 MODAL: workspaceData._id:', workspaceData?._id);
+  
+  if (!workspaceData) {
+    console.error('❌ MODAL: No workspace data found!');
+    return;
+  }
+  
+  if (!workspaceData._id) {
+    console.error('❌ MODAL: workspace has no _id field!');
+    console.error('❌ MODAL: Available fields:', Object.keys(workspaceData));
     return;
   }
 
@@ -148,24 +166,37 @@ const handleSubmit = async () => {
 
     if (validInvitations.length === 1) {
       // Single invitation
-      await onSendInvitation({
-        workspaceId: workspace._id,
+      const invitationPayload = {
+        workspaceId: workspaceData._id,  // ✅ FIX: Use workspaceData._id
         inviteeEmail: validInvitations[0].email,
         role: validInvitations[0].role,
         message: validInvitations[0].customMessage
-      });
+      };
+      
+      console.log('📤 MODAL: Single invitation payload:', JSON.stringify(invitationPayload, null, 2));
+      console.log('🔍 MODAL: workspaceId in payload:', invitationPayload.workspaceId);
+      
+      if (!invitationPayload.workspaceId) {
+        console.error('❌ MODAL: workspaceId is still undefined!');
+        throw new Error('WorkspaceId is missing');
+      }
+      
+      await onSendInvitation(invitationPayload);
     } else {
-      // Bulk invitations - use the bulk endpoint
-      await onSendInvitation({
+      // Bulk invitations
+      const bulkPayload = {
         bulk: true,
-        workspaceId: workspace._id,
+        workspaceId: workspaceData._id,  // ✅ FIX: Use workspaceData._id
         invitations: validInvitations
-      });
+      };
+      
+      console.log('📤 MODAL: Bulk invitation payload:', JSON.stringify(bulkPayload, null, 2));
+      await onSendInvitation(bulkPayload);
     }
 
     onClose();
   } catch (error) {
-    console.error('Failed to send invitations:', error);
+    console.error('❌ MODAL: Failed to send invitations:', error);
     if (error.response?.data?.message) {
       setErrors({ submit: error.response.data.message });
     } else {

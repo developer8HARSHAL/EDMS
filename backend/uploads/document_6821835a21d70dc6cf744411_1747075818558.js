@@ -64,7 +64,7 @@ setupAxiosInterceptors();
 // Document-related API functions
 export const documentApi = {
   // Get all documents
-  getAllDocuments: async () => {
+  getDocuments: async () => {
     try {
       const response = await axios.get(`${API_URL}/documents`);
       return response.data;
@@ -241,14 +241,14 @@ export const checkServerConnection = async () => {
   try {
     // Try a few potential health check endpoints
     try {
-      await axios.get('/api/health', { timeout: 3000 });
+      await axios.get('/api/health', { timeout: 5000 });
       return true;
     } catch (error) {
       if (error.response && error.response.status !== 404) {
         return true; // Server is running but no health endpoint
       }
       // Try root endpoint
-      await axios.get('/api', { timeout: 3000 });
+      await axios.get('/api', { timeout: 5000 });
       return true;
     }
   } catch (error) {

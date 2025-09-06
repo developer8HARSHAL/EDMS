@@ -1,37 +1,237 @@
 const WorkspaceInvitation = require('../models/workspaceInvitationModel');
 const Workspace = require('../models/workspaceModel');
 const User = require('../models/userModel');
-const nodemailer = require('nodemailer');
-const { checkWorkspaceAdmin, checkWorkspaceAccess } = require('../middleware/workspaceAuth');
+// 🔥 FIXED: Use the dedicated EmailService instead of inline email code
+const emailService = require('../utils/emailService');
 
-// Configure email transporter
-const createEmailTransporter = () => {
-  return nodemailer.createTransporter({
-    service: process.env.EMAIL_SERVICE || 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-};
-
-// @desc    Send workspace invitation
-// @route   POST /api/invitations/send
-// @access  Private
+// FIXED: sendInvitation function - declare emailSent variable in correct scope
 const sendInvitation = async (req, res) => {
   try {
+    console.log('📨 Received invitation request:', req.body);
+    
+    // Handle both single and bulk invitations
+    if (req.body.bulk && req.body.invitations) {
+      // Bulk invitation handling
+      return await handleBulkInvitation(req, res);
+    }
+
+    // Single invitation handling
     const { workspaceId, inviteeEmail, role = 'viewer', message } = req.body;
     const inviterId = req.user.id;
+    console.log('🔍 Extracted data:', { workspaceId, inviteeEmail, role, message });
+    
+    // 🔥 FIXED: Declare emailSent variable here, in the correct scope
+    let emailSent = false;
 
     // Validate input
     if (!workspaceId || !inviteeEmail) {
+      console.error('❌ Validation failed - missing required fields');
       return res.status(400).json({
         success: false,
         message: 'Workspace ID and invitee email are required'
       });
     }
+    console.log('✅ Input validation passed');
 
     // Find workspace
+    console.log('🔍 Looking up workspace with ID:', workspaceId);
+    const workspace = await Workspace.findById(workspaceId)
+      .populate('owner', 'name email');
+
+    console.log('🔍 Workspace found:', workspace ? 'YES' : 'NO');
+    if (workspace) {
+      console.log('🔍 Workspace details:', {
+        id: workspace._id,
+        name: workspace.name,
+        owner: workspace.owner
+      });
+    }
+
+    if (!workspace) {
+      console.log('❌ Workspace not found, returning 404');
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found'
+      });
+    }
+
+    console.log('🔍 Checking permissions for user:', inviterId);
+    console.log('🔍 Workspace hasPermission method exists:', typeof workspace.hasPermission === 'function');
+    
+    // Check if user has permission to invite
+    try {
+      const hasPermission = workspace.hasPermission(inviterId, 'canInvite');
+      console.log('🔍 Permission check result:', hasPermission);
+      
+      if (!hasPermission) {
+        console.log('❌ Permission denied for user:', inviterId);
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You do not have permission to send invitations.'
+        });
+      }
+      console.log('✅ Permission check passed');
+    } catch (permissionError) {
+      console.error('❌ Permission check error:', permissionError);
+      throw permissionError;
+    }
+
+    console.log('🔍 Looking up existing user with email:', inviteeEmail.toLowerCase());
+    // Check if invitee is already a member
+    const existingUser = await User.findOne({ email: inviteeEmail.toLowerCase() });
+    console.log('🔍 Existing user found:', existingUser ? 'YES' : 'NO');
+    
+    if (existingUser) {
+      console.log('🔍 Checking if user is already a member');
+      const isAlreadyMember = workspace.isMember(existingUser._id);
+      console.log('🔍 Is already member:', isAlreadyMember);
+      
+      if (isAlreadyMember) {
+        console.log('❌ User is already a member');
+        return res.status(400).json({
+          success: false,
+          message: 'User is already a member of this workspace'
+        });
+      }
+    }
+
+    console.log('🔍 Checking for existing pending invitation');
+    // Check if pending invitation already exists
+    const existingInvitation = await WorkspaceInvitation.existsPending(
+      workspaceId, 
+      inviteeEmail.toLowerCase()
+    );
+    console.log('🔍 Existing invitation found:', existingInvitation ? 'YES' : 'NO');
+
+    if (existingInvitation) {
+      console.log('❌ Pending invitation already exists');
+      return res.status(400).json({
+        success: false,
+        message: 'Pending invitation already exists for this email'
+      });
+    }
+
+    console.log('✅ Creating invitation with data:', {
+      workspace: workspaceId,
+      inviter: inviterId,
+      inviteeEmail: inviteeEmail.toLowerCase(),
+      inviteeUser: existingUser ? existingUser._id : null,
+      role: role,
+      message: message?.trim()
+    });
+
+    // Create and save the invitation
+    const invitation = new WorkspaceInvitation({
+      workspace: workspaceId,
+      inviter: inviterId,
+      inviteeEmail: inviteeEmail.toLowerCase(),
+      inviteeUser: existingUser ? existingUser._id : null,
+      role: role,
+      message: message?.trim()
+    });
+
+    console.log('🔍 About to save invitation to database');
+    // Save the invitation
+    await invitation.save();
+    console.log('✅ Invitation saved with token:', invitation.token);
+
+    console.log('🔍 About to populate invitation data');
+    // Populate invitation for email
+    await invitation.populate([
+      { path: 'workspace', select: 'name description' },
+      { path: 'inviter', select: 'name email' }
+    ]);
+    console.log('✅ Invitation data populated');
+
+    // 🔥 FIXED: Use EmailService and handle errors properly
+    console.log('🔍 About to send email');
+    try {
+      const emailData = {
+        recipientEmail: invitation.inviteeEmail,
+        inviterName: invitation.inviter.name,
+        workspaceName: invitation.workspace.name,
+        workspaceDescription: invitation.workspace.description,
+        role: invitation.role,
+        permissions: invitation.permissions,
+        token: invitation.token,
+        expiresAt: invitation.expiresAt,
+        customMessage: invitation.message
+      };
+
+      console.log('🔍 Email data prepared:', {
+        recipientEmail: emailData.recipientEmail,
+        inviterName: emailData.inviterName,
+        workspaceName: emailData.workspaceName
+      });
+
+      const emailResult = await emailService.sendInvitationEmail(emailData);
+      console.log('✅ Email sent successfully via EmailService:', emailResult);
+      emailSent = true; // 🔥 FIXED: Now emailSent is properly scoped
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError);
+      console.error('❌ Full email error:', emailError.stack);
+      // Don't fail the invitation creation if email fails
+      emailSent = false; // 🔥 FIXED: Set to false on error
+    }
+
+    console.log('🔧 Email sending status:', emailSent ? 'SUCCESS' : 'FAILED');
+
+    console.log('🔍 About to send response');
+    // Return proper response
+    res.status(201).json({
+      success: true,
+      message: 'Invitation sent successfully',
+      data: {
+        id: invitation._id,
+        workspaceId: workspaceId,
+        workspaceName: invitation.workspace.name,
+        inviteeEmail: invitation.inviteeEmail,
+        role: invitation.role,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
+        emailSent: emailSent 
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Send invitation error:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Handle validation errors specifically
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        error: validationErrors.join(', '),
+        details: validationErrors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error sending invitation',
+      error: error.message
+    });
+  }
+};
+
+// FIXED: Moved handleBulkInvitation outside and made it a separate function
+const handleBulkInvitation = async (req, res) => {
+  try {
+    const { workspaceId, invitations } = req.body;
+    const inviterId = req.user.id;
+    
+    console.log('📨 Bulk invitation request:', { workspaceId, invitationCount: invitations?.length });
+    
+    if (!workspaceId || !invitations || !Array.isArray(invitations)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Workspace ID and invitations array are required'
+      });
+    }
+
+    // Find workspace and check permissions
     const workspace = await Workspace.findById(workspaceId)
       .populate('owner', 'name email');
 
@@ -42,7 +242,6 @@ const sendInvitation = async (req, res) => {
       });
     }
 
-    // Check if user has permission to invite
     if (!workspace.hasPermission(inviterId, 'canInvite')) {
       return res.status(403).json({
         success: false,
@@ -50,85 +249,151 @@ const sendInvitation = async (req, res) => {
       });
     }
 
-    // Check if invitee is already a member
-    const existingUser = await User.findOne({ email: inviteeEmail.toLowerCase() });
-    if (existingUser && workspace.isMember(existingUser._id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'User is already a member of this workspace'
-      });
+    const results = [];
+    const errors = [];
+
+    // Get inviter info for email
+    const inviter = await User.findById(inviterId);
+
+    // Process each invitation
+    for (const inviteData of invitations) {
+      try {
+        const inviteeEmail = inviteData.email.toLowerCase();
+        const role = inviteData.role || 'viewer';
+
+        // Check if invitee is already a member
+        const existingUser = await User.findOne({ email: inviteeEmail });
+        if (existingUser && workspace.isMember(existingUser._id)) {
+          errors.push({
+            email: inviteData.email,
+            success: false,
+            error: 'User is already a member of this workspace'
+          });
+          continue;
+        }
+
+        // Check if pending invitation already exists
+        const existingInvitation = await WorkspaceInvitation.existsPending(
+          workspaceId, 
+          inviteeEmail
+        );
+        
+        if (existingInvitation) {
+          errors.push({
+            email: inviteData.email,
+            success: false,
+            error: 'Pending invitation already exists for this email'
+          });
+          continue;
+        }
+
+        // Create invitation
+        const invitation = new WorkspaceInvitation({
+          workspace: workspaceId,
+          inviter: inviterId,
+          inviteeEmail: inviteeEmail,
+          inviteeUser: existingUser ? existingUser._id : null,
+          role: role,
+          message: inviteData.customMessage?.trim()
+        });
+
+        await invitation.save();
+
+        // 🔥 FIXED: Use EmailService for bulk invitations too
+        try {
+          const emailData = {
+            recipientEmail: inviteeEmail,
+            inviterName: inviter.name,
+            workspaceName: workspace.name,
+            workspaceDescription: workspace.description,
+            role: role,
+            permissions: invitation.permissions,
+            token: invitation.token,
+            expiresAt: invitation.expiresAt,
+            customMessage: inviteData.customMessage?.trim()
+          };
+
+          await emailService.sendInvitationEmail(emailData);
+        } catch (emailError) {
+          console.error('❌ Email sending failed for:', inviteData.email, emailError);
+        }
+
+        results.push({
+          email: inviteData.email,
+          success: true,
+          invitationId: invitation._id,
+          role: role,
+          status: invitation.status,
+          expiresAt: invitation.expiresAt
+        });
+      } catch (error) {
+        console.error('❌ Error processing invitation for:', inviteData.email, error);
+        errors.push({
+          email: inviteData.email,
+          success: false,
+          error: error.message
+        });
+      }
     }
 
-    // Check if pending invitation already exists
-    const existingInvitation = await WorkspaceInvitation.existsPending(
-      workspaceId, 
-      inviteeEmail.toLowerCase()
-    );
-
-    if (existingInvitation) {
-      return res.status(400).json({
-        success: false,
-        message: 'Pending invitation already exists for this email'
-      });
-    }
-
-    // Create invitation
-    const invitation = await WorkspaceInvitation.create({
-      workspace: workspaceId,
-      inviter: inviterId,
-      inviteeEmail: inviteeEmail.toLowerCase(),
-      inviteeUser: existingUser ? existingUser._id : null,
-      role: role,
-      message: message?.trim()
-    });
-
-    // Populate invitation for email
-    await invitation.populate([
-      { path: 'workspace', select: 'name description' },
-      { path: 'inviter', select: 'name email' }
-    ]);
-
-    // Send email invitation
-    try {
-      await sendInvitationEmail(invitation);
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      // Don't fail the invitation creation if email fails
-    }
+    console.log(`✅ Bulk invitation completed: ${results.length} sent, ${errors.length} failed`);
 
     res.status(201).json({
       success: true,
-      message: 'Invitation sent successfully',
+      message: `Bulk invitation completed. ${results.length} sent, ${errors.length} failed.`,
       data: {
-        id: invitation._id,
-        workspaceName: invitation.workspace.name,
-        inviteeEmail: invitation.inviteeEmail,
-        role: invitation.role,
-        status: invitation.status,
-        expiresAt: invitation.expiresAt
+        successful: results,
+        failed: errors,
+        totalSent: results.length,
+        totalFailed: errors.length
       }
     });
 
   } catch (error) {
-    console.error('Send invitation error:', error);
+    console.error('❌ Bulk invitation error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error sending invitation',
+      message: 'Error sending bulk invitations',
       error: error.message
     });
   }
 };
 
-// @desc    Get invitations for workspace
-// @route   GET /api/invitations/workspace/:workspaceId
-// @access  Private
+// 🔥 ADDED: Email testing endpoint
+const testEmailService = async (req, res) => {
+  try {
+    const testResult = await emailService.testConnection();
+    
+    if (testResult.success) {
+      res.status(200).json({
+        success: true,
+        message: 'Email service is working properly',
+        data: testResult
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Email service connection failed',
+        error: testResult.error
+      });
+    }
+  } catch (error) {
+    console.error('❌ Email test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error testing email service',
+      error: error.message
+    });
+  }
+};
+
+// All other existing functions remain the same...
 const getWorkspaceInvitations = async (req, res) => {
   try {
     const workspaceId = req.params.workspaceId;
     const userId = req.user.id;
     const { status, page = 1, limit = 10 } = req.query;
 
-    // Find workspace and check permissions
     const workspace = await Workspace.findById(workspaceId);
 
     if (!workspace) {
@@ -138,7 +403,6 @@ const getWorkspaceInvitations = async (req, res) => {
       });
     }
 
-    // Check if user has permission to view invitations
     if (!workspace.hasPermission(userId, 'canInvite') && workspace.owner.toString() !== userId) {
       return res.status(403).json({
         success: false,
@@ -175,38 +439,74 @@ const getWorkspaceInvitations = async (req, res) => {
   }
 };
 
-// @desc    Get pending invitations for user
-// @route   GET /api/invitations/pending
-// @access  Private
+// Enhanced getPendingInvitations function with detailed debugging
 const getPendingInvitations = async (req, res) => {
   try {
-    const userEmail = req.user.email;
+    // Check if user exists
+    if (!req.user) {
+      console.log('❌ No user found in request object');
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required - no user found'
+      });
+    }
 
+    // Check if user has email
+    if (!req.user.email) {
+      console.log('❌ User found but no email property');
+      return res.status(400).json({
+        success: false,
+        message: 'User email not found'
+      });
+    }
+
+    const userEmail = req.user.email;
+    console.log('✅ Using email for invitation lookup:', userEmail);
+    
+    // Import model here to ensure it's loaded
+    const WorkspaceInvitation = require('../models/workspaceInvitationModel');
+    console.log('📦 WorkspaceInvitation model loaded');
+    
+    // Check if the model method exists
+    if (typeof WorkspaceInvitation.findPendingForUser !== 'function') {
+      console.log('❌ findPendingForUser method not found on model');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error - method not found'
+      });
+    }
+
+    console.log('🔍 Calling WorkspaceInvitation.findPendingForUser with email:', userEmail);
     const invitations = await WorkspaceInvitation.findPendingForUser(userEmail);
+    console.log('✅ Found invitations:', invitations?.length || 0);
+    console.log('📋 Invitations data:', invitations);
 
     res.status(200).json({
       success: true,
-      data: invitations
+      data: invitations,
+      count: invitations?.length || 0,
+      userEmail: userEmail
     });
 
   } catch (error) {
-    console.error('Get pending invitations error:', error);
+    console.error('❌ getPendingInvitations error details:');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     res.status(500).json({
       success: false,
       message: 'Error fetching pending invitations',
-      error: error.message
+      error: error.message,
+      errorType: error.name
     });
   }
 };
 
-// @desc    Accept invitation
-// @route   POST /api/invitations/:token/accept
-// @access  Public (token-based)
 const acceptInvitation = async (req, res) => {
   try {
     const { token } = req.params;
 
-    // Find invitation by token
     const invitation = await WorkspaceInvitation.findOne({ token })
       .populate('workspace')
       .populate('inviter', 'name email');
@@ -218,7 +518,6 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Check if invitation is valid
     if (!invitation.isValid()) {
       await WorkspaceInvitation.updateOne(
         { _id: invitation._id },
@@ -231,12 +530,10 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // If user is authenticated, use their ID, otherwise find by email
     let userId;
     if (req.user) {
       userId = req.user.id;
       
-      // Verify email matches
       if (req.user.email.toLowerCase() !== invitation.inviteeEmail) {
         return res.status(403).json({
           success: false,
@@ -244,7 +541,6 @@ const acceptInvitation = async (req, res) => {
         });
       }
     } else {
-      // For public access, find user by email
       const user = await User.findOne({ email: invitation.inviteeEmail });
       if (!user) {
         return res.status(404).json({
@@ -258,7 +554,6 @@ const acceptInvitation = async (req, res) => {
       userId = user._id;
     }
 
-    // Check if user is already a member
     const workspace = await Workspace.findById(invitation.workspace._id);
     if (workspace.isMember(userId)) {
       await invitation.accept();
@@ -268,7 +563,6 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
-    // Add user to workspace
     workspace.members.push({
       user: userId,
       role: invitation.role,
@@ -277,12 +571,16 @@ const acceptInvitation = async (req, res) => {
     });
 
     await workspace.save();
-
-    // Accept invitation
     await invitation.accept();
-
-    // Populate workspace with updated members
     await workspace.populate('members.user', 'name email');
+
+    const user = await User.findById(userId);
+    user.workspaces.push({
+      workspace: workspace._id,
+      role: invitation.role,
+      joinedAt: new Date()
+    });
+    await user.save();
 
     res.status(200).json({
       success: true,
@@ -308,14 +606,10 @@ const acceptInvitation = async (req, res) => {
   }
 };
 
-// @desc    Reject invitation
-// @route   POST /api/invitations/:token/reject
-// @access  Public (token-based)
 const rejectInvitation = async (req, res) => {
   try {
     const { token } = req.params;
 
-    // Find invitation by token
     const invitation = await WorkspaceInvitation.findOne({ token })
       .populate('workspace', 'name')
       .populate('inviter', 'name email');
@@ -327,7 +621,6 @@ const rejectInvitation = async (req, res) => {
       });
     }
 
-    // Check if invitation is valid
     if (!invitation.isValid()) {
       return res.status(400).json({
         success: false,
@@ -335,7 +628,6 @@ const rejectInvitation = async (req, res) => {
       });
     }
 
-    // Reject invitation
     await invitation.reject();
 
     res.status(200).json({
@@ -353,12 +645,6 @@ const rejectInvitation = async (req, res) => {
   }
 };
 
-// @desc    Cancel invitation (by inviter)
-// @route   DELETE /api/invitations/:invitationId
-
-
-
-// @access  Private
 const cancelInvitation = async (req, res) => {
   try {
     const invitationId = req.params.invitationId;
@@ -374,7 +660,6 @@ const cancelInvitation = async (req, res) => {
       });
     }
 
-    // Check if user has permission to cancel invitation
     const workspace = await Workspace.findById(invitation.workspace._id);
     if (!workspace.hasPermission(userId, 'canInvite') && workspace.owner.toString() !== userId) {
       return res.status(403).json({
@@ -383,7 +668,6 @@ const cancelInvitation = async (req, res) => {
       });
     }
 
-    // Can only cancel pending invitations
     if (invitation.status !== 'pending') {
       return res.status(400).json({
         success: false,
@@ -408,9 +692,6 @@ const cancelInvitation = async (req, res) => {
   }
 };
 
-// @desc    Resend invitation
-// @route   POST /api/invitations/:invitationId/resend
-// @access  Private
 const resendInvitation = async (req, res) => {
   try {
     const invitationId = req.params.invitationId;
@@ -429,7 +710,6 @@ const resendInvitation = async (req, res) => {
       });
     }
 
-    // Check if user has permission to resend invitation
     const workspace = await Workspace.findById(invitation.workspace._id);
     if (!workspace.hasPermission(userId, 'canInvite') && workspace.owner.toString() !== userId) {
       return res.status(403).json({
@@ -438,7 +718,6 @@ const resendInvitation = async (req, res) => {
       });
     }
 
-    // Can only resend pending invitations
     if (invitation.status !== 'pending') {
       return res.status(400).json({
         success: false,
@@ -446,15 +725,26 @@ const resendInvitation = async (req, res) => {
       });
     }
 
-    // Update expiration date
-    invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+    invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await invitation.save();
 
-    // Resend email
+    // 🔥 FIXED: Use EmailService for resend too
     try {
-      await sendInvitationEmail(invitation);
+      const emailData = {
+        recipientEmail: invitation.inviteeEmail,
+        inviterName: invitation.inviter.name,
+        workspaceName: invitation.workspace.name,
+        workspaceDescription: invitation.workspace.description,
+        role: invitation.role,
+        permissions: invitation.permissions,
+        token: invitation.token,
+        expiresAt: invitation.expiresAt,
+        customMessage: invitation.message
+      };
+
+      await emailService.sendReminderEmail(emailData);
     } catch (emailError) {
-      console.error('Email resending failed:', emailError);
+      console.error('❌ Email resending failed:', emailError);
       return res.status(500).json({
         success: false,
         message: 'Failed to resend invitation email'
@@ -479,15 +769,13 @@ const resendInvitation = async (req, res) => {
   }
 };
 
-// @desc    Get invitation details by token (for invitation page)
-// @route   GET /api/invitations/:token
-// @access  Public
+// FIXED: getInvitationDetails function in invitationController.js
 const getInvitationDetails = async (req, res) => {
   try {
     const { token } = req.params;
 
     const invitation = await WorkspaceInvitation.findOne({ token })
-      .populate('workspace', 'name description settings')
+      .populate('workspace', 'name description settings _id') // ✅ FIXED: Added _id
       .populate('inviter', 'name email');
 
     if (!invitation) {
@@ -497,7 +785,6 @@ const getInvitationDetails = async (req, res) => {
       });
     }
 
-    // Check if invitation is expired
     if (invitation.isExpired()) {
       await WorkspaceInvitation.updateOne(
         { _id: invitation._id },
@@ -511,7 +798,6 @@ const getInvitationDetails = async (req, res) => {
       });
     }
 
-    // Check if invitation is still pending
     if (invitation.status !== 'pending') {
       return res.status(400).json({
         success: false,
@@ -520,22 +806,26 @@ const getInvitationDetails = async (req, res) => {
       });
     }
 
+    // ✅ FIXED: Match frontend expected structure exactly
     res.status(200).json({
       success: true,
       data: {
         workspace: {
+          _id: invitation.workspace._id,           // ✅ FIXED: Added _id
           name: invitation.workspace.name,
           description: invitation.workspace.description
         },
-        inviter: {
+        invitedBy: {                              // ✅ FIXED: Changed from 'inviter' to 'invitedBy'
           name: invitation.inviter.name,
           email: invitation.inviter.email
         },
         role: invitation.role,
         permissions: invitation.permissions,
-        message: invitation.message,
+        customMessage: invitation.message,        // ✅ FIXED: Changed from 'message' to 'customMessage'
         expiresAt: invitation.expiresAt,
-        inviteeEmail: invitation.inviteeEmail
+        email: invitation.inviteeEmail,          // ✅ FIXED: Changed from 'inviteeEmail' to 'email'
+        createdAt: invitation.createdAt,         // ✅ FIXED: Added createdAt
+        token: invitation.token                  // ✅ FIXED: Added token for reference
       }
     });
 
@@ -549,242 +839,8 @@ const getInvitationDetails = async (req, res) => {
   }
 };
 
-// Add bulk invitation function (FIXED VERSION):
-const sendBulkInvitation = async (req, res) => {
-  try {
-    const { workspaceId, invitations } = req.body;
-    const inviterId = req.user.id;
-    
-    if (!workspaceId || !invitations || !Array.isArray(invitations)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Workspace ID and invitations array are required'
-      });
-    }
-
-    // Find workspace and check permissions
-    const workspace = await Workspace.findById(workspaceId)
-      .populate('owner', 'name email');
-
-    if (!workspace) {
-      return res.status(404).json({
-        success: false,
-        message: 'Workspace not found'
-      });
-    }
-
-    if (!workspace.hasPermission(inviterId, 'canInvite')) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You do not have permission to send invitations.'
-      });
-    }
-
-    const results = [];
-    const errors = [];
-
-    // Process each invitation
-    for (const inviteData of invitations) {
-      try {
-        const inviteeEmail = inviteData.email.toLowerCase();
-        const role = inviteData.role || 'viewer';
-
-        // Check if invitee is already a member
-        const existingUser = await User.findOne({ email: inviteeEmail });
-        if (existingUser && workspace.isMember(existingUser._id)) {
-          errors.push({
-            email: inviteData.email,
-            success: false,
-            error: 'User is already a member of this workspace'
-          });
-          continue;
-        }
-
-        // Check if pending invitation already exists
-        const existingInvitation = await WorkspaceInvitation.existsPending(
-          workspaceId, 
-          inviteeEmail
-        );
-        
-        if (existingInvitation) {
-          errors.push({
-            email: inviteData.email,
-            success: false,
-            error: 'Pending invitation already exists for this email'
-          });
-          continue;
-        }
-
-        // Create invitation
-        const invitation = await WorkspaceInvitation.create({
-          workspace: workspaceId,
-          inviter: inviterId,
-          inviteeEmail: inviteeEmail,
-          inviteeUser: existingUser ? existingUser._id : null,
-          role: role,
-          message: inviteData.customMessage?.trim()
-        });
-
-        await invitation.populate([
-          { path: 'workspace', select: 'name description' },
-          { path: 'inviter', select: 'name email' }
-        ]);
-
-        // Send email (don't fail bulk operation if one email fails)
-        try {
-          await sendInvitationEmail(invitation);
-        } catch (emailError) {
-          console.error('Email sending failed for:', inviteData.email, emailError);
-        }
-
-        results.push({
-          email: inviteData.email,
-          success: true,
-          invitationId: invitation._id,
-          role: role,
-          status: invitation.status,
-          expiresAt: invitation.expiresAt
-        });
-      } catch (error) {
-        console.error('Error processing invitation for:', inviteData.email, error);
-        errors.push({
-          email: inviteData.email,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: `Bulk invitation completed. ${results.length} sent, ${errors.length} failed.`,
-      data: {
-        successful: results,
-        failed: errors,
-        totalSent: results.length,
-        totalFailed: errors.length
-      }
-    });
-
-  } catch (error) {
-    console.error('Bulk invitation error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error sending bulk invitations',
-      error: error.message
-    });
-  }
-};
-// Update module.exports to include new function:
-
-
-
-// Helper function to send invitation email
-const sendInvitationEmail = async (invitation) => {
-  const transporter = createEmailTransporter();
-  
-  const invitationUrl = invitation.invitationUrl;
-  const workspaceName = invitation.workspace.name;
-  const inviterName = invitation.inviter.name;
-  const role = invitation.role;
-  const customMessage = invitation.message;
-
-  const emailHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Workspace Invitation</title>
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #4f46e5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .button:hover { background: #3730a3; }
-            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
-            .role-badge { background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>🎉 You're Invited to Join a Workspace!</h1>
-            </div>
-            <div class="content">
-                <p>Hi there!</p>
-                
-                <p><strong>${inviterName}</strong> has invited you to join the <strong>"${workspaceName}"</strong> workspace as a <span class="role-badge">${role.toUpperCase()}</span>.</p>
-                
-                ${customMessage ? `<div style="background: white; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
-                    <p><em>"${customMessage}"</em></p>
-                </div>` : ''}
-                
-                <p>As a <strong>${role}</strong>, you'll be able to:</p>
-                <ul>
-                    ${invitation.permissions.canView ? '<li>✅ View workspace documents</li>' : ''}
-                    ${invitation.permissions.canEdit ? '<li>✅ Edit documents</li>' : ''}
-                    ${invitation.permissions.canAdd ? '<li>✅ Add new documents</li>' : ''}
-                    ${invitation.permissions.canDelete ? '<li>✅ Delete documents</li>' : ''}
-                    ${invitation.permissions.canInvite ? '<li>✅ Invite other members</li>' : ''}
-                </ul>
-                
-                <div style="text-align: center;">
-                    <a href="${invitationUrl}" class="button">Accept Invitation</a>
-                </div>
-                
-                <p>Or copy and paste this link in your browser:</p>
-                <p style="background: white; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace;">
-                    ${invitationUrl}
-                </p>
-                
-                <p><strong>⏰ This invitation expires on ${invitation.expiresAt.toLocaleDateString()} at ${invitation.expiresAt.toLocaleTimeString()}</strong></p>
-                
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-                
-                <p style="font-size: 14px; color: #6b7280;">
-                    If you don't want to join this workspace, you can safely ignore this email or 
-                    <a href="${invitationUrl.replace('/accept', '/reject')}" style="color: #dc2626;">decline the invitation</a>.
-                </p>
-            </div>
-            <div class="footer">
-                <p>This invitation was sent by ${inviterName} (${invitation.inviter.email})</p>
-                <p>If you have any questions, please contact the workspace administrator.</p>
-            </div>
-        </div>
-    </body>
-    </html>
-  `;
-
-  const mailOptions = {
-    from: `"${process.env.APP_NAME || 'Document Management'}" <${process.env.EMAIL_USER}>`,
-    to: invitation.inviteeEmail,
-    subject: `You're invited to join "${workspaceName}" workspace`,
-    html: emailHTML,
-    text: `
-      You've been invited to join the "${workspaceName}" workspace by ${inviterName}.
-      
-      Role: ${role}
-      ${customMessage ? `Message: "${customMessage}"` : ''}
-      
-      Accept the invitation: ${invitationUrl}
-      
-      This invitation expires on ${invitation.expiresAt.toLocaleDateString()}.
-      
-      If you don't want to join, you can safely ignore this email.
-    `
-  };
-
-  return transporter.sendMail(mailOptions);
-};
-
-// @desc    Cleanup expired invitations (cron job helper)
-// @route   POST /api/invitations/cleanup
-// @access  Private (Admin only)
 const cleanupExpiredInvitations = async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -792,10 +848,7 @@ const cleanupExpiredInvitations = async (req, res) => {
       });
     }
 
-    // Expire old invitations
     const expiredResult = await WorkspaceInvitation.expireOldInvitations();
-    
-    // Clean up old invitations
     const cleanupResult = await WorkspaceInvitation.cleanupOldInvitations();
 
     res.status(200).json({
@@ -817,9 +870,10 @@ const cleanupExpiredInvitations = async (req, res) => {
   }
 };
 
+// FIXED: Proper module exports
 module.exports = {
   sendInvitation,
-  sendBulkInvitation,
+  handleBulkInvitation,
   getWorkspaceInvitations,
   getPendingInvitations,
   acceptInvitation,
@@ -827,5 +881,6 @@ module.exports = {
   cancelInvitation,
   resendInvitation,
   getInvitationDetails,
-  cleanupExpiredInvitations
+  cleanupExpiredInvitations,
+  testEmailService // 🔥 ADDED: Export the test function
 };

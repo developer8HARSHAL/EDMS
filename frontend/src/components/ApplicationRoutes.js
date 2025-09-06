@@ -1,4 +1,4 @@
-// frontend/src/components/ApplicationRoutes.js - Enhanced with Workspace Routes
+// frontend/src/components/ApplicationRoutes.js - FIXED URL PATTERN
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -19,8 +19,33 @@ import WorkspacePage from '../pages/WorkspacePage';
 import WorkspaceSettings from '../pages/WorkspaceSettings';
 import InvitationPage from '../pages/InvitationPage';
 
+import { useParams } from 'react-router-dom';
 // Import permission guard for workspace routes
 import PermissionGuard from './permissions/PermissionGuard';
+
+function WorkspaceRedirect() {
+  const { workspaceId } = useParams();
+  return <Navigate to={`/workspaces/${workspaceId}`} replace />;
+}
+
+function WorkspaceDocumentsRedirect() {
+  const { workspaceId } = useParams();
+  return <Navigate to={`/workspaces/${workspaceId}/documents`} replace />;
+}
+
+function DocumentPreviewWithPermission() {
+  const { workspaceId } = useParams();
+  
+  return (
+    <PermissionGuard 
+      workspaceId={workspaceId}  // ← Direct prop
+      allowedRoles={['viewer', 'editor', 'admin', 'owner']}
+      fallback={<Navigate to="/dashboard" replace />}
+    >
+      <DocumentPreview />
+    </PermissionGuard>
+  );
+}
 
 const ApplicationRoutes = () => {
   const { isAuthenticated, tokenValidated, loading } = useAuth();
@@ -62,9 +87,9 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Public invitation route - no auth required */}
+      {/* 🔥 FIXED: Changed from /invitations/:token to /invitation/:token */}
       <Route 
-        path="/invitations/:token" 
+        path="/invitation/:token" 
         element={<InvitationPage />} 
       />
 
@@ -127,16 +152,6 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Workspace routes
-      <Route 
-        path="/workspaces" 
-        element={
-          <ProtectedRoute>
-            <WorkspaceList />
-          </ProtectedRoute>
-        } 
-      /> */}
-
       {/* Individual workspace routes */}
       <Route 
         path="/workspaces/:workspaceId" 
@@ -144,7 +159,7 @@ const ApplicationRoutes = () => {
           <ProtectedRoute>
             <WorkspacePage />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Workspace settings - Admin/Owner only */}
@@ -162,19 +177,14 @@ const ApplicationRoutes = () => {
           </ProtectedRoute>
         } 
       />
+      
 
-      {/* Workspace documents - filtered by workspace */}
+      {/* Document preview within workspace context - SINGLE ROUTE ONLY */}
       <Route 
-        path="/workspaces/:workspaceId/documents" 
+        path="/workspaces/:workspaceId/documents/:documentId" 
         element={
           <ProtectedRoute>
-            <PermissionGuard 
-              requiredPermissions={['read']} 
-              workspaceIdParam="workspaceId"
-              fallback={<Navigate to="/dashboard" replace />}
-            >
-              <DocumentList />
-            </PermissionGuard>
+            <DocumentPreviewWithPermission />  
           </ProtectedRoute>
         } 
       />
@@ -190,38 +200,6 @@ const ApplicationRoutes = () => {
               fallback={<Navigate to="/dashboard" replace />}
             >
               <UploadDocument />
-            </PermissionGuard>
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Document preview within workspace context */}
-      <Route 
-        path="/workspaces/:workspaceId/documents/:documentId" 
-        element={
-          <ProtectedRoute>
-            <PermissionGuard 
-              requiredPermissions={['read']} 
-              workspaceIdParam="workspaceId"
-              fallback={<Navigate to="/dashboard" replace />}
-            >
-              <DocumentPreview />
-            </PermissionGuard>
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Workspace members management */}
-      <Route 
-        path="/workspaces/:workspaceId/members" 
-        element={
-          <ProtectedRoute>
-            <PermissionGuard 
-              requiredPermissions={['read']} 
-              workspaceIdParam="workspaceId"
-              fallback={<Navigate to="/dashboard" replace />}
-            >
-              <WorkspacePage />
             </PermissionGuard>
           </ProtectedRoute>
         } 
@@ -243,7 +221,7 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Pending invitations management */}
+      {/* Pending invitations management - CHANGED route to avoid conflict */}
       <Route 
         path="/invitations" 
         element={
@@ -256,12 +234,12 @@ const ApplicationRoutes = () => {
       {/* Legacy redirects for backward compatibility */}
       <Route 
         path="/documents/workspace/:workspaceId" 
-        element={<Navigate to="/workspaces/:workspaceId/documents" replace />} 
+        element={<WorkspaceDocumentsRedirect />} 
       />
 
       <Route 
         path="/workspace/:workspaceId" 
-        element={<Navigate to="/workspaces/:workspaceId" replace />} 
+        element={<WorkspaceRedirect />} 
       />
 
       {/* Catch-all route */}

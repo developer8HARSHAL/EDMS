@@ -1,5 +1,5 @@
-// frontend/src/pages/Dashboard.js - Enhanced with Workspace Integration
-import React, { useState, useEffect, useMemo } from 'react';
+// frontend/src/pages/Dashboard.js - FIXED: Maximum update depth exceeded
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { 
   DocumentIcon, 
@@ -19,6 +19,12 @@ import {
   StarIcon,
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
+
+import jwtDecode  from 'jwt-decode';
+import axios from 'axios';
+import apiService from '../services/apiService'; 
+import workspaceService from '../services/workspaceService';
+
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspaces } from '../hooks/useWorkspaces';
 import { useDocuments } from '../hooks/useDocuments';
@@ -35,18 +41,22 @@ import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
 import {Input} from '../components/ui/Input';
 
+
+
+
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated, tokenValidated } = useAuth();
   
   const { 
-  workspaces, 
-  loading: workspacesLoading, 
-  fetchWorkspaces,  // ✅ Direct access instead of operations.fetchWorkspaces
-  createWorkspace,  // ✅ Direct access instead of operations.createWorkspace
-  getUserRole,
-  getUserPermissions
-} = useWorkspaces();
+    workspaces, 
+    loading: workspacesLoading, 
+    fetchWorkspaces,
+    createWorkspace,
+    getUserRole,
+    getUserPermissions
+  } = useWorkspaces();
+console.log("🔍 Dashboard Hook Check:", workspaces.length, workspaces);
 
   const { 
     pendingInvitations, 
@@ -69,113 +79,190 @@ const Dashboard = () => {
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [workspaceSearch, setWorkspaceSearch] = useState('');
+  
   const [activeTab, setActiveTab] = useState('overview'); // overview, workspaces, activity
   const [recentActivity, setRecentActivity] = useState([]);
 
-  // Helper function to safely extract documents from API response
-  const extractDocumentsFromResponse = (response) => {
-    if (!response) {
-      console.warn('Received null/undefined response');
-      return [];
-    }
-    
-    if (Array.isArray(response)) return response;
-    if (response.data) {
-      if (Array.isArray(response.data)) return response.data;
-      if (response.data.documents && Array.isArray(response.data.documents)) {
-        return response.data.documents;
-      }
-    }
-    if (response.documents && Array.isArray(response.documents)) {
-      return response.documents;
-    }
-    if (response.success && response.data && Array.isArray(response.data)) {
-      return response.data;
-    }
-    
-    console.warn('Could not extract documents from response, returning empty array');
-    return [];
-  };
+  // ✅ FIX: Create stable reference for fetchData function
+  const fetchData = useCallback(async () => {
+  setIsLoading(true);
+  setError(null);
 
-  // ✅ FIXED: Updated fetchData to use operations.fetchWorkspaces
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
+  try {
+    console.log('Fetching dashboard data...');
     
-      try {
-        console.log('Fetching dashboard data...');
-        
-        // Fetch documents
-        let allDocs = [];
-        let sharedDocs = [];
-        
-        try {
-          const allDocsResponse = await documentApi.getAllDocuments();
-          console.log('All documents API response:', allDocsResponse);
-          allDocs = extractDocumentsFromResponse(allDocsResponse);
-        } catch (docError) {
-          console.error('Error fetching all documents:', docError);
-        }
-        
-        try {
-          const sharedDocsResponse = await documentApi.getSharedDocuments();
-          console.log('Shared documents API response:', sharedDocsResponse);
-          sharedDocs = extractDocumentsFromResponse(sharedDocsResponse);
-        } catch (sharedError) {
-          console.error('Error fetching shared documents:', sharedError);
-        }
-        
-        // ✅ FIXED: Use operations.fetchWorkspaces
-        await Promise.all([
-           fetchWorkspaces(), 
-          fetchPendingInvitations()
-        ]);
-        
-        // Calculate stats
-        const thisMonth = new Date().getMonth();
-        const thisYear = new Date().getFullYear();
-        
-        const uploadsThisMonth = allDocs.filter(doc => {
-          if (!doc) return false;
-          const docDate = new Date(doc.uploadDate || doc.createdAt || Date.now());
-          return docDate.getMonth() === thisMonth && 
-                 docDate.getFullYear() === thisYear;
-        });
-        
-        setStats({
-          totalDocs: allDocs.length.toString(),
-          uploads: uploadsThisMonth.length.toString(),
-          shared: sharedDocs.length.toString(),
-          workspaces: workspaces.length.toString()
-        });
-        
-        // Get recent documents
-        const recentDocs = [...allDocs]
-          .filter(doc => doc)
-          .sort((a, b) => {
-            const dateA = new Date(a.uploadDate || a.createdAt || 0);
-            const dateB = new Date(b.uploadDate || b.createdAt || 0);
-            return dateB - dateA;
-          })
-          .slice(0, 5);
-        
-        setDocuments(recentDocs);
-        
-        // Generate recent activity
-        setRecentActivity(generateRecentActivity(allDocs, workspaces));
-        
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-        setError("Failed to load dashboard data. Please try again later.");
-        setDocuments([]);
-      } finally {
-        setIsLoading(false);
+    // Helper function to safely extract documents from API response
+    const extractDocumentsFromResponse = (response) => {
+      if (!response) {
+        console.warn('Received null/undefined response');
+        return [];
       }
+      
+      if (Array.isArray(response)) return response;
+      if (response.data) {
+        if (Array.isArray(response.data)) return response.data;
+        if (response.data.documents && Array.isArray(response.data.documents)) {
+          return response.data.documents;
+        }
+      }
+      if (response.documents && Array.isArray(response.documents)) {
+        return response.documents;
+      }
+      if (response.success && response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      
+      console.warn('Could not extract documents from response, returning empty array');
+      return [];
     };
 
-    fetchData();
-  }, [fetchWorkspaces, fetchPendingInvitations]); // ✅ FIXED: Updated dependency
+    // Fetch documents
+    let allDocs = [];
+    let sharedDocs = [];
+    
+    const allDocsResponse = await documentApi.getDocuments();
+    console.log('All documents API response:', allDocsResponse);
+    allDocs = extractDocumentsFromResponse(allDocsResponse);
+    
+    const sharedDocsResponse = await documentApi.getSharedDocuments();
+    console.log('Shared documents API response:', sharedDocsResponse);
+    sharedDocs = extractDocumentsFromResponse(sharedDocsResponse);
+    
+    // ✅ FIX: Only fetch if needed and don't add to dependencies
+    try {
+      if (fetchWorkspaces && workspaces.length === 0) {
+        await fetchWorkspaces(); 
+      }
+    } catch (wsError) {
+      console.warn('Workspace fetch failed:', wsError);
+    }
+    
+    try {
+      if (fetchPendingInvitations) {
+        await fetchPendingInvitations();
+      }
+    } catch (invError) {
+      console.warn('Invitations fetch failed:', invError);
+    }
+    
+    // Calculate stats
+    const thisMonth = new Date().getMonth();
+    const thisYear = new Date().getFullYear();
+    
+    const uploadsThisMonth = allDocs.filter(doc => {
+      if (!doc) return false;
+      const docDate = new Date(doc.uploadDate || doc.createdAt || Date.now());
+      return docDate.getMonth() === thisMonth && 
+             docDate.getFullYear() === thisYear;
+    });
+    
+    setStats({
+      totalDocs: allDocs.length.toString(),
+      uploads: uploadsThisMonth.length.toString(),
+      shared: sharedDocs.length.toString(),
+      workspaces: workspaces.length.toString()
+    });
+    
+    // Get recent documents
+    const recentDocs = [...allDocs]
+      .filter(doc => doc)
+      .sort((a, b) => {
+        const dateA = new Date(a.uploadDate || a.createdAt || 0);
+        const dateB = new Date(b.uploadDate || b.createdAt || 0);
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+    
+    setDocuments(recentDocs);
+    
+    // Generate recent activity
+    setRecentActivity(generateRecentActivity(allDocs, workspaces));
+    
+  } catch (err) {
+    console.error("Error fetching dashboard data:", err);
+    setError("Failed to load dashboard data. Please try again later.");
+    setDocuments([]);
+  } finally {
+    setIsLoading(false);
+  }
+}, [workspaces.length]);
+
+
+
+
+
+
+
+  useEffect(() => {
+    console.log('=== DASHBOARD AUTH DEBUG ===');
+    
+    // Check localStorage token
+    const token = localStorage.getItem('authToken');
+    console.log('1. Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL');
+    
+    // Check axios headers
+    console.log('2. Axios auth header:', axios.defaults.headers.common['Authorization']);
+    
+    // Check Redux auth state
+    console.log('3. Redux auth state:', { 
+      isAuthenticated, 
+      user: user ? { id: user.id, email: user.email } : null,
+      tokenValidated 
+    });
+    
+    // Test token decode
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        console.log('4. Token decoded:', {
+          id: decoded.id,
+          email: decoded.email,
+          exp: decoded.exp,
+          expired: decoded.exp * 1000 < Date.now(),
+          expiryTime: new Date(decoded.exp * 1000)
+        });
+      } catch (e) {
+        console.error('4. Token decode error:', e);
+      }
+    }
+    
+    // Test API call
+    const testAPICall = async () => {
+      try {
+        console.log('5. Testing API call...');
+        const response = await fetch('http://localhost:5000/api/users/profile', {
+          headers: {
+            'Authorization': axios.defaults.headers.common['Authorization']
+          }
+        });
+        console.log('5. API test response:', response.status, response.statusText);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('5. API test data:', data);
+        } else {
+          const errorData = await response.text();
+          console.log('5. API test error:', errorData);
+        }
+      } catch (error) {
+        console.error('5. API test failed:', error);
+      }
+    };
+    
+    if (isAuthenticated && token) {
+      testAPICall();
+    }
+    
+    console.log('=== END AUTH DEBUG ===');
+  }, [isAuthenticated, user, tokenValidated]);
+
+  // ✅ FIX: Use the stable fetchData function with proper dependencies
+  useEffect(() => {
+    // Only fetch if authenticated and token is validated
+    if (isAuthenticated && tokenValidated) {
+      fetchData();
+    }
+  }, [isAuthenticated, tokenValidated, fetchData]); // ✅ fetchData is now stable
 
   // Update stats when workspaces change
   useEffect(() => {
@@ -183,19 +270,47 @@ const Dashboard = () => {
       ...prev,
       workspaces: workspaces.length.toString()
     }));
-  }, [workspaces]);
+  }, [workspaces.length]); // ✅ Only depend on length, not the entire array
+
+
+const [workspaceList, setWorkspaceList] = useState([]);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  const fetchWorkspaces = async () => {
+    try {
+      const res = await workspaceService.getWorkspaces();
+      
+      console.log("API raw response:", res);
+      console.log("Parsed workspaces:", res.data?.data?.workspaces);
+      
+      // ✅ Set state once, safely
+      setWorkspaceList(res.data?.data?.workspaces);
+    } catch (err) {
+      console.error("❌ Failed to fetch workspaces", err);
+    }
+  };
+
+  fetchWorkspaces();
+}, []);
+
+
+
+console.log('apiService:', apiService);
+console.log('apiService.default:', apiService.default);
+console.log('Available methods:', Object.keys(apiService));
 
   // Filter workspaces based on search
   const filteredWorkspaces = useMemo(() => {
-    if (!workspaceSearch) return workspaces.slice(0, 6);
+    if (!workspaceSearch) return workspaces;
     return workspaces.filter(workspace =>
       workspace.name.toLowerCase().includes(workspaceSearch.toLowerCase()) ||
       workspace.description?.toLowerCase().includes(workspaceSearch.toLowerCase())
-    ).slice(0, 6);
+    )
   }, [workspaces, workspaceSearch]);
 
-  // Generate recent activity data
-  const generateRecentActivity = (docs, workspaces) => {
+  // ✅ FIX: Stable generate recent activity function
+  const generateRecentActivity = useCallback((docs, workspaces) => {
     const activities = [];
     
     // Recent document uploads
@@ -221,7 +336,7 @@ const Dashboard = () => {
     });
     
     return activities.sort((a, b) => b.time - a.time).slice(0, 5);
-  };
+  }, []); // ✅ No dependencies needed
 
   const handleDownload = async (docId, docName) => {
     try {
@@ -249,29 +364,40 @@ const Dashboard = () => {
   const handleAcceptInvitation = async (invitationId) => {
     try {
       await acceptInvitation(invitationId);
-     await fetchWorkspaces();// ✅ FIXED: Use operations.fetchWorkspaces
+      await fetchWorkspaces(); // ✅ This is fine since it's user-triggered
     } catch (err) {
       console.error("Error accepting invitation:", err);
     }
   };
 
-  // ✅ NEW: Handle workspace creation
+
+  
+
   const handleCreateWorkspace = async (workspaceData) => {
     try {
-      console.log('Creating workspace:', workspaceData);
-    await createWorkspace(workspaceData);
+      console.log('🏢 Creating workspace:', workspaceData);
       
-      // Refresh workspaces after creation
-      await fetchWorkspaces();
-
+      // Check auth state before creating workspace
+      console.log('🔍 Auth check before workspace creation:', {
+        isAuthenticated,
+        hasToken: !!localStorage.getItem('authToken'),
+        hasAxiosHeader: !!axios.defaults.headers.common['Authorization'],
+        user: user ? { id: user.id, email: user.email } : null
+      });
       
-      // Close modal
+      await createWorkspace(workspaceData);
       setShowCreateModal(false);
-      
-      console.log('Workspace created successfully');
+      console.log('✅ Workspace created successfully');
     } catch (error) {
-      console.error('Failed to create workspace:', error);
-      // Re-throw the error so the modal can handle it
+      console.error('❌ Failed to create workspace:', error);
+      
+      // Check if it's an auth error
+      if (error.response?.status === 401) {
+        console.error('❌ 401 Unauthorized - Token issue detected');
+        console.log('🔍 Current token:', localStorage.getItem('authToken'));
+        console.log('🔍 Current axios header:', axios.defaults.headers.common['Authorization']);
+      }
+      
       throw error;
     }
   };
@@ -616,17 +742,17 @@ const Dashboard = () => {
               )}
 
               {/* Show more workspaces link */}
-              {workspaces.length > 6 && !workspaceSearch && (
-                <div className="text-center">
-                  <Button
-                    as={RouterLink}
-                    to="/workspaces"
-                    variant="outline"
-                  >
-                    View All Workspaces ({workspaces.length})
-                  </Button>
-                </div>
-              )}
+{workspaces.length > 6 && !workspaceSearch && (
+  <div className="text-center">
+    <Button
+      as={RouterLink}    // ✅ Here
+      to="/workspaces"   // ✅ Add /workspaces
+      variant="outline"
+    >
+      View All Workspaces ({workspaces.length})
+    </Button>
+  </div>
+)}
             </>
           )}
 
@@ -697,14 +823,14 @@ const Dashboard = () => {
                       Upload New Document
                     </Button>
                     <Button
-                      as={RouterLink}
-                      to="/workspaces"
-                      variant="outline"
-                      className="w-full justify-start"
-                      leftIcon={<BuildingOfficeIcon className="h-4 w-4" />}
-                    >
-                      Browse All Workspaces
-                    </Button>
+  as={RouterLink}      // ✅ Here
+  to="/workspaces"      // ✅ Add /workspaces
+  variant="outline"
+  className="w-full justify-start"
+  leftIcon={<BuildingOfficeIcon className="h-4 w-4" />}
+>
+  Browse All Workspaces
+</Button>
                     <Button
                       as={RouterLink}
                       to="/profile"
@@ -763,7 +889,7 @@ const Dashboard = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreateWorkspace={handleCreateWorkspace}
-        isLoading={workspacesLoading.createWorkspace || false}
+        isLoading={workspacesLoading?.createWorkspace || false}
       />
     </div>
   );

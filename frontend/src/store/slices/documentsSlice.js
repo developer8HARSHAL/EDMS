@@ -13,6 +13,7 @@ const initialState = {
   recentActivity: [],
   popularDocuments: [],
   analytics: {},
+  isLoading: false,
   loading: false,
   uploading: false,
   error: null,
@@ -52,8 +53,8 @@ export const fetchDocuments = createAsyncThunk(
   'documents/fetchDocuments',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await documentApi.getAllDocuments(params);
-      return response.data || response;
+      const response = await documentApi.getDocuments(params);
+      return  response;
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch documents';
       return rejectWithValue(message);
@@ -62,15 +63,53 @@ export const fetchDocuments = createAsyncThunk(
 );
 
 // NEW: Fetch workspace documents
+
+// FIXED: fetchWorkspaceDocuments in documentsSlice.js
 export const fetchWorkspaceDocuments = createAsyncThunk(
   'documents/fetchWorkspaceDocuments',
   async ({ workspaceId, options = {} }, { rejectWithValue }) => {
     try {
-      const response = await workspaceService.getWorkspaceDocuments(workspaceId, options);
-      return { workspaceId, documents: response.data || response, options };
+      console.log('📄 Fetching documents for workspace:', workspaceId);
+      
+      const response = await documentApi.getWorkspaceDocuments(workspaceId, options);
+      
+      console.log('🔍 Raw API response:', response);
+      console.log('🔍 Response structure:', {
+        hasData: !!response.data,
+        dataIsArray: Array.isArray(response.data),
+        dataLength: response.data?.length,
+        firstItem: response.data?.[0]
+      });
+      
+      // 🔧 FIXED: Use the correct data path
+      let documents = [];
+      
+      if (Array.isArray(response.data)) {
+        // If response.data is directly an array of documents
+        documents = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        // If response.data.data contains the documents array
+        documents = response.data.data;
+      } else if (response.data && response.data.documents) {
+        // If documents are in response.data.documents
+        documents = response.data.documents;
+      } else {
+        console.warn('⚠️ Unexpected response structure:', response);
+        documents = [];
+      }
+      
+      console.log('✅ Documents extracted:', documents.length, 'documents');
+      
+      return {
+        workspaceId,
+        documents,
+        count: documents.length
+      };
     } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch workspace documents';
-      return rejectWithValue(message);
+      console.error('❌ Error fetching workspace documents:', error);
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to fetch workspace documents'
+      );
     }
   }
 );
@@ -522,39 +561,57 @@ const documentsSlice = createSlice({
     }
   },
   extraReducers: (builder) => {
-    // Fetch documents
-    builder
-      .addCase(fetchDocuments.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchDocuments.fulfilled, (state, action) => {
-        state.loading = false;
-        state.documents = Array.isArray(action.payload) ? action.payload : [];
-        state.pagination.totalDocuments = action.payload.length || 0;
-        state.error = null;
-      })
-      .addCase(fetchDocuments.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      });
+  // 1. Fix the fetchDocuments case (should NOT handle workspace data)
+builder
+  .addCase(fetchDocuments.pending, (state) => {
+    state.loading = true;
+    state.error = null;
+  })
+  .addCase(fetchDocuments.fulfilled, (state, action) => {
+    state.loading = false;
+    // 🔧 FIXED: Only handle general documents, not workspace-specific
+    state.documents = Array.isArray(action.payload) ? action.payload : [];
+    state.pagination.totalDocuments = state.documents.length || 0;
+    state.error = null;
+  })
+  .addCase(fetchDocuments.rejected, (state, action) => {
+    state.loading = false;
+    state.error = action.payload;
+  });
 
-    // NEW: Fetch workspace documents
-    builder
-      .addCase(fetchWorkspaceDocuments.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchWorkspaceDocuments.fulfilled, (state, action) => {
-        state.loading = false;
-        const { workspaceId, documents } = action.payload;
-        state.workspaceDocuments[workspaceId] = Array.isArray(documents) ? documents : [];
-        state.error = null;
-      })
-      .addCase(fetchWorkspaceDocuments.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      });
+
+    // 2. Fix the fetchWorkspaceDocuments case (this was the problem!)
+builder
+  .addCase(fetchWorkspaceDocuments.pending, (state) => {
+    state.loading = true;
+    state.error = null;
+  })
+  .addCase(fetchWorkspaceDocuments.fulfilled, (state, action) => {
+    state.loading = false;
+    console.log('🔧 Redux: Processing workspace documents:', action.payload);
+    
+    const { workspaceId, documents } = action.payload;
+    
+    // 🔧 FIXED: Properly store workspace documents
+    if (!state.workspaceDocuments) {
+      state.workspaceDocuments = {};
+    }
+    
+    state.workspaceDocuments[workspaceId] = Array.isArray(documents) ? documents : [];
+    
+    console.log('✅ Redux: Workspace documents stored:', {
+      workspaceId,
+      documentCount: state.workspaceDocuments[workspaceId].length,
+      documents: state.workspaceDocuments[workspaceId]
+    });
+    
+    state.error = null;
+  })
+  .addCase(fetchWorkspaceDocuments.rejected, (state, action) => {
+    state.loading = false;
+    state.error = action.payload;
+    console.error('❌ Redux: Failed to fetch workspace documents:', action.payload);
+  });
 
     // NEW: Fetch workspace stats
     builder
@@ -738,6 +795,7 @@ export const selectCurrentWorkspaceDocuments = (state) =>
   state.documents.currentWorkspaceId ? 
     state.documents.workspaceDocuments[state.documents.currentWorkspaceId] || [] : 
     state.documents.documents;
+export const selectDocumentLoading = (state) => state.documents?.loading || false;
 export const selectSharedDocuments = (state) => state.documents.sharedDocuments;
 export const selectCurrentDocument = (state) => state.documents.currentDocument;
 export const selectFavoriteDocuments = (state) => state.documents.favorites;
@@ -839,6 +897,7 @@ export const selectFilteredDocuments = (state) => {
   
   return filtered;
 };
+
 
 // NEW: Selector for document statistics
 export const selectDocumentStatistics = (state) => {

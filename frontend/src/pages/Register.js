@@ -1,5 +1,6 @@
+// ===== FIXED Register.js =====
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
@@ -19,17 +20,41 @@ const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   
+  // ✅ FIXED: Properly declare invitation handling hooks
+  const [searchParams] = useSearchParams();
+  const invitationToken = searchParams.get('invitation');
+  const invitationAction = searchParams.get('action'); // 'accept' or 'view'
+  const redirectPath = searchParams.get('redirect');
+  
   const { register, error, clearError, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // ✅ FIXED: Handle registration success with invitation redirect
+  const handleRegisterSuccess = useCallback(() => {
+    console.log('Registration successful, checking invitation redirect...');
+    
+    if (invitationToken && redirectPath) {
+      console.log('Redirecting to invitation page after registration:', redirectPath);
+      navigate(redirectPath);
+    } else if (invitationToken) {
+      // Construct invitation URL with action parameter
+      const invitationUrl = `/invitations/${invitationToken}${invitationAction ? `?action=${invitationAction}` : ''}`;
+      console.log('Redirecting to invitation with token:', invitationUrl);
+      navigate(invitationUrl);
+    } else {
+      console.log('Normal registration flow - redirecting to dashboard');
+      navigate('/dashboard');
+    }
+  }, [invitationToken, invitationAction, redirectPath, navigate]);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      handleRegisterSuccess();
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, handleRegisterSuccess]);
 
-  // FIXED: Clear previous errors when component mounts ONLY
+  // Clear previous errors when component mounts ONLY
   useEffect(() => {
     if (typeof clearError === 'function') {
       clearError();
@@ -94,15 +119,25 @@ const Register = () => {
     setIsSubmitting(true);
     
     try {
+      console.log('Attempting to register...');
       await register(name, email, password);
       
       // Show success toast
       showToast('Registration successful! You can now log in with your credentials.', 'success');
       
-      // Navigate to login page after successful registration
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      // ✅ FIXED: Handle invitation redirect or normal flow
+      if (invitationToken) {
+        console.log('Registration successful with invitation - redirecting to invitation page');
+        // Small delay to show success message, then redirect to invitation
+        setTimeout(() => {
+          handleRegisterSuccess();
+        }, 1000);
+      } else {
+        // Navigate to login page after successful registration (normal flow)
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }
     } catch (err) {
       // Error handling is done via the error state in AuthContext
       // But we'll add an additional toast for unexpected errors
@@ -116,8 +151,19 @@ const Register = () => {
 
   const handleLoginClick = useCallback(() => {
     console.log('Login link clicked');
-    navigate('/login');
-  }, [navigate]);
+    
+    // ✅ FIXED: Preserve invitation context when going to login
+    if (invitationToken) {
+      const loginParams = new URLSearchParams();
+      loginParams.set('invitation', invitationToken);
+      if (invitationAction) loginParams.set('action', invitationAction);
+      if (redirectPath) loginParams.set('redirect', redirectPath);
+      
+      navigate(`/login?${loginParams.toString()}`);
+    } else {
+      navigate('/login');
+    }
+  }, [navigate, invitationToken, invitationAction, redirectPath]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
@@ -130,6 +176,15 @@ const Register = () => {
             <p className="mt-2 text-sm text-gray-600 dark:text-white">
               Join us and start managing your documents
             </p>
+            {/* ✅ FIXED: Show invitation context */}
+            {invitationToken && (
+              <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                {invitationAction === 'accept' 
+                  ? 'Create an account to accept your workspace invitation'
+                  : 'Create an account to view your workspace invitation'
+                }
+              </p>
+            )}
           </div>
 
           {/* Toast Notification */}
@@ -226,7 +281,7 @@ const Register = () => {
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center  rounded-r-lg transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-lg transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -262,7 +317,7 @@ const Register = () => {
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center  rounded-r-lg transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-lg transition-colors"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
@@ -302,7 +357,7 @@ const Register = () => {
               <button
                 type="button"
                 onClick={handleLoginClick}
-                className="text-blue-600 hover:text-white-800 font-medium transition-colors underline bg-transparent border-none cursor-pointer"
+                className="text-blue-600 hover:text-blue-800 font-medium transition-colors underline bg-transparent border-none cursor-pointer"
               >
                 Sign in
               </button>

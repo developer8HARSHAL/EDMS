@@ -14,10 +14,10 @@ import { useWorkspaces } from '../hooks/useWorkspaces';
 import { useDocuments } from '../hooks/useDocuments';
 import { useInvitations } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
-import { 
-  FolderIcon, 
-  DocumentIcon, 
-  UserPlusIcon, 
+import {
+  FolderIcon,
+  DocumentIcon,
+  UserPlusIcon,
   CogIcon,
   ChartBarIcon,
   CalendarIcon,
@@ -25,22 +25,25 @@ import {
   EyeIcon,
   ArrowDownTrayIcon,
   ShareIcon,
-  StarIcon
+  StarIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline';
-import { 
-  StarIcon as StarIconSolid 
+import {
+  StarIcon as StarIconSolid
 } from '@heroicons/react/24/solid';
 
 const WorkspacePage = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
-  const { 
+
+  const {
     currentWorkspace,
+    workspaces, // Add this for list view
     isLoading: workspaceLoading,
     hasError: workspaceError,
     fetchWorkspace,
+    fetchWorkspaces, // Add this for list view
     getUserRole,
     getUserPermissions,
     getWorkspaceById
@@ -51,7 +54,7 @@ const WorkspacePage = () => {
     workspaceStats,
     recentActivity,
     popularDocuments,
-    isLoading: documentsLoading,
+    loading: documentsLoading,
     searchQuery,
     setSearchQuery,
     fetchWorkspaceDocuments,
@@ -59,7 +62,16 @@ const WorkspacePage = () => {
     fetchRecentActivity,
     fetchPopularDocuments,
     toggleFavorite
-  } = useDocuments();
+  } = useDocuments(workspaceId);
+
+  // Add this debugging right after the useDocuments call
+  console.log('🔍 WorkspacePage Debug:', {
+    workspaceId,
+    workspaceDocuments,
+    documentsCount: workspaceDocuments?.length || 0,
+    documentsLoading
+  });
+
 
   const {
     workspaceInvitations,
@@ -78,17 +90,108 @@ const WorkspacePage = () => {
   const userRole = getUserRole(workspaceId);
   const userPermissions = getUserPermissions(workspaceId);
 
-  // Load workspace data
+  // Load data based on whether we're in list or detail view
   useEffect(() => {
-    if (workspaceId) {
+    if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
+      // Detail view - load specific workspace data
+      console.log('Fetching data for valid workspaceId:', workspaceId);
+
       fetchWorkspace(workspaceId);
       fetchWorkspaceDocuments(workspaceId);
       fetchWorkspaceStats(workspaceId);
       fetchRecentActivity(workspaceId);
       fetchPopularDocuments(workspaceId);
       fetchWorkspaceInvitations(workspaceId);
+    } else if (!workspaceId) {
+      // List view - load all workspaces
+      console.log('loading workspaces list view');
+      fetchWorkspaces();
+    } else {
+      console.error('Invalid workspaceId:', workspaceId);
+      navigate('/dashboard');
+    }
+  }, [workspaceId, fetchWorkspace, fetchWorkspaces, fetchWorkspaceDocuments, fetchWorkspaceStats, fetchRecentActivity, fetchPopularDocuments, fetchWorkspaceInvitations, navigate]);
+
+  useEffect(() => {
+    if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
+      console.log('🔄 Loading workspace data for:', workspaceId);
+
+      const loadWorkspaceData = async () => {
+        try {
+          // Load workspace info
+          console.log('📍 Fetching workspace info...');
+          await fetchWorkspace(workspaceId);
+
+          // Load documents - this is the main fix!
+          console.log('📄 Fetching workspace documents...');
+          const docsResult = await fetchWorkspaceDocuments(workspaceId);
+          console.log('📄 Documents result:', docsResult);
+
+          // Load stats and activity
+          console.log('📊 Fetching stats and activity...');
+          await Promise.allSettled([
+            fetchWorkspaceStats(workspaceId),
+            fetchRecentActivity(workspaceId),
+            fetchPopularDocuments(workspaceId),
+            fetchWorkspaceInvitations(workspaceId)
+          ]);
+
+          console.log('✅ All workspace data loaded successfully');
+
+        } catch (error) {
+          console.error('❌ Error loading workspace data:', error);
+          // Don't redirect on error, just log it
+        }
+      };
+
+      loadWorkspaceData();
     }
   }, [workspaceId, fetchWorkspace, fetchWorkspaceDocuments, fetchWorkspaceStats, fetchRecentActivity, fetchPopularDocuments, fetchWorkspaceInvitations]);
+
+
+  useEffect(() => {
+    console.log('📊 Document State Update:', {
+      workspaceId,
+      documentsArray: workspaceDocuments,
+      isArray: Array.isArray(workspaceDocuments),
+      length: workspaceDocuments?.length || 0,
+      firstDoc: workspaceDocuments?.[0]?.filename || 'No documents'
+    });
+  }, [workspaceId, workspaceDocuments]);
+
+  useEffect(() => {
+    if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
+      console.log('🔄 Fetching workspace data for:', workspaceId);
+
+      fetchWorkspace(workspaceId)
+        .then(res => console.log('✅ Workspace fetched:', res))
+        .catch(err => console.error('❌ Workspace fetch error:', err));
+
+      fetchWorkspaceDocuments(workspaceId)
+        .then(res => console.log('📄 Documents fetched successfully:', res))
+        .catch(err => console.error('❌ Documents fetch error:', err));
+
+      fetchWorkspaceStats(workspaceId)
+        .then(res => console.log('📊 Stats fetched:', res))
+        .catch(err => console.error('❌ Stats fetch error:', err));
+
+      fetchRecentActivity(workspaceId)
+        .then(res => console.log('🕒 Recent activity fetched:', res))
+        .catch(err => console.error('❌ Recent activity fetch error:', err));
+
+      fetchPopularDocuments(workspaceId)
+        .then(res => console.log('⭐ Popular documents fetched:', res))
+        .catch(err => console.error('❌ Popular documents fetch error:', err));
+
+      fetchWorkspaceInvitations(workspaceId)
+        .then(res => console.log('✉️ Invitations fetched:', res))
+        .catch(err => console.error('❌ Invitations fetch error:', err));
+    } else {
+      console.warn('⚠️ Invalid workspaceId:', workspaceId);
+    }
+  }, [workspaceId]);
+
+
 
   // Handle invitation submission
   const handleInviteSubmit = async (invitationData) => {
@@ -105,7 +208,7 @@ const WorkspacePage = () => {
         await sendInvitation(invitationData);
         console.log('Invitation sent successfully');
       }
-      
+
       // Refresh workspace invitations
       fetchWorkspaceInvitations(workspaceId);
     } catch (error) {
@@ -113,6 +216,13 @@ const WorkspacePage = () => {
       throw error;
     }
   };
+  console.log('🔍 Debug Loading State:', {
+
+    workspaceLoading,
+    workspaceId,
+    workspaces: workspaces?.length || 0,
+    hasWorkspaces: workspaces && workspaces.length > 0
+  });
 
   // Handle loading and error states
   if (workspaceLoading) {
@@ -125,6 +235,136 @@ const WorkspacePage = () => {
     );
   }
 
+  // List view - show when no workspaceId
+  // List view - show when no workspaceId
+  // List view - show when no workspaceId
+  if (!workspaceId) {
+    console.log('📋 List View Debug:', {
+      workspaces: workspaces?.length || 0,
+      workspaceLoading,
+      workspaceError
+    });
+
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* ✅ Add debugging info in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4 p-2 bg-yellow-100 border rounded text-xs">
+              Debug: {workspaces?.length || 0} workspaces loaded, Loading: {workspaceLoading ? 'Yes' : 'No'}
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Workspaces
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 mt-2">
+                {workspaces?.length || 0} workspaces available
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate('/workspaces/create')}
+              className="flex items-center"
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Create Workspace
+            </Button>
+          </div>
+
+          {/* Workspaces Grid */}
+          {workspaces && workspaces.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {workspaces.map((workspace) => (
+                <Card
+                  key={workspace._id}
+                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/workspaces/${workspace._id}`)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        {workspace.name}
+                      </h3>
+                      {workspace.description && (
+                        <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 mb-3">
+                          {workspace.description}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant={workspace.isPublic ? 'success' : 'gray'}>
+                      {workspace.isPublic ? 'Public' : 'Private'}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    <div className="flex items-center">
+                      <UserPlusIcon className="h-4 w-4 mr-1" />
+                      {(workspace.members?.length || 0) + 1} members
+                    </div>
+                    <div className="flex items-center">
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      {new Date(workspace.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {workspace.members?.slice(0, 3).map((member) => (
+                        <Avatar
+                          key={member._id}
+                          user={member.user}
+                          size="xs"
+                        />
+                      ))}
+                      {workspace.members?.length > 3 && (
+                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-xs text-gray-600 dark:text-gray-300">
+                            +{workspace.members.length - 3}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <Badge variant="primary" className="capitalize">
+                      {getUserRole(workspace._id)}
+                    </Badge>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FolderIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No workspaces yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Get started by creating your first workspace.
+              </p>
+              <Button onClick={() => navigate('/workspaces/create')}>
+                Create Workspace
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  console.log('User permissions for this workspace:', userPermissions);
+  console.log('User role:', userRole);
+  console.log('🔐 Permission Debug Info:');
+  console.log('- workspaceId:', workspaceId);
+  console.log('- userRole:', userRole);
+  console.log('- userPermissions:', userPermissions);
+  console.log('- currentWorkspace:', currentWorkspace);
+  console.log('- user:', user);
+
+  // Detail view error handling
   if (workspaceError || !currentWorkspace) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -138,20 +378,75 @@ const WorkspacePage = () => {
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             {workspaceError || "The workspace you're looking for doesn't exist or you don't have access to it."}
           </p>
-          <Button onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
-          </Button>
+          <div className="flex space-x-3 justify-center">
+            <Button variant="outline" onClick={() => navigate('/workspaces')}>
+              Back to Workspaces
+            </Button>
+            <Button onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
         </Card>
       </div>
     );
   }
-
+  console.log('🕵️‍♂️ documentsLoading:', documentsLoading);
+  console.log('🕵️‍♂️ workspaceDocuments array:', workspaceDocuments);
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
+  };
+
+
+
+  const handleDownloadDocument = async (doc) => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch(`/api/workspaces/${workspaceId}/documents/${doc._id}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`, // Adjust based on your auth
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Get the filename from response headers or use doc filename
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = doc.filename || doc.originalName || doc.name || 'download';
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="([^"]*)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log('✅ Document downloaded successfully:', filename);
+
+    } catch (error) {
+      console.error('❌ Download error:', error);
+      alert(`Failed to download document: ${error.message}`);
+    }
   };
 
   const formatFileSize = (bytes) => {
@@ -196,6 +491,13 @@ const WorkspacePage = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/workspaces')}
+            >
+              ← Back to Workspaces
+            </Button>
             <PermissionGuard permissions={['invite']} workspaceId={workspaceId}>
               <Button
                 variant="outline"
@@ -310,22 +612,22 @@ const WorkspacePage = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => toggleFavorite(doc._id)}
-                    className="text-gray-400 hover:text-yellow-500"
-                  >
-                    {doc.isFavorite ? (
-                      <StarIconSolid className="h-4 w-4 text-yellow-500" />
-                    ) : (
-                      <StarIcon className="h-4 w-4" />
-                    )}
-                  </button>
-                  <Link
-                    to={`/workspaces/${workspaceId}/documents/${doc._id}`}
-                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      console.log('🔍 View button clicked');
+                      console.log('🔍 Current permissions check:');
+                      console.log('- Has read permission?', userPermissions?.canView); // ← Fixed: use canView instead of includes
+                      console.log('- All permissions:', userPermissions);
+                      console.log('- User role:', userRole);
+
+                      // Try navigation anyway to see what happens
+                      navigate(`/workspaces/${workspaceId}/documents/${doc._id}`);
+                    }}
                   >
                     <EyeIcon className="h-4 w-4" />
-                  </Link>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -342,6 +644,7 @@ const WorkspacePage = () => {
                   Upload First Document
                 </Button>
               </div>
+
             )}
           </div>
         </Card>
@@ -383,143 +686,95 @@ const WorkspacePage = () => {
       </div>
     </div>
   );
-
-  const renderDocumentsTab = () => (
-    <div className="space-y-6">
-      {/* Documents Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Documents
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            {workspaceDocuments?.length || 0} documents in this workspace
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Input
-            type="text"
-            placeholder="Search documents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-64"
-          />
-          <PermissionGuard permissions={['write']} workspaceId={workspaceId}>
-            <Button
-              onClick={() => navigate(`/workspaces/${workspaceId}/upload`)}
-            >
-              Upload Document
-            </Button>
-          </PermissionGuard>
-        </div>
-      </div>
-
-      {/* Documents Grid/List */}
-      <div className={viewMode === 'grid' 
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
-        : 'space-y-4'
-      }>
-        {workspaceDocuments?.map((doc) => (
-          <Card key={doc._id} className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center space-x-3">
-                <DocumentIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {doc.filename}
-                  </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatFileSize(doc.size)}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => toggleFavorite(doc._id)}
-                className="text-gray-400 hover:text-yellow-500"
-              >
-                {doc.isFavorite ? (
-                  <StarIconSolid className="h-4 w-4 text-yellow-500" />
-                ) : (
-                  <StarIcon className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-            
-            {doc.description && (
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
-                {doc.description}
-              </p>
-            )}
-
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
-              <span>Uploaded {formatDate(doc.uploadDate)}</span>
-              <div className="flex items-center">
-                <Avatar user={doc.uploadedBy} size="xs" className="mr-1" />
-                {doc.uploadedBy?.name}
-              </div>
-            </div>
-
-            {doc.tags && doc.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-3">
-                {doc.tags.slice(0, 3).map((tag, index) => (
-                  <Badge key={index} variant="gray" size="sm">
-                    {tag}
-                  </Badge>
-                ))}
-                {doc.tags.length > 3 && (
-                  <Badge variant="gray" size="sm">
-                    +{doc.tags.length - 3}
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-2">
-                <Link
-                  to={`/workspaces/${workspaceId}/documents/${doc._id}`}
-                  className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
-                >
-                  <EyeIcon className="h-4 w-4" />
-                </Link>
-                <PermissionGuard permissions={['write']} workspaceId={workspaceId}>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-blue-600 text-sm">
-                    <ShareIcon className="h-4 w-4" />
-                  </button>
-                  <button className="text-gray-600 dark:text-gray-400 hover:text-green-600 text-sm">
-                    <ArrowDownTrayIcon className="h-4 w-4" />
-                  </button>
-                </PermissionGuard>
-              </div>
-              <Badge 
-                variant={doc.isPublic ? 'success' : 'gray'} 
-                size="sm"
-              >
-                {doc.isPublic ? 'Public' : 'Private'}
-              </Badge>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {(!workspaceDocuments || workspaceDocuments.length === 0) && (
-        <div className="text-center py-12">
-          <DocumentIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            No documents yet
-          </h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Get started by uploading your first document to this workspace.
-          </p>
+  const renderDocumentsTab = () => {
+    return (
+      <div className="space-y-6">
+        {/* Documents Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Documents ({workspaceDocuments.length})
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300">
+              Manage documents in this workspace
+            </p>
+          </div>
           <PermissionGuard permissions={['write']} workspaceId={workspaceId}>
             <Button onClick={() => navigate(`/workspaces/${workspaceId}/upload`)}>
+              <PlusIcon className="h-4 w-4 mr-2" />
               Upload Document
             </Button>
           </PermissionGuard>
         </div>
-      )}
-    </div>
-  );
+
+        {/* Documents Grid/List */}
+        <div className={viewMode === 'grid'
+          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+          : 'space-y-4'
+        }>
+          {workspaceDocuments.map((doc) => (
+            <Card key={doc._id} className="p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                    {doc.filename || doc.originalName || doc.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {formatFileSize(doc.size)} • {formatDate(doc.uploadDate || doc.createdAt)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => toggleFavorite(doc._id)}
+                  className="text-gray-400 hover:text-yellow-500"
+                >
+                  {doc.isFavorite ? (
+                    <StarIconSolid className="h-5 w-5 text-yellow-500" />
+                  ) : (
+                    <StarIcon className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+
+              {doc.description && (
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
+                  {doc.description}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {doc.category && (
+                    <Badge variant="secondary" size="sm">
+                      {doc.category}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)}
+                    >
+                      <EyeIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadDocument(doc)}  // ← Use the same handler!
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
 
   const renderMembersTab = () => (
     <div className="space-y-6">
@@ -543,7 +798,7 @@ const WorkspacePage = () => {
         </PermissionGuard>
       </div>
 
-      <MemberList 
+      <MemberList
         members={currentWorkspace.members || []}
         workspaceId={workspaceId}
         currentUserRole={userRole}
@@ -557,7 +812,7 @@ const WorkspacePage = () => {
       <div className="flex">
         {/* Sidebar */}
         <WorkspaceSidebar
-          workspace={currentWorkspace}
+          workspace={currentWorkspace?.workspace || currentWorkspace}
           userRole={userRole}
           userPermissions={userPermissions}
           collapsed={sidebarCollapsed}
@@ -565,9 +820,8 @@ const WorkspacePage = () => {
         />
 
         {/* Main Content */}
-        <div className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}>
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'
+          }`}>
           <div className="p-6">
             {/* Tab Navigation */}
             <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
@@ -580,11 +834,10 @@ const WorkspacePage = () => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
+                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
+                      }`}
                   >
                     <tab.icon className="h-4 w-4 mr-2" />
                     {tab.name}
@@ -606,7 +859,7 @@ const WorkspacePage = () => {
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         onSendInvitation={handleInviteSubmit}
-        workspace={currentWorkspace}
+        workspace={currentWorkspace}  // ✅ CORRECT - 'currentWorkspace' is defined
         isLoading={invitationsLoading}
       />
     </div>

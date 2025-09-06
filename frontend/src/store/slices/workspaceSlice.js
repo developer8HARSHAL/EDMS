@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { workspaceApi } from '../../services/apiService'; // ✅ FIXED: Use workspaceApi instead of generic apiService
+import { workspaceApi } from '../../services/apiService';
 
 // Initial state
 const initialState = {
@@ -8,6 +8,7 @@ const initialState = {
   workspaceMembers: [],
   selectedWorkspaceId: null,
   workspaceStats: null,
+  isLoading: false,
   loading: {
     fetchWorkspaces: false,
     fetchWorkspace: false,
@@ -21,7 +22,11 @@ const initialState = {
     workspaces: null,
     currentWorkspace: null,
     memberOperations: null,
-    stats: null
+    stats: null,
+    fetch: null,
+    current: null,
+    create: null,
+    general: null
   },
   pagination: {
     currentPage: 1,
@@ -38,34 +43,84 @@ const initialState = {
   }
 };
 
-// ✅ FIXED: Updated async thunks to use workspaceApi
 
-// Get user's workspaces
+
 export const fetchWorkspaces = createAsyncThunk(
-  'workspaces/fetchWorkspaces',
-  async ({ page = 1, limit = 10, search = '', sortBy = 'updatedAt', sortOrder = 'desc' } = {}, { rejectWithValue }) => {
+  'workspace/fetchWorkspaces',
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const filters = { page, limit, search, sortBy, sortOrder };
-      const response = await workspaceApi.getWorkspaces(filters);
-      return response;
+      console.log('🔄 Redux: Fetching workspaces with params:', params);
+      
+      const response = await workspaceApi.getWorkspaces(params); 
+      console.log('📋 Redux: Raw API response:', response);
+
+     const workspacesData = response?.data;  // ✅ go one level higher
+
+if (response?.success && workspacesData?.workspaces) {
+  console.log("📦 Thunk parsed workspaces:", workspacesData?.workspaces?.length);
+
+  return {
+    workspaces: workspacesData.workspaces,
+    pagination: {
+      totalDocs: workspacesData.totalDocs || 0,
+      totalPages: workspacesData.totalPages || 1,
+      currentPage: workspacesData.currentPage || params?.page || 1,
+      hasNextPage: workspacesData.hasNextPage || false,
+      hasPrevPage: workspacesData.hasPrevPage || false
+    }
+  };
+}
+
+
+      if (Array.isArray(response)) {
+        return {
+          workspaces: response,
+          pagination: {
+            totalDocs: response.length,
+            totalPages: 1,
+            currentPage: 1,
+            hasNextPage: false,
+            hasPrevPage: false
+          }
+        };
+      }
+
+      throw new Error('Invalid response format from server');
     } catch (error) {
+      console.error('❌ Redux: fetchWorkspaces error:', error);
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch workspaces');
+
     }
   }
 );
 
-// Get single workspace
+
+
 export const fetchWorkspace = createAsyncThunk(
-  'workspaces/fetchWorkspace',
+  'workspace/fetchWorkspace',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.getWorkspace(workspaceId);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch workspace');
+      console.log("Fetching workspace with ID:", workspaceId);
+
+      const response = await workspaceApi.getWorkspaceById(workspaceId);
+      console.log("Raw workspace response:", response);
+
+      const workspaceData = response.data?.workspace; // ✅ go inside `.data.workspace`
+
+      if (response?.success && workspaceData) {
+        console.log("Workspace data received:", workspaceData);
+        return { workspace: workspaceData }; // ✅ no extra nesting
+      }
+
+      return rejectWithValue("Invalid workspace data");
+    } catch (err) {
+      console.error("❌ Failed to fetch workspace:", err);
+      return rejectWithValue(err.response?.data || err.message);
     }
   }
 );
+
+
 
 // Create new workspace
 export const createWorkspace = createAsyncThunk(
@@ -73,7 +128,10 @@ export const createWorkspace = createAsyncThunk(
   async (workspaceData, { rejectWithValue }) => {
     try {
       const response = await workspaceApi.createWorkspace(workspaceData);
-      return response;
+      if (response.success && response.data) {
+        return response.data;
+      }
+      throw new Error(response.message || 'Failed to create workspace');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to create workspace');
     }
@@ -86,7 +144,10 @@ export const updateWorkspace = createAsyncThunk(
   async ({ workspaceId, updates }, { rejectWithValue }) => {
     try {
       const response = await workspaceApi.updateWorkspace(workspaceId, updates);
-      return response;
+      if (response.success && response.data) {
+        return response.data.workspace || response.data;
+      }
+      throw new Error(response.message || 'Failed to update workspace');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to update workspace');
     }
@@ -98,8 +159,11 @@ export const deleteWorkspace = createAsyncThunk(
   'workspaces/deleteWorkspace',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      await workspaceApi.deleteWorkspace(workspaceId);
-      return workspaceId;
+      const response = await workspaceApi.deleteWorkspace(workspaceId);
+      if (response.success) {
+        return workspaceId;
+      }
+      throw new Error(response.message || 'Failed to delete workspace');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to delete workspace');
     }
@@ -112,7 +176,10 @@ export const addWorkspaceMember = createAsyncThunk(
   async ({ workspaceId, memberData }, { rejectWithValue }) => {
     try {
       const response = await workspaceApi.addMember(workspaceId, memberData);
-      return response;
+      if (response.success && response.data) {
+        return response.data.workspace || response.data;
+      }
+      throw new Error(response.message || 'Failed to add member');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to add member');
     }
@@ -124,8 +191,11 @@ export const removeWorkspaceMember = createAsyncThunk(
   'workspaces/removeMember',
   async ({ workspaceId, memberId }, { rejectWithValue }) => {
     try {
-      await workspaceApi.removeMember(workspaceId, memberId);
-      return { workspaceId, memberId };
+      const response = await workspaceApi.removeMember(workspaceId, memberId);
+      if (response.success) {
+        return { workspaceId, memberId };
+      }
+      throw new Error(response.message || 'Failed to remove member');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to remove member');
     }
@@ -138,7 +208,10 @@ export const updateMemberRole = createAsyncThunk(
   async ({ workspaceId, memberId, roleData }, { rejectWithValue }) => {
     try {
       const response = await workspaceApi.updateMemberRole(workspaceId, memberId, roleData);
-      return response;
+      if (response.success && response.data) {
+        return response.data.workspace || response.data;
+      }
+      throw new Error(response.message || 'Failed to update member role');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to update member role');
     }
@@ -150,8 +223,11 @@ export const leaveWorkspace = createAsyncThunk(
   'workspaces/leaveWorkspace',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      await workspaceApi.leaveWorkspace(workspaceId);
-      return workspaceId;
+      const response = await workspaceApi.leaveWorkspace(workspaceId);
+      if (response.success) {
+        return workspaceId;
+      }
+      throw new Error(response.message || 'Failed to leave workspace');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to leave workspace');
     }
@@ -163,9 +239,11 @@ export const fetchWorkspaceStats = createAsyncThunk(
   'workspaces/fetchStats',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      // Note: This endpoint might not exist yet, implement if needed
       const response = await workspaceApi.getWorkspaceStats(workspaceId);
-      return response;
+      if (response.success && response.data) {
+        return response.data;
+      }
+      throw new Error(response.message || 'Failed to fetch workspace stats');
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch workspace stats');
     }
@@ -174,7 +252,7 @@ export const fetchWorkspaceStats = createAsyncThunk(
 
 // Workspace slice
 const workspaceSlice = createSlice({
-  name: 'workspaces',
+  name: 'workspace',
   initialState,
   reducers: {
     // Clear specific errors
@@ -183,7 +261,11 @@ const workspaceSlice = createSlice({
         workspaces: null,
         currentWorkspace: null,
         memberOperations: null,
-        stats: null
+        stats: null,
+        fetch: null,
+        current: null,
+        create: null,
+        general: null
       };
     },
     
@@ -193,6 +275,7 @@ const workspaceSlice = createSlice({
       state.workspaceMembers = [];
       state.selectedWorkspaceId = null;
       state.errors.currentWorkspace = null;
+      state.errors.current = null;
     },
     
     // Set current workspace
@@ -254,46 +337,58 @@ const workspaceSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch workspaces
+      // ✅ FIXED: Handle backend response format for fetchWorkspaces
       .addCase(fetchWorkspaces.pending, (state) => {
         state.loading.fetchWorkspaces = true;
+        state.isLoading = true;
+        state.errors.fetch = null;
         state.errors.workspaces = null;
       })
       .addCase(fetchWorkspaces.fulfilled, (state, action) => {
         state.loading.fetchWorkspaces = false;
-        state.workspaces = action.payload.data?.workspaces || action.payload.data || [];
+        state.isLoading = false;
         
-        // Handle pagination data
-        const data = action.payload.data;
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-          state.pagination = {
-            currentPage: data.currentPage || 1,
-            totalPages: data.totalPages || 1,
-            totalDocs: data.totalDocs || 0,
-            hasNextPage: data.hasNextPage || false,
-            hasPrevPage: data.hasPrevPage || false
-          };
-        }
+        // ✅ CLEANED UP: Simple response handling
+        state.workspaces = action.payload.workspaces || [];
+        state.pagination = action.payload.pagination || initialState.pagination;
+        
+        state.errors.fetch = null;
+        state.errors.workspaces = null;
+        console.log("🔧 Reducer received payload:", action.payload);
+console.log("🔧 Before update:", state.workspaces);
+        
+        console.log('✅ Redux: Workspaces updated:', state.workspaces.length);
       })
       .addCase(fetchWorkspaces.rejected, (state, action) => {
         state.loading.fetchWorkspaces = false;
+        state.isLoading = false;
+        state.errors.fetch = action.payload;
         state.errors.workspaces = action.payload;
         state.workspaces = [];
+        
+        console.error('❌ Redux: fetchWorkspaces rejected:', action.payload);
       })
       
-      // Fetch single workspace
+      // ✅ FIXED: Handle backend response format for fetchWorkspace
       .addCase(fetchWorkspace.pending, (state) => {
         state.loading.fetchWorkspace = true;
+        state.isLoading = true;
+        state.errors.current = null;
         state.errors.currentWorkspace = null;
       })
       .addCase(fetchWorkspace.fulfilled, (state, action) => {
         state.loading.fetchWorkspace = false;
-        state.currentWorkspace = action.payload.data;
-        state.workspaceMembers = action.payload.data?.members || [];
-        state.selectedWorkspaceId = action.payload.data?._id;
+        state.isLoading = false;
+        state.currentWorkspace = action.payload;
+        state.workspaceMembers = action.payload?.members || [];
+        state.selectedWorkspaceId = action.payload?._id;
+        state.errors.current = null;
+        state.errors.currentWorkspace = null;
       })
       .addCase(fetchWorkspace.rejected, (state, action) => {
         state.loading.fetchWorkspace = false;
+        state.isLoading = false;
+        state.errors.current = action.payload;
         state.errors.currentWorkspace = action.payload;
         state.currentWorkspace = null;
       })
@@ -301,17 +396,20 @@ const workspaceSlice = createSlice({
       // Create workspace
       .addCase(createWorkspace.pending, (state) => {
         state.loading.createWorkspace = true;
+        state.errors.create = null;
         state.errors.workspaces = null;
       })
       .addCase(createWorkspace.fulfilled, (state, action) => {
         state.loading.createWorkspace = false;
-        const newWorkspace = action.payload.data;
+        const newWorkspace = action.payload;
         state.workspaces.unshift(newWorkspace);
         state.currentWorkspace = newWorkspace;
         state.selectedWorkspaceId = newWorkspace._id;
+        state.errors.create = null;
       })
       .addCase(createWorkspace.rejected, (state, action) => {
         state.loading.createWorkspace = false;
+        state.errors.create = action.payload;
         state.errors.workspaces = action.payload;
       })
       
@@ -322,7 +420,7 @@ const workspaceSlice = createSlice({
       })
       .addCase(updateWorkspace.fulfilled, (state, action) => {
         state.loading.updateWorkspace = false;
-        const updatedWorkspace = action.payload.data;
+        const updatedWorkspace = action.payload;
         
         // Update in workspaces list
         const index = state.workspaces.findIndex(
@@ -376,7 +474,7 @@ const workspaceSlice = createSlice({
       })
       .addCase(addWorkspaceMember.fulfilled, (state, action) => {
         state.loading.memberOperations = false;
-        const updatedWorkspace = action.payload.data;
+        const updatedWorkspace = action.payload;
         
         // Update current workspace
         if (state.currentWorkspace?._id === updatedWorkspace._id) {
@@ -434,7 +532,7 @@ const workspaceSlice = createSlice({
       })
       .addCase(updateMemberRole.fulfilled, (state, action) => {
         state.loading.memberOperations = false;
-        const updatedWorkspace = action.payload.data;
+        const updatedWorkspace = action.payload;
         
         // Update current workspace
         if (state.currentWorkspace?._id === updatedWorkspace._id) {
@@ -488,7 +586,7 @@ const workspaceSlice = createSlice({
       })
       .addCase(fetchWorkspaceStats.fulfilled, (state, action) => {
         state.loading.fetchStats = false;
-        state.workspaceStats = action.payload.data;
+        state.workspaceStats = action.payload;
       })
       .addCase(fetchWorkspaceStats.rejected, (state, action) => {
         state.loading.fetchStats = false;
@@ -512,45 +610,73 @@ export const {
   removeWorkspaceFromList
 } = workspaceSlice.actions;
 
-// ✅ FIXED: Complete set of selectors
-export const selectAllWorkspaces = (state) => state.workspaces.workspaces;
-export const selectCurrentWorkspace = (state) => state.workspaces.currentWorkspace;
-export const selectWorkspaceMembers = (state) => state.workspaces.workspaceMembers;
-export const selectSelectedWorkspaceId = (state) => state.workspaces.selectedWorkspaceId;
-export const selectWorkspaceStats = (state) => state.workspaces.workspaceStats;
+// ✅ FIXED: Add null checks to all selectors
+export const selectAllWorkspaces = (state) => state.workspace?.workspaces || [];
+export const selectCurrentWorkspace = (state) => state.workspace?.currentWorkspace || null;
+export const selectWorkspaceMembers = (state) => state.workspace?.workspaceMembers || [];
+export const selectSelectedWorkspaceId = (state) => state.workspace?.selectedWorkspaceId || null;
+export const selectWorkspaceStats = (state) => state.workspace?.workspaceStats || null;
 
-// Loading selectors
-export const selectWorkspaceLoading = (state) => state.workspaces.loading;
-export const selectWorkspaceErrors = (state) => state.workspaces.errors;
+// ✅ FIXED: Loading selectors with null checks
+export const selectWorkspaceLoading = (state) => state.workspace?.isLoading || state.workspace?.loading?.fetchWorkspaces || false;
+export const selectWorkspacesLoading = (state) => state.workspace?.loading?.fetchWorkspaces || false;
+export const selectWorkspaceDetailsLoading = (state) => state.workspace?.loading?.fetchWorkspace || false;
+export const selectCreateWorkspaceLoading = (state) => state.workspace?.loading?.createWorkspace || false;
+export const selectUpdateWorkspaceLoading = (state) => state.workspace?.loading?.updateWorkspace || false;
+export const selectDeleteWorkspaceLoading = (state) => state.workspace?.loading?.deleteWorkspace || false;
+export const selectMemberOperationsLoading = (state) => state.workspace?.loading?.memberOperations || false;
 
-// Pagination and filters
-export const selectWorkspacePagination = (state) => state.workspaces.pagination;
-export const selectWorkspaceFilters = (state) => state.workspaces.filters;
+// ✅ FIXED: Error selectors with null checks - Updated for backend format
+export const selectWorkspaceErrors = (state) => state.workspace?.errors || {};
+export const selectWorkspacesError = (state) => state.workspace?.errors?.workspaces || state.workspace?.errors?.fetch || null;
+export const selectCurrentWorkspaceError = (state) => state.workspace?.errors?.currentWorkspace || state.workspace?.errors?.current || null;
+export const selectMemberOperationsError = (state) => state.workspace?.errors?.memberOperations || null;
+export const selectWorkspaceStatsError = (state) => state.workspace?.errors?.stats || null;
 
-// Complex selectors
-export const selectWorkspaceById = (state, workspaceId) =>
-  state.workspaces.workspaces.find(workspace => workspace._id === workspaceId);
+// ✅ FIXED: Pagination and filters with null checks
+export const selectWorkspacePagination = (state) => state.workspace?.pagination || { 
+  currentPage: 1, 
+  totalPages: 1, 
+  totalDocs: 0,
+  hasNextPage: false,
+  hasPrevPage: false
+};
+export const selectWorkspaceFilters = (state) => state.workspace?.filters || { 
+  search: '', 
+  sortBy: 'updatedAt', 
+  sortOrder: 'desc', 
+  role: '' 
+};
+
+// ✅ FIXED: Complex selectors with null checks
+export const selectWorkspaceById = (state, workspaceId) => {
+  const workspaces = state.workspace?.workspaces || [];
+  return workspaces.find(workspace => workspace._id === workspaceId) || null;
+};
 
 export const selectUserRoleInWorkspace = (state, workspaceId, userId) => {
-  const workspace = selectWorkspaceById(state, workspaceId) || state.workspaces.currentWorkspace;
+  const workspace = selectWorkspaceById(state, workspaceId) || state.workspace?.currentWorkspace;
   if (!workspace || !userId) return null;
   
   // Check if user is owner
-  if (workspace.owner === userId || workspace.owner?._id === userId) return 'owner';
+  const ownerId = workspace.owner?._id || workspace.owner;
+  if (ownerId === userId) return 'owner';
   
   // Find member role
-  const member = workspace.members?.find(member => 
-    member.user === userId || member.user?._id === userId
-  );
+  const member = workspace.members?.find(member => {
+    const memberId = member.user?._id || member.user;
+    return memberId === userId;
+  });
   return member?.role || null;
 };
 
 export const selectUserPermissionsInWorkspace = (state, workspaceId, userId) => {
-  const workspace = selectWorkspaceById(state, workspaceId) || state.workspaces.currentWorkspace;
+  const workspace = selectWorkspaceById(state, workspaceId) || state.workspace?.currentWorkspace;
   if (!workspace || !userId) return null;
   
   // Owner has all permissions
-  if (workspace.owner === userId || workspace.owner?._id === userId) {
+  const ownerId = workspace.owner?._id || workspace.owner;
+  if (ownerId === userId) {
     return {
       canView: true,
       canEdit: true,
@@ -561,36 +687,39 @@ export const selectUserPermissionsInWorkspace = (state, workspaceId, userId) => 
   }
   
   // Find member permissions
-  const member = workspace.members?.find(member => 
-    member.user === userId || member.user?._id === userId
-  );
+  const member = workspace.members?.find(member => {
+    const memberId = member.user?._id || member.user;
+    return memberId === userId;
+  });
   return member?.permissions || null;
 };
 
 export const selectIsWorkspaceOwner = (state, workspaceId, userId) => {
   const workspace = selectWorkspaceById(state, workspaceId);
   if (!workspace || !userId) return false;
-  return workspace.owner === userId || workspace.owner?._id === userId;
+  const ownerId = workspace.owner?._id || workspace.owner;
+  return ownerId === userId;
 };
 
-// Utility selectors
 export const selectWorkspacesByRole = (state, userId, role) => {
   if (!userId) return [];
   
-  return state.workspaces.workspaces.filter(workspace => {
+  const workspaces = state.workspace?.workspaces || [];
+  return workspaces.filter(workspace => {
     if (role === 'owner') {
-      return workspace.owner === userId || workspace.owner?._id === userId;
+      const ownerId = workspace.owner?._id || workspace.owner;
+      return ownerId === userId;
     }
     
-    const member = workspace.members?.find(m => 
-      m.user === userId || m.user?._id === userId
-    );
+    const member = workspace.members?.find(m => {
+      const memberId = m.user?._id || m.user;
+      return memberId === userId;
+    });
     return member && member.role === role;
   });
 };
 
-export const selectWorkspaceCount = (state) => state.workspaces.workspaces.length;
-
-export const selectHasWorkspaces = (state) => state.workspaces.workspaces.length > 0;
+export const selectWorkspaceCount = (state) => state.workspace?.workspaces?.length || 0;
+export const selectHasWorkspaces = (state) => (state.workspace?.workspaces?.length || 0) > 0;
 
 export default workspaceSlice.reducer;

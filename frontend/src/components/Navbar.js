@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Link as RouterLink, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspaces } from '../hooks/useWorkspaces';
@@ -25,27 +25,27 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
 
-  // FIXED: Safe hook calls with proper error handling
+  // ✅ FIXED: Safe hook calls with proper error handling
   const authHook = useAuth();
   const workspacesHook = useWorkspaces();
   const invitationsHook = useInvitations();
 
-  // FIXED: Safe destructuring with fallback values and memoization
+  // ✅ FIXED: Safe destructuring with correct property names and memoization
   const authData = useMemo(() => ({
     isAuthenticated: authHook?.isAuthenticated || false,
     user: authHook?.user || null,
     logout: authHook?.logout,
     loading: authHook?.loading || false,
-    authReady: authHook?.authReady || false
+    authReady: authHook?.isAuthReady || false  // ✅ FIXED: Use isAuthReady instead of authReady
   }), [
     authHook?.isAuthenticated,
     authHook?.user,
     authHook?.logout,
     authHook?.loading,
-    authHook?.authReady
+    authHook?.isAuthReady  // ✅ FIXED: Use isAuthReady instead of authReady
   ]);
 
-  // FIXED: Workspace integration with safe destructuring and memoization
+  // ✅ FIXED: Workspace integration with safe destructuring and memoization
   const workspaceData = useMemo(() => ({
     workspaces: workspacesHook?.workspaces || [],
     currentWorkspace: workspacesHook?.currentWorkspace || null,
@@ -62,7 +62,7 @@ const Navbar = () => {
     workspacesHook?.isReady
   ]);
 
-  // FIXED: Invitation integration with safe destructuring and memoization
+  // ✅ FIXED: Invitation integration with safe destructuring and memoization
   const invitationData = useMemo(() => ({
     pendingInvitations: invitationsHook?.pendingInvitations || [],
     fetchPendingInvitations: invitationsHook?.fetchPendingInvitations,
@@ -77,29 +77,30 @@ const Navbar = () => {
   const location = useLocation();
   const { workspaceId } = useParams();
 
-  // FIXED: Memoized values to prevent useEffect dependency changes
+  // ✅ FIXED: Memoized values to prevent useEffect dependency changes
   const currentPath = useMemo(() => location.pathname, [location.pathname]);
   const currentWorkspaceId = useMemo(() => workspaceId, [workspaceId]);
 
-  // FIXED: Fetch workspace data when authenticated - stable dependencies
+  // ✅ FIXED: Fetch workspace data when authenticated - stable dependencies
   useEffect(() => {
     const shouldFetch = authData.isAuthenticated && 
                        authData.authReady && 
-                       workspaceData.isReady && 
                        !workspaceData.loading && 
+                       workspaceData.workspaces.length === 0 &&  // ✅ Only fetch if empty
                        workspaceData.fetchWorkspaces;
 
     if (shouldFetch) {
+      console.log('🚀 Navbar: Auto-fetching workspaces...');
       workspaceData.fetchWorkspaces();
     }
   }, [
     authData.isAuthenticated,
     authData.authReady,
-    workspaceData.isReady,
-    workspaceData.loading
-  ]); // Removed fetchWorkspaces from deps to prevent loops
+    workspaceData.loading,
+    workspaceData.workspaces.length  // ✅ Track length, not array
+  ]);
 
-  // FIXED: Fetch pending invitations when authenticated - stable dependencies
+  // ✅ FIXED: Fetch pending invitations when authenticated - stable dependencies  
   useEffect(() => {
     const shouldFetch = authData.isAuthenticated && 
                        authData.authReady && 
@@ -113,9 +114,9 @@ const Navbar = () => {
     authData.isAuthenticated,
     authData.authReady,
     invitationData.isReady
-  ]); // Removed fetchPendingInvitations from deps to prevent loops
+  ]); // ✅ Removed fetchPendingInvitations from deps to prevent loops
 
-  // FIXED: Set current workspace based on URL - stable dependencies with proper workspace finding
+  // ✅ FIXED: Set current workspace based on URL - stable dependencies with proper workspace finding
   useEffect(() => {
     const shouldSetWorkspace = currentWorkspaceId && 
                               workspaceData.workspaces.length > 0 && 
@@ -135,9 +136,9 @@ const Navbar = () => {
     currentWorkspaceId,
     workspaceData.workspaces.length, // Use length instead of array reference
     workspaceData.currentWorkspace?._id // Only track the ID
-  ]); // Removed setCurrentWorkspace to prevent loops
+  ]); // ✅ Removed setCurrentWorkspace to prevent loops
 
-  // FIXED: Memoized logout handler
+  // ✅ FIXED: Memoized logout handler
   const handleLogout = useCallback(() => {
     if (authData.logout) {
       authData.logout();
@@ -145,16 +146,23 @@ const Navbar = () => {
     }
   }, [authData.logout, navigate]);
 
-  // FIXED: Memoized toggle functions
+  // ✅ FIXED: Memoized toggle functions
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(prev => !prev);
   }, []);
 
-  const handleDropdownToggle = useCallback((dropdownName) => {
-    setOpenDropdown(prev => prev === dropdownName ? null : dropdownName);
-  }, []);
+const toggleTimeout = useRef(null);
 
-  // FIXED: Memoized utility functions
+const handleDropdownToggle = useCallback((dropdownName) => {
+  clearTimeout(toggleTimeout.current);
+  toggleTimeout.current = setTimeout(() => {
+    setOpenDropdown(prev => prev === dropdownName ? null : dropdownName);
+  }, 500); // delay in ms
+}, []);
+
+
+
+  // ✅ FIXED: Memoized utility functions
   const getInitials = useCallback((name) => {
     if (!name) return 'U';
     return name
@@ -165,14 +173,14 @@ const Navbar = () => {
       .slice(0, 2);
   }, []);
 
-  // FIXED: Memoized derived state
+  // ✅ FIXED: Memoized derived state
   const derivedState = useMemo(() => ({
     isInWorkspace: !!currentWorkspaceId,
     isLoading: authData.loading || !authData.authReady,
     isReady: authHook && authData.authReady
   }), [currentWorkspaceId, authData.loading, authData.authReady, authHook]);
 
-  // Show loading state while Redux is initializing or if hooks are not ready
+  // ✅ FIXED: Show loading state with proper conditions
   if (derivedState.isLoading || !derivedState.isReady) {
     return (
       <nav className="sticky top-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
@@ -270,7 +278,7 @@ const Navbar = () => {
                   </div>
                 )}
 
-                {/* User dropdown */}
+                {/* ✅ FIXED: User dropdown with stable user data */}
                 <div className="relative">
                   <Dropdown
                     trigger={
@@ -382,7 +390,7 @@ const Navbar = () => {
   );
 };
 
-// FIXED: Memoized DesktopNav component with stable props
+// ✅ FIXED: Memoized DesktopNav component with stable props
 const DesktopNav = React.memo(({ 
   isAuthenticated, 
   currentPath, 
@@ -393,7 +401,7 @@ const DesktopNav = React.memo(({
 }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
 
-  // FIXED: Memoized navigation items to prevent re-computation
+  // ✅ FIXED: Memoized navigation items to prevent re-computation
   const navItems = useMemo(() => {
     if (!isAuthenticated) {
       return [
@@ -515,14 +523,26 @@ const DesktopNav = React.memo(({
     ];
   }, [isAuthenticated, isInWorkspace, currentWorkspace, workspaceId, workspaces]);
 
-  // FIXED: Memoized dropdown handlers
-  const handleMouseEnter = useCallback((label) => {
-    setOpenDropdown(label);
-  }, []);
+  // ✅ FIXED: Memoized dropdown handlers
+const hoverTimeout = useRef(null);
+const closeTimeout = useRef(null);
 
-  const handleMouseLeave = useCallback(() => {
+const handleMouseEnter = useCallback((label) => {
+  // Cancel close timer if mouse comes back quickly
+  clearTimeout(closeTimeout.current);
+
+  hoverTimeout.current = setTimeout(() => {
+    setOpenDropdown(label);
+  }, 300); // delay for opening (ms)
+}, []);
+
+const handleMouseLeave = useCallback(() => {
+  // Delay closing instead of instantly
+  closeTimeout.current = setTimeout(() => {
     setOpenDropdown(null);
-  }, []);
+  }, 500); // delay before closing (ms)
+}, []);
+
 
   return (
     <div className="flex space-x-4">
@@ -594,7 +614,7 @@ const DesktopNav = React.memo(({
   );
 });
 
-// FIXED: Memoized MobileNav component with stable props
+// ✅ FIXED: Memoized MobileNav component with stable props
 const MobileNav = React.memo(({ 
   isAuthenticated, 
   handleLogout, 
@@ -608,7 +628,7 @@ const MobileNav = React.memo(({
 }) => {
   const [expandedItem, setExpandedItem] = useState(null);
 
-  // FIXED: Memoized mobile navigation items
+  // ✅ FIXED: Memoized mobile navigation items
   const navItems = useMemo(() => {
     if (!isAuthenticated) {
       return [
@@ -727,7 +747,7 @@ const MobileNav = React.memo(({
     handleLogout
   ]);
 
-  // FIXED: Memoized item click handler
+  // ✅ FIXED: Memoized item click handler
   const handleItemClick = useCallback((item) => {
     if (item.onClick) {
       item.onClick();
@@ -737,7 +757,7 @@ const MobileNav = React.memo(({
     closeMobileMenu();
   }, [navigate, closeMobileMenu]);
 
-  // FIXED: Memoized expand handler
+  // ✅ FIXED: Memoized expand handler
   const handleExpandToggle = useCallback((label) => {
     setExpandedItem(prev => prev === label ? null : label);
   }, []);
@@ -761,7 +781,7 @@ const MobileNav = React.memo(({
 
       {navItems.map((navItem) => (
         <div key={navItem.label}>
-          {navItem.onClick || navItem.href ? (
+          {navItem.onClick || (navItem.href && !navItem.children) ? (
             <button
               onClick={() => handleItemClick(navItem)}
               className="flex items-center justify-between w-full text-left px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"

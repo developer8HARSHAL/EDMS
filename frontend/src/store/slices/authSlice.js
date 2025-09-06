@@ -1,6 +1,6 @@
-// src/store/slices/authSlice.js - Authentication Redux Slice (Fixed)
+// src/store/slices/authSlice.js - FIXED Authentication Redux Slice
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import jwt_decode from 'jwt-decode';
+import jwtDecode from 'jwt-decode';
 import axios from 'axios';
 import { userApi } from '../../services/apiService';
 
@@ -14,97 +14,154 @@ const initialState = {
   tokenValidated: false,
 };
 
+// ✅ FIXED: Helper function to set axios headers properly
+const setAxiosAuthHeader = (token) => {
+  if (token) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log('✅ Axios auth header set:', axios.defaults.headers.common['Authorization']);
+  } else {
+    delete axios.defaults.headers.common['Authorization'];
+    console.log('❌ Axios auth header removed');
+  }
+};
+
 // Async thunks for API calls
 
-// Validate token on app initialization
+// ✅ FIXED: Validate token on app initialization
 export const validateToken = createAsyncThunk(
   'auth/validateToken',
   async (_, { rejectWithValue }) => {
     try {
+      console.log('🔍 Starting token validation...');
       const token = localStorage.getItem('authToken');
       
       if (!token) {
+        console.log('❌ No token found in localStorage');
         return { user: null, token: null, isAuthenticated: false };
       }
 
-      // Decode and validate token
-      const decoded = jwt_decode(token);
+      console.log('🔍 Token found, decoding...');
+      
+      // ✅ FIXED: Proper JWT decode with error handling
+      let decoded;
+      try {
+        decoded = jwtDecode(token);
+        console.log('✅ Token decoded successfully:', { id: decoded.id, email: decoded.email, exp: decoded.exp });
+      } catch (decodeError) {
+        console.error('❌ JWT decode failed:', decodeError);
+        localStorage.removeItem('authToken');
+        setAxiosAuthHeader(null);
+        return { user: null, token: null, isAuthenticated: false };
+      }
       
       // Check if token is expired
-      if (decoded.exp * 1000 < Date.now()) {
+      const now = Date.now();
+      const expiry = decoded.exp * 1000;
+      console.log('🕒 Token expiry check:', { now: new Date(now), expiry: new Date(expiry), expired: expiry < now });
+      
+      if (expiry < now) {
+        console.log('❌ Token expired, removing...');
         localStorage.removeItem('authToken');
-        delete axios.defaults.headers.common['Authorization'];
+        setAxiosAuthHeader(null);
         return { user: null, token: null, isAuthenticated: false };
       }
 
-      // Set axios header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // ✅ FIXED: Set axios header BEFORE making API calls
+      setAxiosAuthHeader(token);
 
       // Verify with backend
       try {
-        await userApi.getProfile();
+        console.log('🔍 Verifying token with backend...');
+        const profileResponse = await userApi.getProfile();
+        console.log('✅ Backend verification successful:', profileResponse);
+        
+        const userData = {
+          id: decoded.id,
+          name: decoded.name || profileResponse.name,
+          email: decoded.email || profileResponse.email,
+          role: decoded.role || profileResponse.role
+        };
+        
+        console.log('✅ Token validation complete:', userData);
         
         return {
-          user: {
-            id: decoded.id,
-            name: decoded.name,
-            email: decoded.email,
-            role: decoded.role
-          },
+          user: userData,
           token,
           isAuthenticated: true
         };
       } catch (verifyError) {
+        console.error('❌ Backend verification failed:', verifyError);
+        
         if (verifyError.response?.status === 401) {
+          console.log('❌ Token invalid on server, removing...');
           localStorage.removeItem('authToken');
-          delete axios.defaults.headers.common['Authorization'];
+          setAxiosAuthHeader(null);
           return { user: null, token: null, isAuthenticated: false };
         }
         throw verifyError;
       }
     } catch (error) {
+      console.error('❌ Token validation error:', error);
       localStorage.removeItem('authToken');
-      delete axios.defaults.headers.common['Authorization'];
+      setAxiosAuthHeader(null);
       return rejectWithValue(error.message || 'Token validation failed');
     }
   }
 );
 
-// Login user
+// ✅ FIXED: Login user with proper header setup
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async ({ email, password }, { rejectWithValue }) => {
     try {
+      console.log('🔐 Attempting login for:', email);
       const data = await userApi.login(email, password);
+      console.log('✅ Login API response:', data);
       
       if (!data || !data.token) {
+        console.error('❌ No token in login response');
         return rejectWithValue('No authentication token received');
       }
 
       // Store token
       localStorage.setItem('authToken', data.token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      console.log('✅ Token stored in localStorage');
+
+      // ✅ FIXED: Set axios header immediately
+      setAxiosAuthHeader(data.token);
 
       // Decode token to get user data
-      const decoded = jwt_decode(data.token);
+      let decoded;
+      try {
+        decoded = jwtDecode(data.token);
+        console.log('✅ Login token decoded:', decoded);
+      } catch (decodeError) {
+        console.error('❌ Failed to decode login token:', decodeError);
+        return rejectWithValue('Invalid token received from server');
+      }
+      
+      const userData = {
+        id: decoded.id || data.user?.id,
+        name: decoded.name || data.user?.name,
+        email: decoded.email || data.user?.email,
+        role: decoded.role || data.user?.role
+      };
+      
+      console.log('✅ Login successful:', userData);
       
       return {
-        user: {
-          id: decoded.id || data.user?.id,
-          name: decoded.name || data.user?.name,
-          email: decoded.email || data.user?.email,
-          role: decoded.role || data.user?.role
-        },
+        user: userData,
         token: data.token
       };
     } catch (error) {
+      console.error('❌ Login failed:', error);
       const message = error.response?.data?.message || error.message || 'Login failed';
       return rejectWithValue(message);
     }
   }
 );
 
-// Register user
+// Register user (unchanged)
 export const registerUser = createAsyncThunk(
   'auth/registerUser',
   async ({ name, email, password }, { rejectWithValue }) => {
@@ -118,7 +175,7 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-// Update user profile
+// Update user profile (unchanged)
 export const updateUserProfile = createAsyncThunk(
   'auth/updateUserProfile',
   async (profileData, { rejectWithValue, getState }) => {
@@ -129,7 +186,6 @@ export const updateUserProfile = createAsyncThunk(
         return rejectWithValue('Invalid response from server');
       }
       
-      // Return updated user data
       return response.data;
     } catch (error) {
       const message = error.message || 'Failed to update profile';
@@ -138,7 +194,7 @@ export const updateUserProfile = createAsyncThunk(
   }
 );
 
-// Auth slice
+// ✅ FIXED: Auth slice with better logging
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -148,11 +204,12 @@ const authSlice = createSlice({
       state.error = null;
     },
     
-    // Logout user
+    // ✅ FIXED: Logout user with proper cleanup
     logout: (state) => {
+      console.log('🚪 Logging out user...');
       // Clear localStorage and axios headers
       localStorage.removeItem('authToken');
-      delete axios.defaults.headers.common['Authorization'];
+      setAxiosAuthHeader(null);
       
       // Reset state
       state.user = null;
@@ -161,6 +218,8 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       state.tokenValidated = false;
+      
+      console.log('✅ Logout complete');
     },
     
     // Set loading state
@@ -173,16 +232,30 @@ const authSlice = createSlice({
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
       }
+    },
+
+    // ✅ NEW: Force set auth state (for debugging)
+    forceSetAuthState: (state, action) => {
+      const { user, token, isAuthenticated } = action.payload;
+      state.user = user;
+      state.token = token;
+      state.isAuthenticated = isAuthenticated;
+      state.tokenValidated = true;
+      if (token) {
+        setAxiosAuthHeader(token);
+      }
     }
   },
   extraReducers: (builder) => {
-    // Validate token
+    // ✅ FIXED: Validate token with better state management
     builder
       .addCase(validateToken.pending, (state) => {
+        console.log('🔄 Token validation pending...');
         state.loading = true;
         state.error = null;
       })
       .addCase(validateToken.fulfilled, (state, action) => {
+        console.log('✅ Token validation fulfilled:', action.payload);
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
@@ -191,6 +264,7 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(validateToken.rejected, (state, action) => {
+        console.log('❌ Token validation rejected:', action.payload);
         state.loading = false;
         state.user = null;
         state.token = null;
@@ -199,21 +273,24 @@ const authSlice = createSlice({
         state.error = action.payload;
       });
 
-    // Login user
+    // ✅ FIXED: Login user with proper state updates
     builder
       .addCase(loginUser.pending, (state) => {
+        console.log('🔄 Login pending...');
         state.loading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
+        console.log('✅ Login fulfilled:', action.payload);
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
-        state.tokenValidated = true; // Set tokenValidated to true after successful login
+        state.tokenValidated = true;
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
+        console.log('❌ Login rejected:', action.payload);
         state.loading = false;
         state.user = null;
         state.token = null;
@@ -221,7 +298,7 @@ const authSlice = createSlice({
         state.error = action.payload;
       });
 
-    // Register user
+    // Register user (unchanged)
     builder
       .addCase(registerUser.pending, (state) => {
         state.loading = true;
@@ -230,14 +307,13 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state) => {
         state.loading = false;
         state.error = null;
-        // Don't auto-login after registration
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
 
-    // Update profile
+    // Update profile (unchanged)
     builder
       .addCase(updateUserProfile.pending, (state) => {
         state.loading = true;
@@ -245,7 +321,6 @@ const authSlice = createSlice({
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
         state.loading = false;
-        // Update user data with new profile information
         if (state.user) {
           state.user = { ...state.user, ...action.payload };
         }
@@ -259,9 +334,9 @@ const authSlice = createSlice({
 });
 
 // Export actions
-export const { clearError, logout, setLoading, updateUser } = authSlice.actions;
+export const { clearError, logout, setLoading, updateUser, forceSetAuthState } = authSlice.actions;
 
-// FIXED: Safe selectors with proper error handling and fallbacks
+// ✅ FIXED: Safe selectors with better error handling
 export const selectAuth = (state) => {
   try {
     return state?.auth || initialState;

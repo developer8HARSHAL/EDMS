@@ -53,10 +53,12 @@ const WorkspaceInvitationSchema = new mongoose.Schema({
       default: false
     }
   },
+  // FIXED: Remove required:true and let pre-save middleware handle generation
   token: {
     type: String,
-    required: true,
-    unique: true
+    unique: true,
+    // Generate default token immediately
+    default: () => crypto.randomBytes(32).toString('hex')
   },
   status: {
     type: String,
@@ -68,9 +70,11 @@ const WorkspaceInvitationSchema = new mongoose.Schema({
     trim: true,
     maxlength: [500, 'Invitation message cannot be more than 500 characters']
   },
+  // FIXED: Remove required:true and set default expiration
   expiresAt: {
     type: Date,
-    required: true
+    // Generate default expiration immediately (7 days from now)
+    default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   },
   acceptedAt: {
     type: Date,
@@ -86,14 +90,14 @@ const WorkspaceInvitationSchema = new mongoose.Schema({
   }
 });
 
-// Pre-save middleware to generate token and set expiration
+// Pre-save middleware (now just for permissions and backup token/expiry generation)
 WorkspaceInvitationSchema.pre('save', function(next) {
-  // Generate unique token if not provided
+  // Backup token generation if somehow not set
   if (!this.token) {
     this.token = crypto.randomBytes(32).toString('hex');
   }
   
-  // Set expiration date if not provided (7 days from creation)
+  // Backup expiration date if somehow not set
   if (!this.expiresAt) {
     this.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   }

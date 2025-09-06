@@ -63,7 +63,7 @@ setupAxiosInterceptors();
 // Document-related API functions
 export const documentApi = {
   // Get all documents
-  getAllDocuments: async () => {
+  getDocuments: async () => {
     try {
       const response = await axios.get(`${API_URL}/documents`);
       return response.data;

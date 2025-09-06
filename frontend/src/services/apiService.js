@@ -1,4 +1,4 @@
-// apiService.js - Centralized API service with document, user, workspace, and invitation endpoints
+// apiService.js - FIXED: Authentication and API Issues
 import axios from 'axios';
 
 // Base URL for API requests
@@ -7,17 +7,79 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 // For development debugging
 const DEBUG = true;
 
-// Configure axios interceptors
+// ✅ CRITICAL FIX: Create a single axios instance for all API calls
+const api = axios.create({
+  baseURL: API_URL,
+  timeout: 20000, // 10 second timeout
+});
+
+
+
+const mockWorkspaces = [
+  {
+    _id: '1',
+    name: 'Personal Workspace',
+    description: 'My personal documents',
+    members: [{ _id: 'user1', name: 'John Doe', role: 'owner' }],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    _id: '2', 
+    name: 'Team Project',
+    description: 'Collaborative workspace',
+    members: [
+      { _id: 'user1', name: 'John Doe', role: 'owner' },
+      { _id: 'user2', name: 'Jane Smith', role: 'member' }
+    ],
+    createdAt: new Date().toISOString(),
+  }
+];
+
+const mockInvitations = [
+  {
+    _id: 'inv1',
+    workspace: { name: 'Design Team' },
+    invitedBy: { name: 'Sarah Wilson' },
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  }
+];
+
+
+
+
+
+
+
+
+// ✅ FIXED: Improved interceptor setup with better error handling
 const setupAxiosInterceptors = () => {
-  axios.interceptors.request.use(
+  // Request interceptor - Add auth headers
+  api.interceptors.request.use(
     (config) => {
       const token = localStorage.getItem('authToken');
+      
+      if (DEBUG) {
+        console.log('🔄 API Request:', config.method?.toUpperCase(), config.url);
+        console.log('📝 Token found:', !!token);
+      }
+      
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
+        if (DEBUG) {
+          console.log('✅ Authorization header set');
+        }
+      } else {
+        if (DEBUG) {
+          console.warn('⚠️ No token found for request');
+        }
       }
-      if (DEBUG) {
-        console.log('✅ API Request:', config.method.toUpperCase(), config.url);
+      
+      // Ensure Content-Type is set for non-FormData requests
+      if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+        config.headers['Content-Type'] = 'application/json';
       }
+      
       return config;
     },
     (error) => {
@@ -28,7 +90,8 @@ const setupAxiosInterceptors = () => {
     }
   );
 
-  axios.interceptors.response.use(
+  // Response interceptor - Handle auth errors
+  api.interceptors.response.use(
     (response) => {
       if (DEBUG) {
         console.log('✅ API Response:', response.status, response.config.url);
@@ -41,15 +104,26 @@ const setupAxiosInterceptors = () => {
         if (error.response) {
           console.error('Status:', error.response.status);
           console.error('Data:', error.response.data);
+          console.error('Headers:', error.response.headers);
         } else if (error.request) {
           console.error('No response received:', error.request);
         }
       }
 
       // Handle 401 errors (unauthorized)
-      if (error.response && error.response.status === 401) {
+      if (error.response?.status === 401) {
+        console.log('🚨 401 Unauthorized - Clearing token');
         localStorage.removeItem('authToken');
-        // Don't redirect automatically - let the AuthContext handle this
+        
+        // Dispatch logout action if we have access to store
+        if (window.store) {
+          window.store.dispatch({ type: 'auth/logout' });
+        }
+        
+        // Redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
       }
       
       return Promise.reject(error);
@@ -60,231 +134,381 @@ const setupAxiosInterceptors = () => {
 // Initialize interceptors
 setupAxiosInterceptors();
 
-// Document-related API functions
+// ✅ FIXED: Workspace API with consistent error handling
+export const workspaceApi = {
+  // ✅ Existing - fetch all workspaces
+  getWorkspaces: async (params = {}) => {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const url = `/workspaces${queryString ? `?${queryString}` : ''}`;
+
+      if (DEBUG) {
+        console.log('📋 Fetching workspaces from:', url);
+      }
+
+      const response = await api.get(url);
+
+      if (DEBUG) {
+        console.log('✅ Workspaces response:', response.data);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Fetch workspaces error:', error);
+
+      if (!error.response) {
+        throw new Error('Unable to connect to server. Please check your connection.');
+      }
+
+      if (error.response.status === 401) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      if (error.response.status === 403) {
+        throw new Error('Access denied. You do not have permission to view workspaces.');
+      }
+
+      if (error.response.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      }
+
+      throw new Error(error.response?.data?.message || 'Failed to fetch workspaces');
+    }
+  },
+
+  // MINIMAL FIX: Add just the getWorkspace method to fix your current error
+// Add this to your existing workspaceApi object in apiService.js
+
+// ✅ ADD THIS MISSING METHOD to fix the current error
+getWorkspace: async (workspaceId) => {
+  try {
+    if (!workspaceId) {
+      throw new Error('Workspace ID is required');
+    }
+
+    const url = `/workspaces/${workspaceId}`;
+
+    if (DEBUG) {
+      console.log('📋 Fetching single workspace from:', url);
+    }
+
+    const response = await api.get(url);
+
+    if (DEBUG) {
+      console.log('✅ Single workspace response:', response.data);
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error('❌ Fetch single workspace error:', error);
+
+    if (!error.response) {
+      throw new Error('Unable to connect to server. Please check your connection.');
+    }
+
+    if (error.response.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+
+    if (error.response.status === 403) {
+      throw new Error('Access denied. You do not have permission to view this workspace.');
+    }
+
+    if (error.response.status === 404) {
+      throw new Error('Workspace not found.');
+    }
+
+    if (error.response.status >= 500) {
+      throw new Error('Server error. Please try again later.');
+    }
+
+    throw new Error(error.response?.data?.message || 'Failed to fetch workspace');
+  }
+},
+
+
+  // ✅ New - fetch single workspace by ID
+  getWorkspaceById: async (id) => {
+    try {
+      const url = `/workspaces/${id}`;
+
+      if (DEBUG) {
+        console.log('📋 Fetching workspace from:', url);
+      }
+
+      const response = await api.get(url);
+
+      if (DEBUG) {
+        console.log('✅ Workspace response:', response.data);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Fetch workspace error:', error);
+
+      if (!error.response) {
+        throw new Error('Unable to connect to server. Please check your connection.');
+      }
+
+      if (error.response.status === 401) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      if (error.response.status === 403) {
+        throw new Error('Access denied. You do not have permission to view this workspace.');
+      }
+
+      if (error.response.status === 404) {
+        throw new Error('Workspace not found.');
+      }
+
+      if (error.response.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      }
+
+      throw new Error(error.response?.data?.message || 'Failed to fetch workspace');
+    }
+  }
+
+
+};
+
+
+
+
+// Add this to temporarily bypass other failing API calls
+export const mockApiCall = async (endpoint) => {
+  console.log(`🔧 Mock API call to ${endpoint}`);
+  await new Promise(resolve => setTimeout(resolve, 200));
+  return { data: { success: true, data: [] } };
+};
+
+// ✅ FIXED: Document API with consistent usage of api instance
 export const documentApi = {
-  // Get all documents
-  getAllDocuments: async () => {
+  uploadDocument: async (formData, config = {}) => {
     try {
-      const response = await axios.get(`${API_URL}/documents`);
+      const response = await api.post('/documents', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        ...config
+      });
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch documents:', error);
+      console.error('❌ Upload document error:', error);
       throw error;
     }
   },
 
-  // Get documents by workspace
-  getWorkspaceDocuments: async (workspaceId, filters = {}) => {
+  getDocuments: async (params = {}) => {
     try {
-      const params = new URLSearchParams();
-      if (filters.category) params.append('category', filters.category);
-      if (filters.tags) params.append('tags', filters.tags.join(','));
-      if (filters.search) params.append('search', filters.search);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.page) params.append('page', filters.page);
-      if (filters.limit) params.append('limit', filters.limit);
+      const queryString = new URLSearchParams(params).toString();
+      const url = `/documents${queryString ? `?${queryString}` : ''}`;
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Get documents error:', error);
+      throw error;
+    }
+  },
 
-      const queryString = params.toString();
-      const url = `${API_URL}/documents/workspace/${workspaceId}${queryString ? `?${queryString}` : ''}`;
+  getWorkspaceDocuments: async (workspaceId, params = {}) => {
+    try {
+      if (!workspaceId || workspaceId === 'undefined') {
+        throw new Error('Invalid workspace ID');
+      }
       
-      const response = await axios.get(url);
+      const queryString = new URLSearchParams(params).toString();
+      const url = `/documents/workspace/${workspaceId}${queryString ? `?${queryString}` : ''}`;
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch workspace documents for ${workspaceId}:`, error);
+      console.error(`❌ Get workspace ${workspaceId} documents error:`, error);
       throw error;
     }
   },
 
-  // Get workspace document statistics
+  getDocument: async (documentId) => {
+    try {
+      if (!documentId || documentId === 'undefined' || documentId === 'null' || documentId === ':documentId') {
+        console.error('Invalid document ID passed to getDocument:', documentId);
+        throw new Error('Invalid document ID provided');
+      }
+      
+      console.log('Fetching document with ID:', documentId);
+      const response = await api.get(`/documents/${documentId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Get document ${documentId} error:`, error);
+      throw error;
+    }
+  },
+
+  updateDocument: async (documentId, updates) => {
+    try {
+      const response = await api.put(`/documents/${documentId}`, updates);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Update document ${documentId} error:`, error);
+      throw error;
+    }
+  },
+
+  deleteDocument: async (documentId) => {
+    try {
+      const response = await api.delete(`/documents/${documentId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Delete document ${documentId} error:`, error);
+      throw error;
+    }
+  },
+
+previewDocument: async (documentId) => {
+  try {
+    const response = await api.get(`/documents/${documentId}/preview`, {
+      responseType: 'blob'
+    });
+    return response.data; // ✅ Return just the blob data
+  } catch (error) {
+    console.error(`❌ Preview document ${documentId} error:`, error);
+    throw error;
+  }
+},
+
+  shareDocument: async (documentId, shareData) => {
+    try {
+      const response = await api.post(`/documents/${documentId}/share`, shareData);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Share document ${documentId} error:`, error);
+      throw error;
+    }
+  },
+
   getWorkspaceDocumentStats: async (workspaceId) => {
     try {
-      const response = await axios.get(`${API_URL}/documents/workspace/${workspaceId}/stats`);
+      if (!workspaceId || workspaceId === 'undefined') {
+        throw new Error('Invalid workspace ID');
+      }
+      
+      const response = await api.get(`/documents/workspace/${workspaceId}/stats`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch workspace document stats for ${workspaceId}:`, error);
+      console.error(`❌ Get workspace document stats ${workspaceId} error:`, error);
       throw error;
     }
   },
 
-  // Move document between workspaces
   moveDocument: async (documentId, targetWorkspaceId) => {
     try {
-      const response = await axios.post(`${API_URL}/documents/${documentId}/move`, {
+      const response = await api.post(`/documents/${documentId}/move`, {
         targetWorkspaceId
       });
       return response.data;
     } catch (error) {
-      console.error(`Failed to move document ${documentId}:`, error);
+      console.error(`❌ Move document ${documentId} error:`, error);
       throw error;
     }
   },
 
-  // Duplicate document
   duplicateDocument: async (documentId, targetWorkspaceId = null) => {
     try {
-      const response = await axios.post(`${API_URL}/documents/${documentId}/duplicate`, {
+      const response = await api.post(`/documents/${documentId}/duplicate`, {
         targetWorkspaceId
       });
       return response.data;
     } catch (error) {
-      console.error(`Failed to duplicate document ${documentId}:`, error);
+      console.error(`❌ Duplicate document ${documentId} error:`, error);
       throw error;
     }
   },
 
-  // Bulk delete documents
   bulkDeleteDocuments: async (workspaceId, documentIds) => {
     try {
-      const response = await axios.post(`${API_URL}/documents/workspace/${workspaceId}/bulk-delete`, {
+      const response = await api.post(`/documents/workspace/${workspaceId}/bulk-delete`, {
         documentIds
       });
       return response.data;
     } catch (error) {
-      console.error(`Failed to bulk delete documents in workspace ${workspaceId}:`, error);
-      throw error;
-    }
-  },
-  
-  // Get single document details
-  getDocument: async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/documents/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to fetch document with ID ${id}:`, error);
+      console.error(`❌ Bulk delete documents in workspace ${workspaceId} error:`, error);
       throw error;
     }
   },
 
-  // Updated previewDocument function for apiService.js
-  previewDocument: async (id) => {
-    try {
-      console.log(`Attempting to preview document with ID ${id}`);
-      const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
-        responseType: 'blob'
-      });
-      console.log('Preview response received:', response.status);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to preview document with ID ${id}:`, error);
-      
-      // Log more detailed error info
-      if (error.response) {
-        console.error('Error status:', error.response.status);
-        console.error('Error data:', error.response.data);
-        // If we got a 404, it means the preview endpoint might not be implemented
-        if (error.response.status === 404) {
-          console.warn('Preview endpoint returned 404 - falling back to document download');
-          // We could implement a fallback here, but we'll let the component handle this
-        }
-      }
-      
-      throw error;
-    }
-  },
-  
-  // Upload a new document
-  uploadDocument: async (formData) => {
-    try {
-      const response = await axios.post(`${API_URL}/documents`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to upload document:', error);
-      throw error;
-    }
-  },
-  
-  // Upload document to specific workspace
   uploadDocumentToWorkspace: async (workspaceId, formData) => {
     try {
-      // Add workspace ID to form data
       formData.append('workspaceId', workspaceId);
       
-      const response = await axios.post(`${API_URL}/documents`, formData, {
+      const response = await api.post('/documents', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
       return response.data;
     } catch (error) {
-      console.error('Failed to upload document to workspace:', error);
+      console.error('❌ Upload document to workspace error:', error);
       throw error;
     }
   },
-  
-  // Download a document
+
   downloadDocument: async (id) => {
     try {
       console.log(`Attempting to download document with ID ${id}`);
-      // This should point to the /preview endpoint which serves the file content
-      const response = await axios.get(`${API_URL}/documents/${id}/preview`, {
+      const response = await api.get(`/documents/${id}/preview`, {
         responseType: 'blob'
       });
       console.log('Download response received:', response.status);
       return response;
     } catch (error) {
-      console.error(`Failed to download document with ID ${id}:`, error);
+      console.error(`❌ Download document ${id} error:`, error);
       throw error;
     }
   },
-  
-  // Delete a document
-  deleteDocument: async (id) => {
-    try {
-      const response = await axios.delete(`${API_URL}/documents/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to delete document with ID ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  // Get documents shared with user
+
   getSharedDocuments: async () => {
     try {
-      // Better approach: use server-side filtering with a query parameter
-      const response = await axios.get(`${API_URL}/documents?shared=true`);
+      const response = await api.get('/documents?shared=true');
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch shared documents:', error);
-      // Return empty data structure on error to prevent dashboard crashes
+      console.error('❌ Get shared documents error:', error);
       return { success: true, data: [] };
     }
   }
 };
 
-// User-related API functions
+// ✅ FIXED: User API with consistent usage of api instance
 export const userApi = {
-  // Get user profile
   getProfile: async () => {
     try {
-      const response = await axios.get(`${API_URL}/users/profile`);
+      if (DEBUG) {
+        console.log('👤 Fetching user profile...');
+      }
+      
+      const response = await api.get('/users/profile');
+      
+      if (DEBUG) {
+        console.log('✅ Profile fetched:', response.data);
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch user profile:', error);
+      console.error('❌ Get profile error:', error);
       throw error;
     }
   },
 
-  // Update user profile with improved error handling
   updateProfile: async (userData) => {
     try {
-      // Only include fields that are actually needed to update
       const updateData = {
         name: userData.name
       };
       
-      // Only include password fields if there's actually a password change
       if (userData.currentPassword && userData.newPassword) {
         updateData.currentPassword = userData.currentPassword;
         updateData.newPassword = userData.newPassword;
       }
       
-      // Log the data being sent (omit passwords for security)
       if (DEBUG) {
         console.log('Updating profile with data:', {
           ...updateData,
@@ -293,7 +517,7 @@ export const userApi = {
         });
       }
       
-      const response = await axios.put(`${API_URL}/users/profile`, updateData);
+      const response = await api.put('/users/profile', updateData);
       
       if (!response || !response.data) {
         throw new Error('No response data received from server');
@@ -305,9 +529,8 @@ export const userApi = {
       
       return response.data;
     } catch (error) {
-      console.error('Update profile error:', error);
+      console.error('❌ Update profile error:', error);
       
-      // More descriptive error handling
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check your internet connection.');
       }
@@ -320,7 +543,6 @@ export const userApi = {
         throw new Error('Current password is incorrect.');
       }
       
-      // If we have an error message from the server, use it
       if (error.response && error.response.data && error.response.data.message) {
         throw new Error(error.response.data.message);
       }
@@ -329,25 +551,28 @@ export const userApi = {
     }
   },
 
-  // Login function with correct endpoint
   login: async (email, password) => {
     try {
-      // Use the correct endpoint based on routes.js
-      const response = await axios.post(`${API_URL}/users/login`, { email, password });
+      if (DEBUG) {
+        console.log('🔐 Attempting login for:', email);
+      }
       
-      // Store the token in localStorage
+      const response = await api.post('/users/login', { email, password });
+      
       if (response.data && response.data.token) {
         localStorage.setItem('authToken', response.data.token);
-        // Set default header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
+        if (DEBUG) {
+          console.log('✅ Token stored, login successful');
+        }
       } else {
-        console.error('No token received in login response');
+        console.error('❌ No token received in login response');
         throw new Error('Authentication failed - no token received');
       }
       
       return response.data;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check if the server is running.');
@@ -356,12 +581,10 @@ export const userApi = {
       throw error;
     }
   },
-  
-  // Register function with correct endpoint
+
   register: async (name, email, password) => {
     try {
-      // Use the correct endpoint based on routes.js
-      const response = await axios.post(`${API_URL}/users/register`, { 
+      const response = await api.post('/users/register', { 
         name, 
         email, 
         password 
@@ -369,7 +592,7 @@ export const userApi = {
       
       return response.data;
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('❌ Registration error:', error);
       
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check if the server is running.');
@@ -378,256 +601,176 @@ export const userApi = {
       throw error;
     }
   },
-  
-  // Logout function
+
   logout: () => {
     localStorage.removeItem('authToken');
-    // Also clear the Authorization header
-    delete axios.defaults.headers.common['Authorization'];
+    console.log('✅ Token removed from localStorage');
   }
 };
 
-// ✅ UPDATED: Workspace-related API functions with proper error handling
-export const workspaceApi = {
-  // Get all user's workspaces
-  getWorkspaces: async (filters = {}) => {
-    try {
-      const params = new URLSearchParams();
-      if (filters.search) params.append('search', filters.search);
-      if (filters.page) params.append('page', filters.page);
-      if (filters.limit) params.append('limit', filters.limit);
-      if (filters.sortBy) params.append('sortBy', filters.sortBy);
-      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
-
-      const queryString = params.toString();
-      const url = `${API_URL}/workspaces${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await axios.get(url);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch workspaces:', error);
-      throw error;
-    }
-  },
-
-  // Get single workspace
-  getWorkspace: async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/workspaces/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to fetch workspace with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  // Create new workspace
-  createWorkspace: async (workspaceData) => {
-    try {
-      const response = await axios.post(`${API_URL}/workspaces`, workspaceData);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to create workspace:', error);
-      throw error;
-    }
-  },
-
-  // Update workspace
-  updateWorkspace: async (id, workspaceData) => {
-    try {
-      const response = await axios.put(`${API_URL}/workspaces/${id}`, workspaceData);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to update workspace with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  // Delete workspace
-  deleteWorkspace: async (id) => {
-    try {
-      const response = await axios.delete(`${API_URL}/workspaces/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to delete workspace with ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  // ✅ ADDED: Get workspace statistics
-  getWorkspaceStats: async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/workspaces/${id}/stats`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to fetch workspace stats for ID ${id}:`, error);
-      throw error;
-    }
-  },
-
-  // Add member to workspace
-  addMember: async (workspaceId, memberData) => {
-    try {
-      const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/members`, memberData);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to add member to workspace ${workspaceId}:`, error);
-      throw error;
-    }
-  },
-
-  // Remove member from workspace
-  removeMember: async (workspaceId, memberId) => {
-    try {
-      const response = await axios.delete(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to remove member ${memberId} from workspace ${workspaceId}:`, error);
-      throw error;
-    }
-  },
-
-  // Update member role/permissions
-  updateMemberRole: async (workspaceId, memberId, roleData) => {
-    try {
-      const response = await axios.put(`${API_URL}/workspaces/${workspaceId}/members/${memberId}`, roleData);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to update member ${memberId} role in workspace ${workspaceId}:`, error);
-      throw error;
-    }
-  },
-
-  // Leave workspace
-  leaveWorkspace: async (workspaceId) => {
-    try {
-      const response = await axios.post(`${API_URL}/workspaces/${workspaceId}/leave`);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to leave workspace ${workspaceId}:`, error);
-      throw error;
-    }
-  }
-};
-
-// NEW: Invitation-related API functions
+// ✅ FIXED: Invitation API with consistent usage of api instance
 export const invitationApi = {
-  // Send invitation
-  sendInvitation: async (invitationData) => {
-    try {
-      const response = await axios.post(`${API_URL}/invitations/send`, invitationData);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to send invitation:', error);
-      throw error;
+sendInvitation: async (invitationData) => {
+  try {
+    console.log('🔍 RAW INVITATION DATA RECEIVED:', JSON.stringify(invitationData, null, 2));
+    console.log('📤 Original invitation data:', invitationData);
+    
+    // ✅ FIX: Properly map the data fields to match backend expectations
+    const requestData = {
+      workspaceId: invitationData.workspaceId,
+      inviteeEmail: invitationData.inviteeEmail || invitationData.email,
+      role: invitationData.role,
+      message: invitationData.message || invitationData.customMessage
+    };
+    
+    console.log('🔧 Mapped request data being sent to API:', JSON.stringify(requestData, null, 2));
+    console.log('🚀 About to POST to /invitations/send with:', requestData);
+    
+    // Validate required fields before sending
+    if (!requestData.workspaceId) {
+      console.error('❌ CRITICAL: workspaceId is missing from request data!');
+      throw new Error('workspaceId is required');
     }
-  },
+    if (!requestData.inviteeEmail) {
+      console.error('❌ CRITICAL: inviteeEmail is missing from request data!');
+      throw new Error('inviteeEmail is required');
+    }
+    if (!requestData.role) {
+      console.error('❌ CRITICAL: role is missing from request data!');
+      throw new Error('role is required');
+    }
+    
+    const response = await api.post('/invitations/send', requestData);
+    
+    console.log('✅ Invitation sent successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Send invitation error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data
+    });
+    
+    if (error.response) {
+      console.log('📊 Full error response:', JSON.stringify(error.response.data, null, 2));
+    }
+    
+    throw error;
+  }
+},
 
-  // Get invitation details by token (public endpoint)
   getInvitationDetails: async (token) => {
     try {
-      const response = await axios.get(`${API_URL}/invitations/${token}`);
+      const response = await api.get(`/invitations/${token}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch invitation details for token ${token}:`, error);
+      console.error(`❌ Get invitation details for token ${token} error:`, error);
       throw error;
     }
   },
 
-  // Accept invitation (public endpoint)
   acceptInvitation: async (token) => {
     try {
-      const response = await axios.post(`${API_URL}/invitations/${token}/accept`);
+      const response = await api.post(`/invitations/${token}/accept`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to accept invitation with token ${token}:`, error);
+      console.error(`❌ Accept invitation ${token} error:`, error);
       throw error;
     }
   },
 
-  // Reject invitation (public endpoint)
   rejectInvitation: async (token) => {
     try {
-      const response = await axios.post(`${API_URL}/invitations/${token}/reject`);
+      const response = await api.post(`/invitations/${token}/reject`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to reject invitation with token ${token}:`, error);
+      console.error(`❌ Reject invitation ${token} error:`, error);
       throw error;
     }
   },
 
-  // Get user's pending invitations
   getPendingInvitations: async () => {
     try {
-      const response = await axios.get(`${API_URL}/invitations/pending`);
+      console.log('📥 Fetching pending invitations from:', `/invitations/pending`);
+      const response = await api.get('/invitations/pending');
+      console.log('✅ Pending invitations response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch pending invitations:', error);
+      console.error('❌ Get pending invitations error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Request URL:', error.config?.url);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      }
+      
       throw error;
     }
   },
 
-  // Get workspace invitations (admin view)
   getWorkspaceInvitations: async (workspaceId) => {
     try {
-      const response = await axios.get(`${API_URL}/invitations/workspace/${workspaceId}`);
+      console.log('📤 Fetching workspace invitations for:', workspaceId);
+      const response = await api.get(`/invitations/workspace/${workspaceId}`);
+      console.log('✅ Workspace invitations fetched:', response.data);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch workspace invitations for ${workspaceId}:`, error);
+      console.error(`❌ Get workspace invitations ${workspaceId} error:`, error);
       throw error;
     }
   },
 
-  // Cancel invitation
   cancelInvitation: async (invitationId) => {
     try {
-      const response = await axios.delete(`${API_URL}/invitations/${invitationId}`);
+      const response = await api.delete(`/invitations/${invitationId}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to cancel invitation ${invitationId}:`, error);
+      console.error(`❌ Cancel invitation ${invitationId} error:`, error);
       throw error;
     }
   },
 
-  // Resend invitation
   resendInvitation: async (invitationId) => {
     try {
-      const response = await axios.post(`${API_URL}/invitations/${invitationId}/resend`);
+      const response = await api.post(`/invitations/${invitationId}/resend`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to resend invitation ${invitationId}:`, error);
-      throw error;
-    }
-  },
-
-  // Bulk invite (send multiple invitations)
-  bulkInvite: async (workspaceId, invitations) => {
-    try {
-      const bulkData = {
-        workspaceId,
-        invitations
-      };
-      const response = await axios.post(`${API_URL}/invitations/bulk`, bulkData);
-      return response.data;
-    } catch (error) {
-      console.error(`Failed to send bulk invitations to workspace ${workspaceId}:`, error);
-      throw error;
-    }
-  },
-
-  // Admin: Cleanup expired invitations
-  cleanupExpiredInvitations: async () => {
-    try {
-      const response = await axios.post(`${API_URL}/invitations/cleanup`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to cleanup expired invitations:', error);
+      console.error(`❌ Resend invitation ${invitationId} error:`, error);
       throw error;
     }
   }
 };
 
-// Export all APIs as a combined object with backwards compatibility
+// ✅ UTILITY: Expose the configured api instance for direct use if needed
+export const apiInstance = api;
+
+// ✅ UTILITY: Function to manually set auth header (useful for debugging)
+export const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem('authToken', token);
+    console.log('✅ Auth token set manually');
+  } else {
+    localStorage.removeItem('authToken');
+    console.log('✅ Auth token removed manually');
+  }
+};
+
+// ✅ UTILITY: Function to check if user is authenticated
+export const isAuthenticated = () => {
+  const token = localStorage.getItem('authToken');
+  return !!token;
+};
+
+// BACKWARDS COMPATIBILITY
+export const sendInvitation = invitationApi.sendInvitation;
+export const getWorkspaceInvitations = invitationApi.getWorkspaceInvitations;
+export const getPendingInvitations = invitationApi.getPendingInvitations;
+
+// Export all APIs as a combined object
 const apiService = { 
   documentApi, 
   userApi, 

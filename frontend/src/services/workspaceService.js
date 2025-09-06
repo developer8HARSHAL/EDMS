@@ -1,5 +1,4 @@
-import apiService from './apiService';
-
+import { workspaceApi } from './apiService'; // ✅ FIXED: Import workspaceApi directly
 /**
  * Dedicated Workspace API Service
  * Handles all workspace-related API calls with proper error handling and response formatting
@@ -13,23 +12,57 @@ class WorkspaceService {
    * @param {Object} params - Query parameters
    * @returns {Promise} API response
    */
-  async getWorkspaces(params = {}) {
-    try {
-      const queryParams = {
-        page: params.page || 1,
-        limit: params.limit || 10,
-        search: params.search || '',
-        role: params.role || '',
-        sortBy: params.sortBy || 'updatedAt',
-        sortOrder: params.sortOrder || 'desc'
-      };
+async getWorkspaces(params = {}) {
+  try {
+    const queryParams = {
+      page: params.page || 1,
+      limit: params.limit || 10,
+      search: params.search || '',
+      role: params.role || '',
+      sortBy: params.sortBy || 'updatedAt',
+      sortOrder: params.sortOrder || 'desc'
+    };
 
-      const response = await apiService.get('/workspaces', { params: queryParams });
-      return this.formatResponse(response);
-    } catch (error) {
-      throw this.handleError(error, 'Failed to fetch workspaces');
+    const response = await workspaceApi.getWorkspaces(queryParams);
+
+    // ✅ Handle multiple possible response structures
+    if (response.success || response.data || Array.isArray(response)) {
+      // Handle direct array response
+      if (Array.isArray(response)) {
+        return {
+          workspaces: response,
+          pagination: {
+            totalDocs: response.length,
+            totalPages: 1,
+            currentPage: 1,
+            hasNextPage: false,
+            hasPrevPage: false
+          }
+        };
+      }
+
+      // Handle structured response
+      const data = response.data || response;
+      const workspaces = data.workspaces || data.data?.workspaces || data.data || [];
+      
+      return {
+        workspaces: Array.isArray(workspaces) ? workspaces : [],
+        pagination: {
+          totalDocs: data.totalDocs || data.totalWorkspaces || workspaces.length,
+          totalPages: data.totalPages || Math.ceil((data.totalDocs || workspaces.length) / (params.limit || 10)),
+          currentPage: data.currentPage || params.page || 1,
+          hasNextPage: data.hasNextPage || false,
+          hasPrevPage: data.hasPrevPage || false
+        }
+      };
     }
+
+    throw new Error(response.message || 'Failed to fetch workspaces');
+  } catch (error) {
+    throw this.handleError(error, 'Failed to fetch workspaces');
   }
+}
+
 
   /**
    * Get single workspace by ID
@@ -42,8 +75,9 @@ class WorkspaceService {
         throw new Error('Workspace ID is required');
       }
 
-      const response = await apiService.get(`/workspaces/${workspaceId}`);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.getWorkspace directly
+      const response = await workspaceApi.getWorkspace(workspaceId);
+      return response.data.workspace || null;
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch workspace');
     }
@@ -57,8 +91,9 @@ class WorkspaceService {
   async createWorkspace(workspaceData) {
     try {
       const validatedData = this.validateWorkspaceData(workspaceData);
-      const response = await apiService.post('/workspaces', validatedData);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.createWorkspace directly
+      const response = await workspaceApi.createWorkspace(validatedData);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to create workspace');
     }
@@ -77,8 +112,9 @@ class WorkspaceService {
       }
 
       const validatedData = this.validateWorkspaceData(updates, false);
-      const response = await apiService.put(`/workspaces/${workspaceId}`, validatedData);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.updateWorkspace directly
+      const response = await workspaceApi.updateWorkspace(workspaceId, validatedData);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to update workspace');
     }
@@ -95,8 +131,10 @@ class WorkspaceService {
         throw new Error('Workspace ID is required');
       }
 
-      const response = await apiService.delete(`/workspaces/${workspaceId}`);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.deleteWorkspace directly
+      const response = await workspaceApi.deleteWorkspace(workspaceId);
+      return { success: true, message: response.message || 'Workspace deleted' };
+
     } catch (error) {
       throw this.handleError(error, 'Failed to delete workspace');
     }
@@ -117,8 +155,9 @@ class WorkspaceService {
       }
 
       const validatedData = this.validateMemberData(memberData);
-      const response = await apiService.post(`/workspaces/${workspaceId}/members`, validatedData);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.addMember directly
+      const response = await workspaceApi.addMember(workspaceId, validatedData);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to add member');
     }
@@ -136,8 +175,9 @@ class WorkspaceService {
         throw new Error('Workspace ID and Member ID are required');
       }
 
-      const response = await apiService.delete(`/workspaces/${workspaceId}/members/${memberId}`);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.removeMember directly
+      const response = await workspaceApi.removeMember(workspaceId, memberId);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to remove member');
     }
@@ -157,8 +197,9 @@ class WorkspaceService {
       }
 
       const validatedData = this.validateMemberData(roleData);
-      const response = await apiService.put(`/workspaces/${workspaceId}/members/${memberId}`, validatedData);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.updateMemberRole directly
+      const response = await workspaceApi.updateMemberRole(workspaceId, memberId, validatedData);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to update member role');
     }
@@ -175,14 +216,16 @@ class WorkspaceService {
         throw new Error('Workspace ID is required');
       }
 
-      const response = await apiService.post(`/workspaces/${workspaceId}/leave`);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.leaveWorkspace directly
+      const response = await workspaceApi.leaveWorkspace(workspaceId);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to leave workspace');
     }
   }
 
   // ==================== INVITATION MANAGEMENT ====================
+  // Note: These will use invitationApi from apiService
 
   /**
    * Send workspace invitation
@@ -191,9 +234,11 @@ class WorkspaceService {
    */
   async sendInvitation(invitationData) {
     try {
+      const { invitationApi } = await import('./apiService');
       const validatedData = this.validateInvitationData(invitationData);
-      const response = await apiService.post('/invitations/send', validatedData);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use invitationApi.sendInvitation directly
+      const response = await invitationApi.sendInvitation(validatedData);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to send invitation');
     }
@@ -206,8 +251,10 @@ class WorkspaceService {
    */
   async getPendingInvitations(params = {}) {
     try {
-      const response = await apiService.get('/invitations/pending', { params });
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.getPendingInvitations directly
+      const response = await invitationApi.getPendingInvitations();
+      return response.data.workspace || [];
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch pending invitations');
     }
@@ -225,8 +272,10 @@ class WorkspaceService {
         throw new Error('Workspace ID is required');
       }
 
-      const response = await apiService.get(`/invitations/workspace/${workspaceId}`, { params });
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.getWorkspaceInvitations directly
+      const response = await invitationApi.getWorkspaceInvitations(workspaceId);
+      return response.data.workspace || [];
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch workspace invitations');
     }
@@ -243,8 +292,10 @@ class WorkspaceService {
         throw new Error('Invitation token is required');
       }
 
-      const response = await apiService.get(`/invitations/${token}`);
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.getInvitationDetails directly
+      const response = await invitationApi.getInvitationDetails(token);
+      return response.data.workspace || null;
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch invitation details');
     }
@@ -262,9 +313,10 @@ class WorkspaceService {
         throw new Error('Invitation token is required');
       }
 
-      const payload = userData ? { userData } : {};
-      const response = await apiService.post(`/invitations/${token}/accept`, payload);
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.acceptInvitation directly
+      const response = await invitationApi.acceptInvitation(token);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to accept invitation');
     }
@@ -282,9 +334,10 @@ class WorkspaceService {
         throw new Error('Invitation token is required');
       }
 
-      const payload = reason ? { reason } : {};
-      const response = await apiService.post(`/invitations/${token}/reject`, payload);
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.rejectInvitation directly
+      const response = await invitationApi.rejectInvitation(token);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to reject invitation');
     }
@@ -301,8 +354,10 @@ class WorkspaceService {
         throw new Error('Invitation ID is required');
       }
 
-      const response = await apiService.delete(`/invitations/${invitationId}`);
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.cancelInvitation directly
+      const response = await invitationApi.cancelInvitation(invitationId);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to cancel invitation');
     }
@@ -320,9 +375,10 @@ class WorkspaceService {
         throw new Error('Invitation ID is required');
       }
 
-      const payload = customMessage ? { customMessage } : {};
-      const response = await apiService.post(`/invitations/${invitationId}/resend`, payload);
-      return this.formatResponse(response);
+      const { invitationApi } = await import('./apiService');
+      // ✅ FIXED: Use invitationApi.resendInvitation directly
+      const response = await invitationApi.resendInvitation(invitationId);
+      return response.data.workspace;
     } catch (error) {
       throw this.handleError(error, 'Failed to resend invitation');
     }
@@ -341,8 +397,9 @@ class WorkspaceService {
         throw new Error('Workspace ID is required');
       }
 
-      const response = await apiService.get(`/workspaces/${workspaceId}/stats`);
-      return this.formatResponse(response);
+      // ✅ FIXED: Use workspaceApi.getWorkspaceStats directly
+      const response = await workspaceApi.getWorkspaceStats(workspaceId);
+      return response.data.workspace || response.data;
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch workspace statistics');
     }
@@ -360,8 +417,10 @@ class WorkspaceService {
         throw new Error('Workspace ID is required');
       }
 
-      const response = await apiService.get(`/documents/workspace/${workspaceId}`, { params });
-      return this.formatResponse(response);
+      const { documentApi } = await import('./apiService');
+      // ✅ FIXED: Use documentApi.getWorkspaceDocuments directly
+      const response = await documentApi.getWorkspaceDocuments(workspaceId, params);
+      return response.data.workspace || [];
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch workspace documents');
     }
@@ -623,17 +682,34 @@ validateMemberData(data) {
   // ==================== UTILITY METHODS ====================
 
   /**
-   * Format API response
-   * @param {Object} response - Axios response
+   * ✅ FIXED: Format API response - handle different response formats
+   * @param {Object} response - API response (could be axios response or direct data)
    * @returns {Object} Formatted response
    */
   formatResponse(response) {
+    // If it's already a formatted response from apiService, return as-is
+    if (response && response.success !== undefined) {
+      return response;
+    }
+    
+    // If it's an axios response, format it
+    if (response && response.data) {
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Success',
+        meta: response.data.meta || null,
+        status: response.status || 200
+      };
+    }
+    
+    // If it's direct data, wrap it
     return {
       success: true,
-      data: response.data.data || response.data,
-      message: response.data.message || 'Success',
-      meta: response.data.meta || null,
-      status: response.status
+      data: response,
+      message: 'Success',
+      meta: null,
+      status: 200
     };
   }
 
@@ -739,5 +815,4 @@ convertFrontendToBackendPermissions(frontendPermissions) {
 
 // Create and export singleton instance
 const workspaceService = new WorkspaceService();
-
 export default workspaceService;
