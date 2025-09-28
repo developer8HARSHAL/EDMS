@@ -58,7 +58,7 @@ const WorkspaceCard = ({
     if (e.target.closest('.dropdown-container') || e.target.closest('.action-button')) {
       return;
     }
-    navigate(`/workspace/${workspace._id}`);
+    navigate(`/workspaces/${workspace._id}`);
   };
 
   // Handle dropdown actions

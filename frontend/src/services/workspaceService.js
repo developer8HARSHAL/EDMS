@@ -69,35 +69,126 @@ async getWorkspaces(params = {}) {
    * @param {string} workspaceId - Workspace ID
    * @returns {Promise} API response
    */
-  async getWorkspace(workspaceId) {
-    try {
-      if (!workspaceId) {
-        throw new Error('Workspace ID is required');
-      }
+// REPLACE this method in your workspaceService.js file
 
-      // ✅ FIXED: Use workspaceApi.getWorkspace directly
-      const response = await workspaceApi.getWorkspace(workspaceId);
-      return response.data.workspace || null;
-    } catch (error) {
-      throw this.handleError(error, 'Failed to fetch workspace');
+async getWorkspaces(params = {}) {
+  try {
+    const queryParams = {
+      page: params.page || 1,
+      limit: params.limit || 10,
+      search: params.search || '',
+      role: params.role || '',
+      sortBy: params.sortBy || 'updatedAt',
+      sortOrder: params.sortOrder || 'desc'
+    };
+
+    console.log('🔍 WorkspaceService: Calling API with params:', queryParams);
+    
+    const response = await workspaceApi.getWorkspaces(queryParams);
+    console.log('📡 WorkspaceService: Raw API response:', response);
+
+    // ✅ CRITICAL FIX: Handle the EXACT backend response format
+    // Backend returns: { success: true, data: { workspaces: [...], totalDocs: 7, ... } }
+    
+    if (response && response.success && response.data) {
+      const responseData = response.data;
+      
+      console.log('📦 WorkspaceService: Parsed response data:', responseData);
+      
+      return {
+        success: true,
+        data: {
+          workspaces: responseData.workspaces || [],
+          totalDocs: responseData.totalDocs || 0,
+          totalPages: responseData.totalPages || 1,
+          currentPage: responseData.currentPage || params.page || 1,
+          hasNextPage: responseData.hasNextPage || false,
+          hasPrevPage: responseData.hasPrevPage || false
+        }
+      };
     }
+
+    // Handle direct array response (fallback)
+    if (Array.isArray(response)) {
+      return {
+        success: true,
+        data: {
+          workspaces: response,
+          totalDocs: response.length,
+          totalPages: 1,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      };
+    }
+
+    console.error('❌ Invalid response structure:', response);
+    throw new Error('Invalid response format from server');
+    
+  } catch (error) {
+    console.error('❌ WorkspaceService getWorkspaces error:', error);
+    throw this.handleError(error, 'Failed to fetch workspaces');
   }
+}
+
+
+// ADD this method to your workspaceService.js file after the getWorkspaces method
+
+/**
+ * Get single workspace by ID
+ * @param {string} workspaceId - Workspace ID
+ * @returns {Promise} API response
+ */
+async getWorkspace(workspaceId) {
+  try {
+    if (!workspaceId) {
+      throw new Error('Workspace ID is required');
+    }
+
+    console.log('🔍 WorkspaceService: Fetching single workspace:', workspaceId);
+
+    const response = await workspaceApi.getWorkspace(workspaceId);
+    console.log('📡 WorkspaceService: Raw single workspace response:', response);
+    
+    // ✅ Handle the backend response format for single workspace
+    // Backend returns: { success: true, data: { workspace: {...} } }
+    if (response && response.success && response.data && response.data.workspace) {
+      console.log('📦 WorkspaceService: Parsed workspace:', response.data.workspace);
+      return response.data.workspace;
+    }
+    
+    // Handle direct workspace object (fallback)
+    if (response && response._id) {
+      console.log('📦 WorkspaceService: Direct workspace object:', response);
+      return response;
+    }
+    
+    console.error('❌ Invalid workspace response structure:', response);
+    throw new Error('Invalid workspace response structure');
+  } catch (error) {
+    console.error('❌ WorkspaceService getWorkspace error:', error);
+    throw this.handleError(error, 'Failed to fetch workspace');
+  }
+}
 
   /**
    * Create new workspace
    * @param {Object} workspaceData - Workspace data
    * @returns {Promise} API response
    */
-  async createWorkspace(workspaceData) {
-    try {
-      const validatedData = this.validateWorkspaceData(workspaceData);
-      // ✅ FIXED: Use workspaceApi.createWorkspace directly
-      const response = await workspaceApi.createWorkspace(validatedData);
-      return response.data.workspace;
-    } catch (error) {
-      throw this.handleError(error, 'Failed to create workspace');
-    }
+async createWorkspace(workspaceData) {
+  try {
+    const validatedData = this.validateWorkspaceData(workspaceData);
+    const response = await workspaceApi.createWorkspace(validatedData);
+    
+    // Handle multiple response formats
+    const data = response.data.data || response.data.workspace || response.data;
+    return data;
+  } catch (error) {
+    throw this.handleError(error, 'Failed to create workspace');
   }
+}
 
   /**
    * Update workspace

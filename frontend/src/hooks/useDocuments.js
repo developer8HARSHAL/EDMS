@@ -64,20 +64,7 @@ export const useDocuments = (workspaceId = null) => {
 
   // Set workspace context
 // Add this AFTER the useCallback definitions
-// Add this useEffect to ensure data is fetched
-useEffect(() => {
-  console.log('Fetching data for:', { workspaceId, currentWorkspaceId });
-  
-  if (workspaceId) {
-    // Workspace context
-    dispatch(fetchWorkspaceDocuments({ workspaceId }));
-  } else {
-    // General documents context
-    dispatch(fetchDocuments());
-  }
-}, [dispatch, workspaceId]);
-
-
+// Add this useEffect to ensure data is fetched----------------------------------------------
 
   // Selectors
   const documents = useSelector(selectDocuments);
@@ -112,23 +99,23 @@ const workspaceDocuments = useSelector(state => {
 
   
 useEffect(() => {
-  if (workspaceId) {
-    fetchWorkspaceDocuments(workspaceId).then((res) => {
-      console.log('Fetched documents:', workspaceDocuments);
+  if (workspaceId && workspaceId !== 'undefined' && workspaceId !== ':workspaceId') {
+    console.log('📄 Fetching workspace documents for:', workspaceId);
+    dispatch(fetchWorkspaceDocuments({ workspaceId }));
+  } else if (!workspaceId) {
+    console.log('📄 Fetching all user documents');
+    dispatch(fetchDocuments());
+  }
+}, [dispatch, workspaceId]);
+
+// Keep only the error handling useEffect:
+useEffect(() => {
+  if (error) {
+    toast.error('Document Error', {
+      duration: 5000,
     });
   }
-}, [workspaceId]);
-
-
-  // Handle document errors with toast notifications
-  useEffect(() => {
-    if (error) {
-      toast.error('Document Error',{
-        duration: 5000,
-    });
-    }
-  }, [error, toast]);
-
+}, [error]);
   // ===== DOCUMENT FETCHING =====
 
   // Fetch all documents (user's documents across workspaces)

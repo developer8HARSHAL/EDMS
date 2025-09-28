@@ -4,8 +4,8 @@ import { ChevronDown, Check, Plus, Search, Users, FileText, Globe, Lock, Crown }
 const WorkspaceSelector = ({ 
   workspaces = [], 
   selectedWorkspace, 
-  onWorkspaceSelect,
-  onCreateWorkspace,
+  onWorkspaceSelect = () => {}, // Default empty function
+  onCreateWorkspace = () => {}, // Default empty function
   className = '',
   showCreateOption = true,
   placeholder = "Select workspace"
@@ -21,36 +21,75 @@ const WorkspaceSelector = ({
     workspace.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Get current user ID with multiple fallbacks
+  const getCurrentUserId = () => {
+    // Try multiple sources for user ID
+    const userId = localStorage.getItem('userId') || 
+                   localStorage.getItem('user_id') ||
+                   sessionStorage.getItem('userId') ||
+                   sessionStorage.getItem('user_id');
+    
+    // You might also get it from Redux state if available
+    // const currentUser = useSelector(state => state.auth.user);
+    // return currentUser?.id || currentUser?._id || userId;
+    
+    return userId;
+  };
+
   // Get user role in workspace
   const getUserRole = (workspace) => {
-    // This should be determined from your workspace data structure
-    // For now, we'll check if the current user is the owner
-    const currentUserId = localStorage.getItem('userId'); // Adjust based on your auth system
+    if (!workspace) return 'viewer';
     
-    if (workspace.owner === currentUserId || workspace.owner?._id === currentUserId) {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return 'viewer';
+    
+    // Check if the current user is the owner
+    const ownerId = workspace.owner?._id || workspace.owner;
+    if (ownerId === currentUserId) {
       return 'owner';
     }
     
     // Find user in members array
-    const member = workspace.members?.find(m => 
-      m.user === currentUserId || m.user?._id === currentUserId
-    );
+    const member = workspace.members?.find(m => {
+      const memberId = m.user?._id || m.user?.id || m.user;
+      return memberId === currentUserId;
+    });
     
     return member?.role || 'viewer';
   };
 
-  // Handle workspace selection
+  // Handle workspace selection with error handling
   const handleWorkspaceSelect = (workspace) => {
-    onWorkspaceSelect(workspace);
-    setIsOpen(false);
-    setSearchTerm('');
+    try {
+      if (typeof onWorkspaceSelect === 'function') {
+        onWorkspaceSelect(workspace);
+      } else {
+        console.warn('onWorkspaceSelect is not a function');
+      }
+      setIsOpen(false);
+      setSearchTerm('');
+    } catch (error) {
+      console.error('Error selecting workspace:', error);
+      setIsOpen(false);
+      setSearchTerm('');
+    }
   };
 
-  // Handle create new workspace
+  // Handle create new workspace with error handling
   const handleCreateWorkspace = () => {
-    setIsOpen(false);
-    setSearchTerm('');
-    onCreateWorkspace?.();
+    try {
+      if (typeof onCreateWorkspace === 'function') {
+        onCreateWorkspace();
+      } else {
+        console.warn('onCreateWorkspace is not a function');
+      }
+      setIsOpen(false);
+      setSearchTerm('');
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+      setIsOpen(false);
+      setSearchTerm('');
+    }
   };
 
   // Close dropdown when clicking outside
@@ -83,7 +122,17 @@ const WorkspaceSelector = ({
 
   // Format member count
   const formatCount = (count, singular, plural) => {
+    if (count === undefined || count === null) return `0 ${plural}`;
     return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
+  };
+
+  // Safe property access helper
+  const safeGet = (obj, path, defaultValue = 0) => {
+    try {
+      return path.split('.').reduce((current, key) => current?.[key], obj) ?? defaultValue;
+    } catch {
+      return defaultValue;
+    }
   };
 
   return (
@@ -110,7 +159,7 @@ const WorkspaceSelector = ({
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900 truncate">
-                    {selectedWorkspace.name}
+                    {selectedWorkspace.name || 'Unnamed Workspace'}
                   </span>
                   {getUserRole(selectedWorkspace) === 'owner' && (
                     <Crown className="w-4 h-4 text-yellow-500 flex-shrink-0" />
@@ -119,11 +168,16 @@ const WorkspaceSelector = ({
                 <div className="flex items-center gap-4 text-xs text-gray-500">
                   <span className="flex items-center gap-1">
                     <Users className="w-3 h-3" />
-                    {formatCount(selectedWorkspace.memberCount || selectedWorkspace.members?.length || 0, 'member', 'members')}
+                    {formatCount(
+                      safeGet(selectedWorkspace, 'memberCount') || 
+                      safeGet(selectedWorkspace, 'members.length'), 
+                      'member', 
+                      'members'
+                    )}
                   </span>
                   <span className="flex items-center gap-1">
                     <FileText className="w-3 h-3" />
-                    {formatCount(selectedWorkspace.documentCount || 0, 'doc', 'docs')}
+                    {formatCount(safeGet(selectedWorkspace, 'documentCount'), 'doc', 'docs')}
                   </span>
                 </div>
               </div>
@@ -166,7 +220,7 @@ const WorkspaceSelector = ({
                 
                 return (
                   <button
-                    key={workspace._id}
+                    key={workspace._id || workspace.id || Math.random()}
                     onClick={() => handleWorkspaceSelect(workspace)}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
                   >
@@ -188,7 +242,7 @@ const WorkspaceSelector = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`font-medium truncate ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
-                          {workspace.name}
+                          {workspace.name || 'Unnamed Workspace'}
                         </span>
                         {userRole === 'owner' && (
                           <Crown className="w-4 h-4 text-yellow-500 flex-shrink-0" />
@@ -215,11 +269,16 @@ const WorkspaceSelector = ({
                       <div className="flex items-center gap-4 text-xs text-gray-500">
                         <span className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
-                          {formatCount(workspace.memberCount || workspace.members?.length || 0, 'member', 'members')}
+                          {formatCount(
+                            safeGet(workspace, 'memberCount') || 
+                            safeGet(workspace, 'members.length'), 
+                            'member', 
+                            'members'
+                          )}
                         </span>
                         <span className="flex items-center gap-1">
                           <FileText className="w-3 h-3" />
-                          {formatCount(workspace.documentCount || 0, 'doc', 'docs')}
+                          {formatCount(safeGet(workspace, 'documentCount'), 'doc', 'docs')}
                         </span>
                       </div>
                     </div>

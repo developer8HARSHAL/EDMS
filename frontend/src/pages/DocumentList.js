@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -30,11 +30,6 @@ import {
   AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-// Add this right at the top of your DocumentList component
-
-
-
-
 
 const DocumentList = () => {
   const { workspaceId } = useParams();
@@ -42,122 +37,151 @@ const DocumentList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
 
+  // Get hooks data with proper error handling
+  const documentsHookResult = useDocuments(workspaceId);
+  const workspacesHookResult = useWorkspaces();
+
+  // Safely destructure hook results with fallbacks
   const {
-    documents,
-    workspaceDocuments,
-    isLoading: documentsLoading,
-    error: documentsError,
-    searchQuery,
-    setSearchQuery,
-    filters: documentFilters,
-    updateFilters: setDocumentFilters, // renamed for convenience
-    fetchDocuments,
-    fetchWorkspaceDocuments,
-    toggleFavorite,
-    deleteDocument
-  } = useDocuments(workspaceId); // pass workspaceId here
+    documents = [],
+    workspaceDocuments = [],
+    isLoading: documentsLoading = false,
+    error: documentsError = null,
+    searchQuery = '',
+    setSearchQuery = () => {},
+    filters: documentFilters = {},
+    updateFilters = () => {},
+    fetchDocuments = () => {},
+    fetchWorkspaceDocuments = () => {},
+    toggleFavorite = () => {},
+    deleteDocument = () => {}
+  } = documentsHookResult || {};
 
   const {
-    workspaces,
-    currentWorkspace,
-    userRole,
-    userPermissions,
-    isLoading: workspacesLoading,
-    fetchWorkspaces,
-    fetchWorkspace
-  } = useWorkspaces();
+    workspaces = [],
+    currentWorkspace = null,
+    userRole = null,
+    userPermissions = {},
+    isLoading: workspacesLoading = false,
+    fetchWorkspaces = () => {},
+    fetchWorkspace = () => {}
+  } = workspacesHookResult || {};
+
+  // Create a proper setDocumentFilters function if updateFilters doesn't work as expected
+  const setDocumentFilters = (newFilters) => {
+    if (typeof updateFilters === 'function') {
+      if (typeof newFilters === 'function') {
+        updateFilters(newFilters);
+      } else {
+        updateFilters(() => newFilters);
+      }
+    }
+  };
 
   // Local state
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Initialize filters from URL params
+useEffect(() => {
+  const category = searchParams.get('category') || '';
+  const tag = searchParams.get('tag') || '';
+  const type = searchParams.get('type') || '';
+  const favorite = searchParams.get('favorite') === 'true';
 
-  useEffect(() => {
-    const category = searchParams.get('category') || '';
-    const tag = searchParams.get('tag') || '';
-    const type = searchParams.get('type') || '';
-    const favorite = searchParams.get('favorite') === 'true';
-
-    setDocumentFilters(prev => {
-      if (
-        prev.category === category &&
-        prev.tag === tag &&
-        prev.type === type &&
-        prev.favorite === favorite
-      ) {
-        return prev; // No change, skip update
-      }
-      return { ...prev, category, tag, type, favorite };
-    });
-  }, [searchParams]);
-
+  // Only update if we have actual changes
+  setDocumentFilters(prev => {
+    const current = prev || {};
+    if (
+      current.category === category &&
+      current.tag === tag &&
+      current.type === type &&
+      current.favorite === favorite
+    ) {
+      return current; // Return same object reference to prevent re-render
+    }
+    return { ...current, category, tag, type, favorite };
+  });
+}, [searchParams]); // Remove setDocumentFilters from here
 
   // Redirect unauthenticated users to login
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: workspaceId ? `/workspaces/${workspaceId}/documents` : '/documents' } });
+      navigate('/login', { 
+        state: { 
+          from: workspaceId ? `/workspaces/${workspaceId}/documents` : '/documents' 
+        } 
+      });
     }
   }, [isAuthenticated, navigate, workspaceId]);
 
   // Load data based on context (workspace or all documents)
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     if (workspaceId) {
-      fetchWorkspaceDocuments(workspaceId);
+      if (typeof fetchWorkspaceDocuments === 'function') {
+        fetchWorkspaceDocuments(workspaceId);
+      }
     } else {
-      fetchDocuments();   // <-- fetch all documents when no workspaceId
+      if (typeof fetchDocuments === 'function') {
+        fetchDocuments();
+      }
     }
-  }, [workspaceId, fetchWorkspaceDocuments, fetchDocuments]);
+  }, [workspaceId, fetchWorkspaceDocuments, fetchDocuments, isAuthenticated]);
 
-
-  
+  // Enhanced search handler
   const handleSearch = (term) => {
-    setSearchQuery(term);
-    setDocumentFilters({ ...documentFilters, searchTerm: term });
+    if (typeof setSearchQuery === 'function') {
+      setSearchQuery(term);
+    }
+    setDocumentFilters(prev => ({ ...(prev || {}), searchTerm: term }));
   };
+
   // Get current document list based on context
   const currentDocuments = workspaceId ? workspaceDocuments : documents;
   const isLoading = documentsLoading || workspacesLoading;
   const error = documentsError;
 
   // Enhanced search and filter functionality
-  const filteredDocuments = React.useMemo(() => {
+  const filteredDocuments = useMemo(() => {
     if (!Array.isArray(currentDocuments)) return [];
 
     return currentDocuments.filter(doc => {
       if (!doc) return false;
 
       // Search query filter
-      const matchesSearch = !searchQuery ||
-        doc.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      const searchTerm = searchQuery || documentFilters?.searchTerm || '';
+      const matchesSearch = !searchTerm ||
+        doc.filename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
 
       // Category filter
-      const matchesCategory = !documentFilters.category ||
+      const matchesCategory = !documentFilters?.category ||
         doc.category === documentFilters.category;
 
       // Tag filter
-      const matchesTag = !documentFilters.tag ||
+      const matchesTag = !documentFilters?.tag ||
         doc.tags?.includes(documentFilters.tag);
 
       // File type filter
-      const matchesType = !documentFilters.type ||
+      const matchesType = !documentFilters?.type ||
         doc.mimeType?.includes(documentFilters.type) ||
         doc.fileType?.includes(documentFilters.type);
 
       // Favorite filter
-      const matchesFavorite = !documentFilters.favorite || doc.isFavorite;
+      const matchesFavorite = !documentFilters?.favorite || doc.isFavorite;
 
       // Date range filter
-      const matchesDateRange = !documentFilters.dateFrom || !documentFilters.dateTo ||
-        (new Date(doc.uploadDate) >= new Date(documentFilters.dateFrom) &&
-          new Date(doc.uploadDate) <= new Date(documentFilters.dateTo));
+      const matchesDateRange = !documentFilters?.dateFrom || !documentFilters?.dateTo ||
+        (new Date(doc.uploadDate || doc.createdAt) >= new Date(documentFilters.dateFrom) &&
+          new Date(doc.uploadDate || doc.createdAt) <= new Date(documentFilters.dateTo));
 
       // Size filter
-      const matchesSize = !documentFilters.minSize || !documentFilters.maxSize ||
+      const matchesSize = !documentFilters?.minSize || !documentFilters?.maxSize ||
         (doc.size >= documentFilters.minSize && doc.size <= documentFilters.maxSize);
 
       return matchesSearch && matchesCategory && matchesTag &&
@@ -165,17 +189,8 @@ const DocumentList = () => {
     });
   }, [currentDocuments, searchQuery, documentFilters]);
 
-
-console.log('Route params:', { 
-  workspaceId, 
-  pathname: window.location.pathname,
-  searchParams: Object.fromEntries(searchParams)
-});
-
-
-
   // Get unique values for filter options
-  const filterOptions = React.useMemo(() => {
+  const filterOptions = useMemo(() => {
     if (!Array.isArray(currentDocuments)) return { categories: [], tags: [], types: [] };
 
     const categories = [...new Set(currentDocuments.map(doc => doc.category).filter(Boolean))];
@@ -187,15 +202,26 @@ console.log('Route params:', {
     return { categories, tags, types };
   }, [currentDocuments]);
 
-  // Handle document actions
+  // Handle document actions with proper error handling
   const handleDeleteDocument = async (documentId) => {
-    if (window.confirm('Are you sure you want to delete this document?')) {
-      try {
+    if (!window.confirm('Are you sure you want to delete this document?')) return;
+
+    try {
+      if (typeof deleteDocument === 'function') {
         await deleteDocument(documentId);
-      } catch (error) {
-        console.error('Error deleting document:', error);
-        alert('Failed to delete document. Please try again.');
+      } else {
+        // Fallback to direct API call
+        await apiService.documentApi.deleteDocument(documentId);
+        // Manually refresh the list
+        if (workspaceId) {
+          fetchWorkspaceDocuments(workspaceId);
+        } else {
+          fetchDocuments();
+        }
       }
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('Failed to delete document. Please try again.');
     }
   };
 
@@ -208,7 +234,7 @@ console.log('Route params:', {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', documentName);
+      link.setAttribute('download', documentName || 'document');
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -221,7 +247,18 @@ console.log('Route params:', {
 
   const handleToggleFavorite = async (documentId) => {
     try {
-      await toggleFavorite(documentId);
+      if (typeof toggleFavorite === 'function') {
+        await toggleFavorite(documentId);
+      } else {
+        // Fallback to direct API call
+        await apiService.documentApi.toggleFavorite(documentId);
+        // Manually refresh the list
+        if (workspaceId) {
+          fetchWorkspaceDocuments(workspaceId);
+        } else {
+          fetchDocuments();
+        }
+      }
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
@@ -240,30 +277,41 @@ console.log('Route params:', {
     setSelectedDocuments(
       selectedDocuments.length === filteredDocuments.length
         ? []
-        : filteredDocuments.map(doc => doc._id)
+        : filteredDocuments.map(doc => doc._id || doc.id)
     );
   };
 
   const handleBulkDelete = async () => {
     if (selectedDocuments.length === 0) return;
 
-    if (window.confirm(`Are you sure you want to delete ${selectedDocuments.length} documents?`)) {
-      setBulkActionLoading(true);
-      try {
-        await Promise.all(selectedDocuments.map(id => deleteDocument(id)));
-        setSelectedDocuments([]);
-      } catch (error) {
-        console.error('Error bulk deleting documents:', error);
-        alert('Some documents could not be deleted. Please try again.');
-      } finally {
-        setBulkActionLoading(false);
-      }
+    if (!window.confirm(`Are you sure you want to delete ${selectedDocuments.length} documents?`)) return;
+
+    setBulkActionLoading(true);
+    try {
+      await Promise.all(selectedDocuments.map(id => handleDeleteDocument(id)));
+      setSelectedDocuments([]);
+    } catch (error) {
+      console.error('Error bulk deleting documents:', error);
+      alert('Some documents could not be deleted. Please try again.');
+    } finally {
+      setBulkActionLoading(false);
     }
+  };
+
+  // WorkspaceSelector handlers
+  const handleWorkspaceSelect = (workspace) => {
+    if (workspace && (workspace._id || workspace.id)) {
+      navigate(`/workspaces/${workspace._id || workspace.id}/documents`);
+    }
+  };
+
+  const handleCreateWorkspace = () => {
+    navigate('/workspaces/create');
   };
 
   // Helper functions
   const formatFileSize = (size) => {
-    if (!size) return '0 KB';
+    if (!size || size === 0) return '0 KB';
     const sizeInKB = size / 1024;
     if (sizeInKB < 1024) return `${Math.round(sizeInKB)} KB`;
     return `${(sizeInKB / 1024).toFixed(2)} MB`;
@@ -285,53 +333,50 @@ console.log('Route params:', {
   };
 
   const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!date) return 'Unknown';
+    try {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   const isOwner = (doc) => {
-    const docOwner = doc.uploadedBy?._id || doc.owner || '';
+    if (!doc || !user) return false;
+    const docOwner = doc.uploadedBy?._id || doc.uploadedBy?.id || doc.owner || '';
     const userId = user?.id || user?._id || '';
     return docOwner === userId;
   };
 
+  // Debug logging
+  useEffect(() => {
+    console.log('DocumentList Debug:', {
+      workspaceId,
+      documents: documents?.length || 0,
+      workspaceDocuments: workspaceDocuments?.length || 0,
+      currentDocuments: currentDocuments?.length || 0,
+      isLoading,
+      error
+    });
+  }, [workspaceId, documents, workspaceDocuments, currentDocuments, isLoading, error]);
 
-useEffect(() => {
-  console.log('DocumentList Debug:', {
-    workspaceId,
-    documents: documents?.length || 0,
-    workspaceDocuments: workspaceDocuments?.length || 0,
-    currentDocuments: currentDocuments?.length || 0,
-    isLoading,
-    error
-  });
-}, [workspaceId, documents, workspaceDocuments, currentDocuments, isLoading, error]);
+  // Force fetch if no documents and not loading - with better dependency control
+  useEffect(() => {
+    if (!isLoading && currentDocuments.length === 0 && !error && isAuthenticated) {
+      console.log('Force fetching documents...');
+      if (workspaceId && typeof fetchWorkspaceDocuments === 'function') {
+        fetchWorkspaceDocuments(workspaceId);
+      } else if (!workspaceId && typeof fetchDocuments === 'function') {
+        fetchDocuments();
+      }
+    }
+  }, [isLoading, currentDocuments.length, error, isAuthenticated]);
 
-
-
-// In DocumentList.js, add this useEffect
-useEffect(() => {
-  console.log('Full Redux State:', {
-    documents: documents,
-    workspaceDocuments: workspaceDocuments,
-    error: error
-  });
-}, [documents, workspaceDocuments, error]);
-
-
-// Add this right after your hooks in DocumentList
-useEffect(() => {
-  if (!isLoading && documents.length === 0 && !error) {
-    console.log('Force fetching documents...');
-    fetchDocuments();
-  }
-}, [isLoading, documents.length, error, fetchDocuments]);
-
-
-  // If not authenticated, don't render anything (will redirect via useEffect)
+  // If not authenticated, show loading state
   if (!isAuthenticated) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -344,30 +389,32 @@ useEffect(() => {
   return (
     <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="container mx-auto px-4 py-8">
+        {/* Debug Button - Remove in production */}
+        <div className="mb-4">
+          <button 
+            onClick={async () => {
+              try {
+                console.log('Testing direct API call...');
+                const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+                const result = await fetch('/api/documents', {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                const data = await result.json();
+                console.log('Direct API result:', data);
+              } catch (err) {
+                console.error('Direct API error:', err);
+              }
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Test Direct API
+          </button>
+        </div>
+
         {/* Header */}
-
-
-         <div>
-              // Add this temporarily for testing
-<button onClick={async () => {
-  try {
-    console.log('Testing direct API call...');
-    const result = await fetch('/api/documents', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}` // or however you handle auth
-      }
-    });
-    const data = await result.json();
-    console.log('Direct API result:', data);
-  } catch (err) {
-    console.error('Direct API error:', err);
-  }
-}}>
-  Test Direct API
-</button>
-            </div>
-
-            
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 space-y-4 lg:space-y-0">
           <div>
             <div className="flex items-center space-x-3 mb-2">
@@ -394,18 +441,16 @@ useEffect(() => {
                 </span>
               )}
             </div>
-           
           </div>
 
-
-
           <div className="flex items-center space-x-3">
-            {/* Workspace Selector (only show when not in workspace context) */}
+            {/* Workspace Selector */}
             {!workspaceId && (
               <WorkspaceSelector
                 workspaces={workspaces}
                 selectedWorkspace={null}
-                onSelect={(workspace) => navigate(`/workspaces/${workspace._id}/documents`)}
+                onWorkspaceSelect={handleWorkspaceSelect}
+                onCreateWorkspace={handleCreateWorkspace}
                 placeholder="Filter by workspace"
                 className="w-64"
               />
@@ -519,7 +564,7 @@ useEffect(() => {
                       Category
                     </label>
                     <select
-                      value={documentFilters.category || ''}
+                      value={documentFilters?.category || ''}
                       onChange={(e) => setDocumentFilters({ ...documentFilters, category: e.target.value })}
                       className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     >
@@ -536,7 +581,7 @@ useEffect(() => {
                       Tag
                     </label>
                     <select
-                      value={documentFilters.tag || ''}
+                      value={documentFilters?.tag || ''}
                       onChange={(e) => setDocumentFilters({ ...documentFilters, tag: e.target.value })}
                       className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     >
@@ -553,7 +598,7 @@ useEffect(() => {
                       File Type
                     </label>
                     <select
-                      value={documentFilters.type || ''}
+                      value={documentFilters?.type || ''}
                       onChange={(e) => setDocumentFilters({ ...documentFilters, type: e.target.value })}
                       className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     >
@@ -573,7 +618,7 @@ useEffect(() => {
                       <input
                         type="checkbox"
                         id="favorites"
-                        checked={documentFilters.favorite || false}
+                        checked={documentFilters?.favorite || false}
                         onChange={(e) => setDocumentFilters({ ...documentFilters, favorite: e.target.checked })}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
@@ -585,7 +630,7 @@ useEffect(() => {
                 </div>
 
                 {/* Clear Filters */}
-                {Object.values(documentFilters).some(Boolean) && (
+                {Object.values(documentFilters || {}).some(Boolean) && (
                   <div className="mt-4">
                     <Button
                       variant="outline"
@@ -600,21 +645,6 @@ useEffect(() => {
             )}
           </div>
         </Card>
-
-        {/* Bulk Selection Header */}
-        {viewMode === 'list' && filteredDocuments.length > 0 && (
-          <div className="mb-4 flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedDocuments.length === filteredDocuments.length}
-              onChange={handleSelectAll}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Select All ({filteredDocuments.length})
-            </span>
-          </div>
-        )}
 
         {/* Documents Display */}
         {isLoading ? (
@@ -685,13 +715,13 @@ useEffect(() => {
           // Grid View
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredDocuments.map((doc) => (
-              <Card key={doc._id} className="p-4 hover:shadow-lg transition-shadow">
+              <Card key={doc._id || doc.id} className="p-4 hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <DocumentIcon className={`h-8 w-8 ${getFileTypeIcon(doc.mimeType || doc.fileType)}`} />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {doc.filename}
+                        {doc.filename || 'Unnamed Document'}
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {formatFileSize(doc.size)}
@@ -699,7 +729,7 @@ useEffect(() => {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleToggleFavorite(doc._id)}
+                    onClick={() => handleToggleFavorite(doc._id || doc.id)}
                     className="text-gray-400 hover:text-yellow-500 flex-shrink-0"
                   >
                     {doc.isFavorite ? (
@@ -719,7 +749,7 @@ useEffect(() => {
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
                   <div className="flex items-center">
                     <CalendarIcon className="h-3 w-3 mr-1" />
-                    {formatDate(doc.uploadDate)}
+                    {formatDate(doc.uploadDate || doc.createdAt)}
                   </div>
                   {doc.uploadedBy && (
                     <div className="flex items-center">
@@ -761,8 +791,8 @@ useEffect(() => {
                     <button
                       onClick={() => navigate(
                         workspaceId
-                          ? `/workspaces/${workspaceId}/documents/${doc._id}`
-                          : `/documents/preview/${doc._id}`
+                          ? `/workspaces/${workspaceId}/documents/${doc._id || doc.id}`
+                          : `/documents/preview/${doc._id || doc.id}`
                       )}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                       title="Preview"
@@ -770,7 +800,7 @@ useEffect(() => {
                       <EyeIcon className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => handleDownloadDocument(doc._id, doc.filename)}
+                      onClick={() => handleDownloadDocument(doc._id || doc.id, doc.filename)}
                       className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
                       title="Download"
                     >
@@ -782,7 +812,7 @@ useEffect(() => {
                       fallback={isOwner(doc)}
                     >
                       <button
-                        onClick={() => handleDeleteDocument(doc._id)}
+                        onClick={() => handleDeleteDocument(doc._id || doc.id)}
                         className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                         title="Delete"
                       >
@@ -839,12 +869,12 @@ useEffect(() => {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredDocuments.map((doc) => (
-                    <tr key={doc._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tr key={doc._id || doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
-                          checked={selectedDocuments.includes(doc._id)}
-                          onChange={() => handleSelectDocument(doc._id)}
+                          checked={selectedDocuments.includes(doc._id || doc.id)}
+                          onChange={() => handleSelectDocument(doc._id || doc.id)}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                       </td>
@@ -854,10 +884,10 @@ useEffect(() => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center">
                               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                {doc.filename}
+                                {doc.filename || 'Unnamed Document'}
                               </p>
                               <button
-                                onClick={() => handleToggleFavorite(doc._id)}
+                                onClick={() => handleToggleFavorite(doc._id || doc.id)}
                                 className="ml-2 text-gray-400 hover:text-yellow-500"
                               >
                                 {doc.isFavorite ? (
@@ -899,7 +929,7 @@ useEffect(() => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {formatDate(doc.uploadDate)}
+                          {formatDate(doc.uploadDate || doc.createdAt)}
                         </div>
                         {doc.uploadedBy && (
                           <div className="flex items-center mt-1">
@@ -925,8 +955,8 @@ useEffect(() => {
                           <button
                             onClick={() => navigate(
                               workspaceId
-                                ? `/workspaces/${workspaceId}/documents/${doc._id}`
-                                : `/documents/preview/${doc._id}`
+                                ? `/workspaces/${workspaceId}/documents/${doc._id || doc.id}`
+                                : `/documents/preview/${doc._id || doc.id}`
                             )}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                             title="Preview"
@@ -934,7 +964,7 @@ useEffect(() => {
                             <EyeIcon className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDownloadDocument(doc._id, doc.filename)}
+                            onClick={() => handleDownloadDocument(doc._id || doc.id, doc.filename)}
                             className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
                             title="Download"
                           >
@@ -946,7 +976,7 @@ useEffect(() => {
                             fallback={isOwner(doc)}
                           >
                             <button
-                              onClick={() => handleDeleteDocument(doc._id)}
+                              onClick={() => handleDeleteDocument(doc._id || doc.id)}
                               className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                               title="Delete"
                             >

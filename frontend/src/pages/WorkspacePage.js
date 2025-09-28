@@ -91,105 +91,31 @@ const WorkspacePage = () => {
   const userPermissions = getUserPermissions(workspaceId);
 
   // Load data based on whether we're in list or detail view
-  useEffect(() => {
-    if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
-      // Detail view - load specific workspace data
-      console.log('Fetching data for valid workspaceId:', workspaceId);
+// In WorkspacePage.js, REPLACE all the duplicate useEffect hooks with this single one:
 
-      fetchWorkspace(workspaceId);
-      fetchWorkspaceDocuments(workspaceId);
-      fetchWorkspaceStats(workspaceId);
-      fetchRecentActivity(workspaceId);
-      fetchPopularDocuments(workspaceId);
-      fetchWorkspaceInvitations(workspaceId);
-    } else if (!workspaceId) {
-      // List view - load all workspaces
-      console.log('loading workspaces list view');
-      fetchWorkspaces();
-    } else {
-      console.error('Invalid workspaceId:', workspaceId);
-      navigate('/dashboard');
-    }
-  }, [workspaceId, fetchWorkspace, fetchWorkspaces, fetchWorkspaceDocuments, fetchWorkspaceStats, fetchRecentActivity, fetchPopularDocuments, fetchWorkspaceInvitations, navigate]);
+useEffect(() => {
+  if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
+    console.log('📄 Loading workspace data for:', workspaceId);
 
-  useEffect(() => {
-    if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
-      console.log('🔄 Loading workspace data for:', workspaceId);
+    const loadData = async () => {
+      try {
+        await Promise.all([
+          fetchWorkspace(workspaceId),
+          fetchWorkspaceDocuments(workspaceId),
+          fetchWorkspaceStats(workspaceId),
+          fetchRecentActivity(workspaceId),
+          fetchPopularDocuments(workspaceId),
+          fetchWorkspaceInvitations(workspaceId)
+        ]);
+        console.log('✅ All workspace data loaded');
+      } catch (error) {
+        console.error('❌ Error loading workspace data:', error);
+      }
+    };
 
-      const loadWorkspaceData = async () => {
-        try {
-          // Load workspace info
-          console.log('📍 Fetching workspace info...');
-          await fetchWorkspace(workspaceId);
-
-          // Load documents - this is the main fix!
-          console.log('📄 Fetching workspace documents...');
-          const docsResult = await fetchWorkspaceDocuments(workspaceId);
-          console.log('📄 Documents result:', docsResult);
-
-          // Load stats and activity
-          console.log('📊 Fetching stats and activity...');
-          await Promise.allSettled([
-            fetchWorkspaceStats(workspaceId),
-            fetchRecentActivity(workspaceId),
-            fetchPopularDocuments(workspaceId),
-            fetchWorkspaceInvitations(workspaceId)
-          ]);
-
-          console.log('✅ All workspace data loaded successfully');
-
-        } catch (error) {
-          console.error('❌ Error loading workspace data:', error);
-          // Don't redirect on error, just log it
-        }
-      };
-
-      loadWorkspaceData();
-    }
-  }, [workspaceId, fetchWorkspace, fetchWorkspaceDocuments, fetchWorkspaceStats, fetchRecentActivity, fetchPopularDocuments, fetchWorkspaceInvitations]);
-
-
-  useEffect(() => {
-    console.log('📊 Document State Update:', {
-      workspaceId,
-      documentsArray: workspaceDocuments,
-      isArray: Array.isArray(workspaceDocuments),
-      length: workspaceDocuments?.length || 0,
-      firstDoc: workspaceDocuments?.[0]?.filename || 'No documents'
-    });
-  }, [workspaceId, workspaceDocuments]);
-
-  useEffect(() => {
-    if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
-      console.log('🔄 Fetching workspace data for:', workspaceId);
-
-      fetchWorkspace(workspaceId)
-        .then(res => console.log('✅ Workspace fetched:', res))
-        .catch(err => console.error('❌ Workspace fetch error:', err));
-
-      fetchWorkspaceDocuments(workspaceId)
-        .then(res => console.log('📄 Documents fetched successfully:', res))
-        .catch(err => console.error('❌ Documents fetch error:', err));
-
-      fetchWorkspaceStats(workspaceId)
-        .then(res => console.log('📊 Stats fetched:', res))
-        .catch(err => console.error('❌ Stats fetch error:', err));
-
-      fetchRecentActivity(workspaceId)
-        .then(res => console.log('🕒 Recent activity fetched:', res))
-        .catch(err => console.error('❌ Recent activity fetch error:', err));
-
-      fetchPopularDocuments(workspaceId)
-        .then(res => console.log('⭐ Popular documents fetched:', res))
-        .catch(err => console.error('❌ Popular documents fetch error:', err));
-
-      fetchWorkspaceInvitations(workspaceId)
-        .then(res => console.log('✉️ Invitations fetched:', res))
-        .catch(err => console.error('❌ Invitations fetch error:', err));
-    } else {
-      console.warn('⚠️ Invalid workspaceId:', workspaceId);
-    }
-  }, [workspaceId]);
+    loadData();
+  }
+}, [workspaceId]); // Remove all the function dependencies to avoid infinite loops
 
 
 
@@ -225,7 +151,7 @@ const WorkspacePage = () => {
   });
 
   // Handle loading and error states
-  if (workspaceLoading) {
+  if (workspaceLoading || (!currentWorkspace && !workspaceError)) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center justify-center h-64">
@@ -365,7 +291,7 @@ const WorkspacePage = () => {
   console.log('- user:', user);
 
   // Detail view error handling
-  if (workspaceError || !currentWorkspace) {
+  if (workspaceError || (!workspaceLoading && !currentWorkspace)) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <Card className="max-w-md mx-auto text-center p-6">

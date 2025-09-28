@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { workspaceApi } from '../../services/apiService';
+import workspaceService from '../../services/workspaceService';
 
 // Initial state
 const initialState = {
@@ -51,7 +51,7 @@ export const fetchWorkspaces = createAsyncThunk(
     try {
       console.log('🔄 Redux: Fetching workspaces with params:', params);
       
-      const response = await workspaceApi.getWorkspaces(params); 
+      const response = await workspaceService.getWorkspaces(params);
       console.log('📋 Redux: Raw API response:', response);
 
      const workspacesData = response?.data;  // ✅ go one level higher
@@ -102,17 +102,16 @@ export const fetchWorkspace = createAsyncThunk(
     try {
       console.log("Fetching workspace with ID:", workspaceId);
 
-      const response = await workspaceApi.getWorkspaceById(workspaceId);
+      const response = await workspaceService.getWorkspace(workspaceId);
       console.log("Raw workspace response:", response);
 
-      const workspaceData = response.data?.workspace; // ✅ go inside `.data.workspace`
+      if (response) {
+  console.log("Workspace data received:", response);
+  return response;
+}
 
-      if (response?.success && workspaceData) {
-        console.log("Workspace data received:", workspaceData);
-        return { workspace: workspaceData }; // ✅ no extra nesting
-      }
+return rejectWithValue("Invalid workspace data");
 
-      return rejectWithValue("Invalid workspace data");
     } catch (err) {
       console.error("❌ Failed to fetch workspace:", err);
       return rejectWithValue(err.response?.data || err.message);
@@ -122,18 +121,31 @@ export const fetchWorkspace = createAsyncThunk(
 
 
 
-// Create new workspace
+// Create new workspace - FIXED VERSION
 export const createWorkspace = createAsyncThunk(
   'workspaces/createWorkspace',
   async (workspaceData, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.createWorkspace(workspaceData);
-      if (response.success && response.data) {
-        return response.data;
-      }
-      throw new Error(response.message || 'Failed to create workspace');
+      console.log('🚀 Creating workspace with data:', workspaceData);
+      
+      const response = await workspaceService.createWorkspace(workspaceData);
+console.log('🔨 Raw API Response:', response);
+
+// workspaceService returns the workspace object directly
+return response;
+      
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to create workspace');
+      console.error('❌ Create workspace error:', error);
+      console.error('❌ Error response:', error.response);
+      
+      // Handle different error formats
+      if (error.response?.data?.message) {
+        return rejectWithValue(error.response.data.message);
+      }
+      if (error.response?.data) {
+        return rejectWithValue(error.response.data);
+      }
+      return rejectWithValue(error.message || 'Failed to create workspace');
     }
   }
 );
@@ -143,7 +155,7 @@ export const updateWorkspace = createAsyncThunk(
   'workspaces/updateWorkspace',
   async ({ workspaceId, updates }, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.updateWorkspace(workspaceId, updates);
+      const response = await workspaceService.updateWorkspace(workspaceId, updates);
       if (response.success && response.data) {
         return response.data.workspace || response.data;
       }
@@ -159,7 +171,7 @@ export const deleteWorkspace = createAsyncThunk(
   'workspaces/deleteWorkspace',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.deleteWorkspace(workspaceId);
+      const response = await workspaceService.deleteWorkspace(workspaceId);
       if (response.success) {
         return workspaceId;
       }
@@ -175,7 +187,7 @@ export const addWorkspaceMember = createAsyncThunk(
   'workspaces/addMember',
   async ({ workspaceId, memberData }, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.addMember(workspaceId, memberData);
+      const response = await workspaceService.addMember(workspaceId, memberData);
       if (response.success && response.data) {
         return response.data.workspace || response.data;
       }
@@ -191,7 +203,7 @@ export const removeWorkspaceMember = createAsyncThunk(
   'workspaces/removeMember',
   async ({ workspaceId, memberId }, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.removeMember(workspaceId, memberId);
+      const response = await workspaceService.removeMember(workspaceId, memberId);
       if (response.success) {
         return { workspaceId, memberId };
       }
@@ -207,7 +219,7 @@ export const updateMemberRole = createAsyncThunk(
   'workspaces/updateMemberRole',
   async ({ workspaceId, memberId, roleData }, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.updateMemberRole(workspaceId, memberId, roleData);
+      const response = await workspaceService.updateMemberRole(workspaceId, memberId, roleData);
       if (response.success && response.data) {
         return response.data.workspace || response.data;
       }
@@ -223,7 +235,7 @@ export const leaveWorkspace = createAsyncThunk(
   'workspaces/leaveWorkspace',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.leaveWorkspace(workspaceId);
+      const response = await workspaceService.leaveWorkspace(workspaceId);
       if (response.success) {
         return workspaceId;
       }
@@ -239,7 +251,7 @@ export const fetchWorkspaceStats = createAsyncThunk(
   'workspaces/fetchStats',
   async (workspaceId, { rejectWithValue }) => {
     try {
-      const response = await workspaceApi.getWorkspaceStats(workspaceId);
+      const response = await workspaceService.getWorkspaceStats(workspaceId);
       if (response.success && response.data) {
         return response.data;
       }

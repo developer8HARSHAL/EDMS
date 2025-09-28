@@ -133,6 +133,14 @@ const ApplicationRoutes = () => {
           </ProtectedRoute>
         } 
       />
+      <Route 
+  path="/workspaces/:workspaceId/documents" 
+  element={
+    <ProtectedRoute>
+      <DocumentList />
+    </ProtectedRoute>
+  } 
+/>
       
       <Route 
         path="/documents/upload" 

@@ -61,12 +61,17 @@ const InvitationPage = () => {
   }, [token, fetchInvitationDetails]);
 
   // Handle authentication status and show login prompt
-  useEffect(() => {
-    if (invitationDetails && !isAuthenticated && !actionResult) {
-      console.log('👤 User not authenticated, showing login prompt');
-      setShowLoginPrompt(true);
+useEffect(() => {
+  if (invitationDetails && !isAuthenticated && !actionResult) {
+    // Check if invitation is already accepted
+    if (invitationDetails.alreadyAccepted || invitationDetails.status === 'accepted') {
+      setActionResult('accepted');
+      return;
     }
-  }, [invitationDetails, isAuthenticated, actionResult]);
+    console.log('User not authenticated, showing login prompt');
+    setShowLoginPrompt(true);
+  }
+}, [invitationDetails, isAuthenticated, actionResult]);
 
   // Auto-accept invitation logic
   const handleAutoAccept = useCallback(async () => {
@@ -96,51 +101,64 @@ const InvitationPage = () => {
   }, [isAuthenticated, invitationDetails, isAutoAccept, autoAcceptAttempted, handleAutoAccept]);
 
   // ✅ FIXED: Handle invitation acceptance - updated to use unwrapped result
-  const handleAcceptInvitation = async () => {
-    if (!isAuthenticated) {
-      console.log('❌ User not authenticated for accept action');
-      setShowLoginPrompt(true);
-      return;
-    }
+ const handleAcceptInvitation = async () => {
+  if (!isAuthenticated) {
+    console.log('User not authenticated for accept action');
+    setShowLoginPrompt(true);
+    return;
+  }
 
-    // Verify user email matches invitation
-    if (user?.email?.toLowerCase() !== invitationDetails?.email?.toLowerCase()) {
-      console.error('❌ Email mismatch:', {
-        userEmail: user?.email,
-        invitationEmail: invitationDetails?.email
-      });
-      setActionResult('error');
-      return;
-    }
+  // Verify user email matches invitation
+  if (user?.email?.toLowerCase() !== invitationDetails?.email?.toLowerCase()) {
+    console.error('Email mismatch:', {
+      userEmail: user?.email,
+      invitationEmail: invitationDetails?.email
+    });
+    setActionResult('error');
+    return;
+  }
 
-    setIsAccepting(true);
-    try {
-      console.log('🔨 Accepting invitation with token:', token);
-      
-      // ✅ FIXED: Use unwrapped result from Redux Toolkit
-      const result = await acceptInvitation(token).unwrap();
-      
-      console.log('✅ Invitation accepted successfully:', result);
+  setIsAccepting(true);
+  try {
+    console.log('Accepting invitation with token:', token);
+    
+    const result = await acceptInvitation(token).unwrap();
+    console.log('Invitation accepted successfully:', result);
+    
+    // ✅ FIXED: Handle already accepted/member responses
+    if (result.alreadyAccepted || result.alreadyMember) {
       setActionResult('accepted');
-
-      // Redirect to workspace after success message
-      setTimeout(() => {
-        const workspaceId = invitationDetails?.workspace?._id;
-        if (workspaceId) {
-          console.log('📄 Redirecting to workspace:', workspaceId);
-          navigate(`/workspaces/${workspaceId}`);
-        } else {
-          navigate('/dashboard');
-        }
-      }, 2000);
-      
-    } catch (error) {
-      console.error('❌ Accept invitation error:', error);
-      setActionResult('error');
-    } finally {
-      setIsAccepting(false);
+    } else {
+      setActionResult('accepted');
     }
-  };
+
+    // Redirect to workspace after success message
+    setTimeout(() => {
+      const workspaceId = result.data?.workspace?.id || invitationDetails?.workspace?._id;
+      if (workspaceId) {
+        console.log('Redirecting to workspace:', workspaceId);
+        navigate(`/workspaces/${workspaceId}`);
+      } else {
+        navigate('/dashboard');
+      }
+    }, 2000);
+    
+  } catch (error) {
+    console.error('Accept invitation error:', error);
+    
+    // ✅ FIXED: Handle specific error cases
+    if (error.data?.alreadyAccepted || error.data?.alreadyMember) {
+      setActionResult('accepted');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+    } else {
+      setActionResult('error');
+    }
+  } finally {
+    setIsAccepting(false);
+  }
+};
 
   // ✅ FIXED: Handle invitation rejection - updated to use unwrapped result
   const handleRejectInvitation = async () => {

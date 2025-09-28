@@ -567,7 +567,7 @@ builder
     state.loading = true;
     state.error = null;
   })
-.addCase(fetchDocuments.fulfilled, (state, action) => {
+  .addCase(fetchDocuments.fulfilled, (state, action) => {
   state.loading = false;
   
   // Handle the actual API response structure

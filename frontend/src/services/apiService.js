@@ -15,41 +15,6 @@ const api = axios.create({
 
 
 
-const mockWorkspaces = [
-  {
-    _id: '1',
-    name: 'Personal Workspace',
-    description: 'My personal documents',
-    members: [{ _id: 'user1', name: 'John Doe', role: 'owner' }],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    _id: '2', 
-    name: 'Team Project',
-    description: 'Collaborative workspace',
-    members: [
-      { _id: 'user1', name: 'John Doe', role: 'owner' },
-      { _id: 'user2', name: 'Jane Smith', role: 'member' }
-    ],
-    createdAt: new Date().toISOString(),
-  }
-];
-
-const mockInvitations = [
-  {
-    _id: 'inv1',
-    workspace: { name: 'Design Team' },
-    invitedBy: { name: 'Sarah Wilson' },
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  }
-];
-
-
-
-
-
-
 
 
 // ✅ FIXED: Improved interceptor setup with better error handling
@@ -227,6 +192,89 @@ getWorkspace: async (workspaceId) => {
 },
 
 
+  // ... your existing methods (getWorkspaces, getWorkspace, getWorkspaceById) ...
+
+  // ADD THESE MISSING METHODS:
+  createWorkspace: async (workspaceData) => {
+    try {
+      const response = await api.post('/workspaces', workspaceData);
+      return response.data;
+    } catch (error) {
+      console.error('Create workspace error:', error);
+      throw error;
+    }
+  },
+
+  updateWorkspace: async (workspaceId, updates) => {
+    try {
+      const response = await api.put(`/workspaces/${workspaceId}`, updates);
+      return response.data;
+    } catch (error) {
+      console.error('Update workspace error:', error);
+      throw error;
+    }
+  },
+
+  deleteWorkspace: async (workspaceId) => {
+    try {
+      const response = await api.delete(`/workspaces/${workspaceId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete workspace error:', error);
+      throw error;
+    }
+  },
+
+  addMember: async (workspaceId, memberData) => {
+    try {
+      const response = await api.post(`/workspaces/${workspaceId}/members`, memberData);
+      return response.data;
+    } catch (error) {
+      console.error('Add member error:', error);
+      throw error;
+    }
+  },
+
+  removeMember: async (workspaceId, memberId) => {
+    try {
+      const response = await api.delete(`/workspaces/${workspaceId}/members/${memberId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Remove member error:', error);
+      throw error;
+    }
+  },
+
+  updateMemberRole: async (workspaceId, memberId, roleData) => {
+    try {
+      const response = await api.put(`/workspaces/${workspaceId}/members/${memberId}`, roleData);
+      return response.data;
+    } catch (error) {
+      console.error('Update member role error:', error);
+      throw error;
+    }
+  },
+
+  leaveWorkspace: async (workspaceId) => {
+    try {
+      const response = await api.post(`/workspaces/${workspaceId}/leave`);
+      return response.data;
+    } catch (error) {
+      console.error('Leave workspace error:', error);
+      throw error;
+    }
+  },
+
+  getWorkspaceStats: async (workspaceId) => {
+    try {
+      const response = await api.get(`/workspaces/${workspaceId}/stats`);
+      return response.data;
+    } catch (error) {
+      console.error('Get workspace stats error:', error);
+      throw error;
+    }
+  },
+  
   // ✅ New - fetch single workspace by ID
   getWorkspaceById: async (id) => {
     try {
@@ -276,6 +324,8 @@ getWorkspace: async (workspaceId) => {
 
 
 
+
+
 // Add this to temporarily bypass other failing API calls
 export const mockApiCall = async (endpoint) => {
   console.log(`🔧 Mock API call to ${endpoint}`);
@@ -308,6 +358,16 @@ export const documentApi = {
       return response.data;
     } catch (error) {
       console.error('❌ Get documents error:', error);
+      throw error;
+    }
+  },
+
+   getDashboardData: async () => {
+    try {
+      const response = await api.get('/documents/dashboard-data');
+      return response.data;
+    } catch (error) {
+      console.error('⚠️ Get dashboard data error:', error);
       throw error;
     }
   },

@@ -56,7 +56,7 @@ const Dashboard = () => {
     getUserRole,
     getUserPermissions
   } = useWorkspaces();
-console.log("🔍 Dashboard Hook Check:", workspaces.length, workspaces);
+console.log("ðŸ” Dashboard Hook Check:", workspaces.length, workspaces);
 
   const { 
     pendingInvitations, 
@@ -83,105 +83,28 @@ console.log("🔍 Dashboard Hook Check:", workspaces.length, workspaces);
   const [activeTab, setActiveTab] = useState('overview'); // overview, workspaces, activity
   const [recentActivity, setRecentActivity] = useState([]);
 
-  // ✅ FIX: Create stable reference for fetchData function
-  const fetchData = useCallback(async () => {
+  // âœ… FIX: Create stable reference for fetchData function
+const fetchData = useCallback(async () => {
   setIsLoading(true);
-  setError(null);
-
   try {
-    console.log('Fetching dashboard data...');
+    console.log('-----Fetching dashboard data...');
+    const response = await documentApi.getDashboardData();
+    console.log('----API Response:', response);
+    console.log('-----Stats from API:', response.data.stats);
     
-    // Helper function to safely extract documents from API response
-    const extractDocumentsFromResponse = (response) => {
-      if (!response) {
-        console.warn('Received null/undefined response');
-        return [];
-      }
-      
-      if (Array.isArray(response)) return response;
-      if (response.data) {
-        if (Array.isArray(response.data)) return response.data;
-        if (response.data.documents && Array.isArray(response.data.documents)) {
-          return response.data.documents;
-        }
-      }
-      if (response.documents && Array.isArray(response.documents)) {
-        return response.documents;
-      }
-      if (response.success && response.data && Array.isArray(response.data)) {
-        return response.data;
-      }
-      
-      console.warn('Could not extract documents from response, returning empty array');
-      return [];
-    };
-
-    // Fetch documents
-    let allDocs = [];
-    let sharedDocs = [];
-    
-    const allDocsResponse = await documentApi.getDocuments();
-    console.log('All documents API response:', allDocsResponse);
-    allDocs = extractDocumentsFromResponse(allDocsResponse);
-    
-    const sharedDocsResponse = await documentApi.getSharedDocuments();
-    console.log('Shared documents API response:', sharedDocsResponse);
-    sharedDocs = extractDocumentsFromResponse(sharedDocsResponse);
-    
-    // ✅ FIX: Only fetch if needed and don't add to dependencies
-    try {
-      if (fetchWorkspaces && workspaces.length === 0) {
-        await fetchWorkspaces(); 
-      }
-    } catch (wsError) {
-      console.warn('Workspace fetch failed:', wsError);
-    }
-    
-    try {
-      if (fetchPendingInvitations) {
-        await fetchPendingInvitations();
-      }
-    } catch (invError) {
-      console.warn('Invitations fetch failed:', invError);
-    }
-    
-    // Calculate stats
-    const thisMonth = new Date().getMonth();
-    const thisYear = new Date().getFullYear();
-    
-    const uploadsThisMonth = allDocs.filter(doc => {
-      if (!doc) return false;
-      const docDate = new Date(doc.uploadDate || doc.createdAt || Date.now());
-      return docDate.getMonth() === thisMonth && 
-             docDate.getFullYear() === thisYear;
-    });
-    
-    setStats({
-      totalDocs: allDocs.length.toString(),
-      uploads: uploadsThisMonth.length.toString(),
-      shared: sharedDocs.length.toString(),
+    const newStats = {
+      totalDocs: response.data.stats.totalDocs.toString(),
+      uploads: response.data.stats.thisMonth.toString(),
+      shared: '0',
       workspaces: workspaces.length.toString()
-    });
+    };
     
-    // Get recent documents
-    const recentDocs = [...allDocs]
-      .filter(doc => doc)
-      .sort((a, b) => {
-        const dateA = new Date(a.uploadDate || a.createdAt || 0);
-        const dateB = new Date(b.uploadDate || b.createdAt || 0);
-        return dateB - dateA;
-      })
-      .slice(0, 5);
-    
-    setDocuments(recentDocs);
-    
-    // Generate recent activity
-    setRecentActivity(generateRecentActivity(allDocs, workspaces));
-    
+    console.log('-----Setting stats to:', newStats);
+    setDocuments(response.data.recentDocuments);
+    setStats(newStats);
   } catch (err) {
-    console.error("Error fetching dashboard data:", err);
-    setError("Failed to load dashboard data. Please try again later.");
-    setDocuments([]);
+    console.error('-----Dashboard fetch error:', err);
+    setError("Failed to load dashboard data");
   } finally {
     setIsLoading(false);
   }
@@ -256,13 +179,13 @@ console.log("🔍 Dashboard Hook Check:", workspaces.length, workspaces);
     console.log('=== END AUTH DEBUG ===');
   }, [isAuthenticated, user, tokenValidated]);
 
-  // ✅ FIX: Use the stable fetchData function with proper dependencies
+  // âœ… FIX: Use the stable fetchData function with proper dependencies
   useEffect(() => {
     // Only fetch if authenticated and token is validated
     if (isAuthenticated && tokenValidated) {
       fetchData();
     }
-  }, [isAuthenticated, tokenValidated, fetchData]); // ✅ fetchData is now stable
+  }, [isAuthenticated, tokenValidated, fetchData]); // âœ… fetchData is now stable
 
   // Update stats when workspaces change
   useEffect(() => {
@@ -270,29 +193,10 @@ console.log("🔍 Dashboard Hook Check:", workspaces.length, workspaces);
       ...prev,
       workspaces: workspaces.length.toString()
     }));
-  }, [workspaces.length]); // ✅ Only depend on length, not the entire array
+  }, [workspaces.length]); // âœ… Only depend on length, not the entire array
 
 
-const [workspaceList, setWorkspaceList] = useState([]);
-const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const fetchWorkspaces = async () => {
-    try {
-      const res = await workspaceService.getWorkspaces();
-      
-      console.log("API raw response:", res);
-      console.log("Parsed workspaces:", res.data?.data?.workspaces);
-      
-      // ✅ Set state once, safely
-      setWorkspaceList(res.data?.data?.workspaces);
-    } catch (err) {
-      console.error("❌ Failed to fetch workspaces", err);
-    }
-  };
-
-  fetchWorkspaces();
-}, []);
 
 
 
@@ -309,7 +213,7 @@ console.log('Available methods:', Object.keys(apiService));
     )
   }, [workspaces, workspaceSearch]);
 
-  // ✅ FIX: Stable generate recent activity function
+  // âœ… FIX: Stable generate recent activity function
   const generateRecentActivity = useCallback((docs, workspaces) => {
     const activities = [];
     
@@ -336,7 +240,7 @@ console.log('Available methods:', Object.keys(apiService));
     });
     
     return activities.sort((a, b) => b.time - a.time).slice(0, 5);
-  }, []); // ✅ No dependencies needed
+  }, []); // âœ… No dependencies needed
 
   const handleDownload = async (docId, docName) => {
     try {
@@ -364,7 +268,7 @@ console.log('Available methods:', Object.keys(apiService));
   const handleAcceptInvitation = async (invitationId) => {
     try {
       await acceptInvitation(invitationId);
-      await fetchWorkspaces(); // ✅ This is fine since it's user-triggered
+      await fetchWorkspaces(); // âœ… This is fine since it's user-triggered
     } catch (err) {
       console.error("Error accepting invitation:", err);
     }
@@ -375,10 +279,10 @@ console.log('Available methods:', Object.keys(apiService));
 
   const handleCreateWorkspace = async (workspaceData) => {
     try {
-      console.log('🏢 Creating workspace:', workspaceData);
+      console.log('ðŸ¢ Creating workspace:', workspaceData);
       
       // Check auth state before creating workspace
-      console.log('🔍 Auth check before workspace creation:', {
+      console.log('ðŸ” Auth check before workspace creation:', {
         isAuthenticated,
         hasToken: !!localStorage.getItem('authToken'),
         hasAxiosHeader: !!axios.defaults.headers.common['Authorization'],
@@ -387,15 +291,15 @@ console.log('Available methods:', Object.keys(apiService));
       
       await createWorkspace(workspaceData);
       setShowCreateModal(false);
-      console.log('✅ Workspace created successfully');
+      console.log('âœ… Workspace created successfully');
     } catch (error) {
-      console.error('❌ Failed to create workspace:', error);
+      console.error('âŒ Failed to create workspace:', error);
       
       // Check if it's an auth error
       if (error.response?.status === 401) {
-        console.error('❌ 401 Unauthorized - Token issue detected');
-        console.log('🔍 Current token:', localStorage.getItem('authToken'));
-        console.log('🔍 Current axios header:', axios.defaults.headers.common['Authorization']);
+        console.error('âŒ 401 Unauthorized - Token issue detected');
+        console.log('ðŸ” Current token:', localStorage.getItem('authToken'));
+        console.log('ðŸ” Current axios header:', axios.defaults.headers.common['Authorization']);
       }
       
       throw error;
@@ -414,6 +318,9 @@ console.log('Available methods:', Object.keys(apiService));
       <Icon className="h-5 w-5" />
       <span>{label}</span>
     </button>
+
+
+
   );
 
   return (
@@ -430,10 +337,12 @@ console.log('Available methods:', Object.keys(apiService));
                 Here's what's happening in your workspaces today
               </p>
             </div>
+
+            
             
             <div className="flex space-x-3">
               <Button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => setShowCreateModal(true)}workspaceList
                 leftIcon={<PlusIcon className="h-4 w-4" />}
               >
                 New Workspace
@@ -745,8 +654,8 @@ console.log('Available methods:', Object.keys(apiService));
 {workspaces.length > 6 && !workspaceSearch && (
   <div className="text-center">
     <Button
-      as={RouterLink}    // ✅ Here
-      to="/workspaces"   // ✅ Add /workspaces
+      as={RouterLink}    // âœ… Here
+      to="/workspaces"   // âœ… Add /workspaces
       variant="outline"
     >
       View All Workspaces ({workspaces.length})
@@ -823,8 +732,8 @@ console.log('Available methods:', Object.keys(apiService));
                       Upload New Document
                     </Button>
                     <Button
-  as={RouterLink}      // ✅ Here
-  to="/workspaces"      // ✅ Add /workspaces
+  as={RouterLink}      // âœ… Here
+  to="/workspaces"      // âœ… Add /workspaces
   variant="outline"
   className="w-full justify-start"
   leftIcon={<BuildingOfficeIcon className="h-4 w-4" />}
@@ -884,7 +793,7 @@ console.log('Available methods:', Object.keys(apiService));
         </div>
       </div>
 
-      {/* ✅ FIXED: Create Workspace Modal with correct props */}
+      {/* âœ… FIXED: Create Workspace Modal with correct props */}
       <CreateWorkspaceModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}

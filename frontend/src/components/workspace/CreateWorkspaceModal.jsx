@@ -80,33 +80,59 @@ const CreateWorkspaceModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+ // Handle form submission - CORRECTED VERSION
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!validateForm()) {
+    return;
+  }
 
-    try {
-      const workspaceData = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
+  try {
+    // ✅ FIX: Format data to match backend expectations exactly
+    const workspaceData = {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      settings: {
         isPublic: formData.isPublic
-      };
-
-      await onCreateWorkspace(workspaceData);
-      onClose();
-    } catch (error) {
-      console.error('Failed to create workspace:', error);
-      // Handle server errors
-      if (error.response?.data?.message) {
-        setErrors({ submit: error.response.data.message });
-      } else {
-        setErrors({ submit: 'Failed to create workspace. Please try again.' });
       }
+    };
+
+    console.log('🔄 Sending workspace data:', workspaceData);
+    
+    // Pass the workspace data to the parent component
+    await onCreateWorkspace(workspaceData);
+    
+    console.log('✅ Workspace created successfully');
+    
+    // Reset form and close modal
+    setFormData({
+      name: '',
+      description: '',
+      isPublic: false
+    });
+    setErrors({});
+    onClose();
+    
+  } catch (error) {
+    console.error('❌ Failed to create workspace:', error);
+    
+    // Handle different error formats more robustly
+    let errorMessage = 'Failed to create workspace. Please try again.';
+    
+    if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error?.message) {
+      errorMessage = error.message;
+    } else if (error?.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error?.response?.data) {
+      errorMessage = error.response.data;
     }
-  };
+    
+    setErrors({ submit: errorMessage });
+  }
+};
 
   // Handle modal backdrop click
   const handleBackdropClick = (e) => {

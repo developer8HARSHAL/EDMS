@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Home, FileText, Users, Settings, Plus, Search, Filter,
@@ -23,17 +23,63 @@ const WorkspaceSidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [expandedSections, setExpandedSections] = useState(['documents', 'categories']);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const { workspace, isLoading } = useWorkspaces();
-  const { documents, categories, recentDocuments } = useDocuments();
+  // Get current user from Redux store
+  const currentUser = useSelector(state => state.auth.user);
+  
+  // Get workspace data
+  const { workspace, isLoading } = useWorkspaces(workspaceId);
+  const { documents, categories, recentDocuments } = useDocuments(workspaceId);
+  
+  // Get permissions - assuming usePermissions hook exists and works correctly
   const { userRole, isAdmin, isEditor, canPerformAction } = usePermissions(workspaceId);
   
+  // Get current workspace from Redux store
   const currentWorkspace = useSelector(state => 
     state.workspaces.workspaces.find(w => w._id === workspaceId)
-  );
+  ) || workspace;
+
+  // Helper function to get user role (if not available from usePermissions)
+  const getUserRole = (workspace) => {
+    if (!workspace || !currentUser) return 'viewer';
+    
+    // Check if current user is the owner
+    const ownerId = workspace.owner?._id || workspace.owner;
+    if (ownerId === currentUser._id || ownerId === currentUser.id) {
+      return 'owner';
+    }
+    
+    // Find user in members array
+    const member = workspace.members?.find(m => {
+      const memberId = m.user?._id || m.user?.id || m.user;
+      const currentUserId = currentUser._id || currentUser.id;
+      return memberId === currentUserId;
+    });
+    
+    return member?.role || 'viewer';
+  };
+
+  // Get actual user role if not provided by usePermissions
+  const actualUserRole = userRole || getUserRole(currentWorkspace);
+  const actualIsAdmin = isAdmin !== undefined ? isAdmin : ['admin', 'owner'].includes(actualUserRole);
+  const actualIsEditor = isEditor !== undefined ? isEditor : ['admin', 'owner', 'editor'].includes(actualUserRole);
+
+  // Permission checker function
+  const actualCanPerformAction = canPerformAction || ((action) => {
+    const rolePermissions = {
+      owner: ['read', 'write', 'delete', 'admin', 'invite'],
+      admin: ['read', 'write', 'delete', 'admin', 'invite'],
+      editor: ['read', 'write'],
+      viewer: ['read']
+    };
+    
+    const userPermissions = rolePermissions[actualUserRole] || ['read'];
+    return userPermissions.includes(action);
+  });
 
   // Navigation items configuration
   const navigationItems = [
@@ -127,11 +173,11 @@ const WorkspaceSidebar = ({
     }
   ];
 
-  // Categories
+  // Categories - provide fallback if not available from hook
   const documentCategories = categories || [
-    { id: 'documents', name: 'Documents', count: 15, icon: FileText },
-    { id: 'images', name: 'Images', count: 8, icon: FileText },
-    { id: 'spreadsheets', name: 'Spreadsheets', count: 5, icon: FileText }
+    { id: 'documents', name: 'Documents', count: documents?.filter(d => d.type === 'document')?.length || 0, icon: FileText },
+    { id: 'images', name: 'Images', count: documents?.filter(d => d.type === 'image')?.length || 0, icon: FileText },
+    { id: 'spreadsheets', name: 'Spreadsheets', count: documents?.filter(d => d.type === 'spreadsheet')?.length || 0, icon: FileText }
   ];
 
   // Set active section based on current path
@@ -156,13 +202,32 @@ const WorkspaceSidebar = ({
   // Check if user has required permissions
   const hasPermission = (item) => {
     if (item.requiredRole) {
-      if (item.requiredRole === 'admin') return isAdmin;
-      if (item.requiredRole === 'editor') return isEditor;
+      if (item.requiredRole === 'admin') return actualIsAdmin;
+      if (item.requiredRole === 'editor') return actualIsEditor;
+      if (item.requiredRole === 'owner') return actualUserRole === 'owner';
     }
     if (item.requiredPermission) {
-      return canPerformAction(item.requiredPermission);
+      return actualCanPerformAction(item.requiredPermission);
     }
     return true;
+  };
+
+  // Enhanced Badge component that handles role prop
+  const RoleBadge = ({ role, size = "xs", ...props }) => {
+    const roleConfig = {
+      owner: { variant: 'yellow', text: 'Owner' },
+      admin: { variant: 'blue', text: 'Admin' },
+      editor: { variant: 'green', text: 'Editor' },
+      viewer: { variant: 'gray', text: 'Viewer' }
+    };
+
+    const config = roleConfig[role] || roleConfig.viewer;
+    
+    return (
+      <Badge variant={config.variant} size={size} {...props}>
+        {config.text}
+      </Badge>
+    );
   };
 
   // Render navigation item
@@ -312,7 +377,7 @@ const WorkspaceSidebar = ({
                     {currentWorkspace.name}
                   </h2>
                   <div className="flex items-center space-x-2 mt-1">
-                    <Badge role={userRole} size="xs" />
+                    <RoleBadge role={actualUserRole} size="xs" />
                     <span className="text-xs text-gray-500">
                       {currentWorkspace.members?.length || 0} members
                     </span>
@@ -408,7 +473,7 @@ const WorkspaceSidebar = ({
                 <div className="min-w-0 flex-1 text-left">
                   <p className="truncate font-medium">{doc.name}</p>
                   <p className="text-xs text-gray-500 truncate">
-                    {new Date(doc.lastModified).toLocaleDateString()}
+                    {new Date(doc.lastModified || doc.updatedAt || doc.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </button>
