@@ -61,23 +61,30 @@ exports.uploadDocument = async (req, res) => {
     });
 
     // Create document record in database
-    const document = await Document.create({
+  const document = await Document.create({
       name: req.body.name || file.name,
       originalName: file.name,
-      path: fileId.toString(), // Store the GridFS file ID as the path
+      path: fileId.toString(),
       size: file.size,
       type: file.mimetype,
       owner: req.user.id,
       uploadedBy: req.user.id,
-      workspace: req.body.workspaceId, // Add workspace if provided
-      // Add the owner to the permissions array with write access
-      permissions: [
-        {
-          user: req.user.id,
-          access: 'write'
-        }
-      ]
+      workspace: req.body.workspaceId, // Make sure this is being passed
+      description: req.body.description,
+      tags: req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [],
+      // For workspace documents, don't add individual permissions
+      permissions: req.body.workspaceId ? [] : [{
+        user: req.user.id,
+        access: 'write'
+      }]
     });
+
+    // Populate the response
+    await document.populate([
+      { path: 'owner', select: 'name email' },
+      { path: 'workspace', select: 'name' },
+      { path: 'uploadedBy', select: 'name email' }
+    ]);
 
     res.status(201).json({
       success: true,
@@ -98,18 +105,67 @@ exports.uploadDocument = async (req, res) => {
 // @access  Private
 exports.getDocuments = async (req, res) => {
   try {
-    // Find documents user has access to (either owner or in permissions)
-    const documents = await Document.find({
-      $or: [
-        { owner: req.user.id },
-        { 'permissions.user': req.user.id }
-      ]
-    }).select('-__v');
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required - no user found'
+      });
+    }
+
+    // ✅ PERFORMANCE FIX: Parallel queries instead of sequential
+    const [userWorkspaces, documents] = await Promise.all([
+      // Get user workspaces with minimal fields
+      Workspace.find({
+        $or: [
+          { owner: req.user.id },
+          { 'members.user': req.user.id }
+        ]
+      }).select('_id').lean(), // ✅ Use lean() for better performance
+
+      // Get documents with optimized query
+      Document.find({
+        $or: [
+          { owner: req.user.id },
+          { 'permissions.user': req.user.id }
+        ]
+      })
+      .populate('owner', 'name email')
+      .populate('workspace', 'name')
+      .select('-__v -permissions') // ✅ Exclude heavy fields
+      .lean() // ✅ Return plain objects for faster processing
+      .sort({ uploadDate: -1 }) // ✅ Use indexed field
+      .limit(50) // ✅ Limit results for dashboard
+    ]);
+
+    const workspaceIds = userWorkspaces.map(ws => ws._id);
+
+    // ✅ Get workspace documents separately to avoid $in query overhead
+    const workspaceDocuments = await Document.find({
+      workspace: { $in: workspaceIds },
+      owner: { $ne: req.user.id } // Exclude own documents (already fetched)
+    })
+    .populate('owner', 'name email')
+    .populate('workspace', 'name')
+    .select('-__v -permissions')
+    .lean()
+    .sort({ uploadDate: -1 })
+    .limit(50);
+
+    // ✅ Combine and deduplicate results
+    const allDocuments = [
+      ...documents,
+      ...workspaceDocuments.filter(doc => 
+        !documents.some(existingDoc => existingDoc._id.toString() === doc._id.toString())
+      )
+    ];
+
+    // ✅ Sort final results
+    allDocuments.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
 
     res.status(200).json({
       success: true,
-      count: documents.length,
-      data: documents
+      count: allDocuments.length,
+      data: allDocuments
     });
   } catch (error) {
     console.error('Error getting documents:', error);
@@ -121,31 +177,70 @@ exports.getDocuments = async (req, res) => {
   }
 };
 
+
 // @desc    Get workspace documents
 // @route   GET /api/documents/workspace/:workspaceId
 // @access  Private
 exports.getWorkspaceDocuments = async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    
-    // Find documents in the specific workspace
-    const documents = await Document.find({
-      workspace: workspaceId,
-      $or: [
-        { owner: req.user.id },
-        { 'permissions.user': req.user.id }
-      ]
-    })
-    .populate('owner', 'name email')
-    .populate('uploadedBy', 'name email')
-    .select('-__v')
-    .sort({ createdAt: -1 });
+
+    // Verify user has access to this workspace
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found'
+      });
+    }
+
+    // Check if user is owner or member
+    const isOwner = workspace.owner.toString() === req.user.id;
+    const isMember = workspace.members.some(
+      member => member.user.toString() === req.user.id
+    );
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this workspace'
+      });
+    }
+
+    // Get ALL documents in the workspace
+    const documents = await Document.find({ workspace: workspaceId })
+      .populate('owner', 'name email')
+      .populate('uploadedBy', 'name email')
+      .select('-__v')
+      .sort({ createdAt: -1 });
+
+    // Attach current user's permission per document
+    const documentsWithPermissions = documents.map(doc => {
+      let userPermission = { access: 'none' };
+
+      // Owner of document can write
+      if (doc.owner._id.toString() === req.user.id) {
+        userPermission.access = 'write';
+      } else {
+        // Check explicit permissions
+        const perm = doc.permissions.find(
+          p => p.user.toString() === req.user.id
+        );
+        if (perm) userPermission.access = perm.access; // 'read' or 'write'
+      }
+
+      return {
+        ...doc.toObject(),
+        userPermission,
+      };
+    });
 
     res.status(200).json({
       success: true,
-      count: documents.length,
-      data: documents
+      count: documentsWithPermissions.length,
+      data: documentsWithPermissions
     });
+
   } catch (error) {
     console.error('Error getting workspace documents:', error);
     res.status(500).json({
@@ -155,6 +250,122 @@ exports.getWorkspaceDocuments = async (req, res) => {
     });
   }
 };
+console.log("✅ documentController.js loaded");
+
+exports.getDashboardData = async (req, res) => {
+  try {
+    console.log("✅ getDashboardData called");
+    console.log("🔍 DEBUG: User ID:", req.user?.id);
+
+    // Get user workspaces
+    const userWorkspaces = await Workspace.find({
+      $or: [
+        { owner: req.user.id },
+        { "members.user": req.user.id }
+      ]
+    }).select("_id name").lean();
+
+    console.log("--------DEBUG: User workspaces:", userWorkspaces);
+
+    const workspaceIds = userWorkspaces.map(ws => ws._id);
+    console.log("🔍 DEBUG: Workspace IDs:", workspaceIds);
+
+    // Step 1: Owned documents
+    const ownedDocs = await Document.find({ owner: req.user.id })
+      .select("name workspace")
+      .lean();
+    console.log("🔍 DEBUG: Owned documents:", ownedDocs);
+
+    // Step 2: Shared documents
+    const sharedDocs = await Document.find({ "permissions.user": req.user.id })
+      .select("name workspace")
+      .lean();
+    console.log("🔍 DEBUG: Shared documents:", sharedDocs);
+
+    // Step 3: Workspace documents
+    const workspaceDocs = await Document.find({ workspace: { $in: workspaceIds } })
+      .select("name workspace owner")
+      .lean();
+    console.log("🔍 DEBUG: All workspace documents:", workspaceDocs);
+
+    // Step 4: All accessible documents
+    const allAccessibleDocs = await Document.find({
+      $or: [
+        { owner: req.user.id },
+        { "permissions.user": req.user.id },
+        { workspace: { $in: workspaceIds } }
+      ]
+    }).select("name workspace owner").lean();
+
+    console.log("🔍 DEBUG: All accessible documents:", allAccessibleDocs);
+
+    // Step 5: Recent docs + stats
+    const [recentDocs, stats] = await Promise.all([
+      Document.find({
+        $or: [
+          { owner: req.user.id },
+          { "permissions.user": req.user.id },
+          { workspace: { $in: workspaceIds } }
+        ]
+      })
+        .select("name type uploadDate size workspace")
+        .populate("workspace", "name")
+        .sort({ uploadDate: -1 })
+        .limit(10)
+        .lean(),
+
+      Document.aggregate([
+        {
+          $match: {
+            $or: [
+              { owner: new mongoose.Types.ObjectId(req.user.id) }, // ✅ FIXED with "new"
+              { "permissions.user": new mongoose.Types.ObjectId(req.user.id) },
+              { workspace: { $in: workspaceIds } }
+            ]
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalDocs: { $sum: 1 },
+            totalSize: { $sum: "$size" },
+            thisMonth: {
+              $sum: {
+                $cond: [
+                  { $gte: ["$uploadDate", new Date(new Date().getFullYear(), new Date().getMonth(), 1)] },
+                  1, 0
+                ]
+              }
+            }
+          }
+        }
+      ])
+    ]);
+
+    console.log("🔍 DEBUG: Aggregation result:", stats);
+    console.log("🔍 DEBUG: Recent docs count:", recentDocs.length);
+
+    // ✅ Final response (prevents hanging request)
+    console.log("✅ Sending dashboard data response");
+    res.status(200).json({
+      success: true,
+      data: {
+        ownedDocuments: ownedDocs,
+        sharedDocuments: sharedDocs,
+        workspaceDocuments: workspaceDocs,
+        allAccessibleDocuments: allAccessibleDocs,
+        recentDocuments: recentDocs,
+        stats: stats[0] || { totalDocs: 0, totalSize: 0, thisMonth: 0 }
+      }
+    });
+  } catch (error) {
+    console.error("❌ Dashboard data error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+
 
 // @desc    Get document statistics for workspace
 // @route   GET /api/documents/workspace/:workspaceId/stats

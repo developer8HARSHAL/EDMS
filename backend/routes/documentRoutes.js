@@ -15,6 +15,7 @@ const {
   duplicateDocument,
   getDocumentVersions,
   bulkDeleteDocuments,
+  getDashboardData,
   exportDocuments
 } = require('../controllers/documentController');
 
@@ -23,6 +24,9 @@ const {
 // General document routes (all user's documents across workspaces)
 router.get('/', protect, getDocuments);
 router.post('/', protect, uploadDocument);
+
+// FIXED: Dashboard route - place before /:id routes
+router.get('/dashboard-data', protect, getDashboardData);
 
 // Workspace-specific document routes
 router.get('/workspace/:workspaceId', protect, getWorkspaceDocuments);
@@ -40,8 +44,8 @@ router.get('/:id/preview', protect, previewDocument);
 router.post('/:id/share', protect, shareDocument);
 
 // Advanced document operations
-router.post('/:id/move', protect, moveDocument);          // Move document to different workspace
-router.post('/:id/duplicate', protect, duplicateDocument); // Duplicate document
-router.get('/:id/versions', protect, getDocumentVersions); // Get document version history
+router.post('/:id/move', protect, moveDocument);
+router.post('/:id/duplicate', protect, duplicateDocument);
+router.get('/:id/versions', protect, getDocumentVersions);
 
 module.exports = router;

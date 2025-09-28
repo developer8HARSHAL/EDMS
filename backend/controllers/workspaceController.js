@@ -60,6 +60,15 @@ const createWorkspace = async (req, res) => {
 // @access  Private
 const getWorkspaces = async (req, res) => {
   try {
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required - no user found'
+      });
+    }
+
+
     const userId = req.user.id;
     const { page = 1, limit = 10, search, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
 
@@ -156,17 +165,28 @@ const getWorkspace = async (req, res) => {
     await workspace.populate('members.user', 'name email');
 
     const workspaceObj = workspace.toObject();
-    workspaceObj.userRole = workspace.getUserRole(userId);
-    workspaceObj.userPermissions = workspace.getUserPermissions(userId);
+    
+    // ✅ FIXED: Add the same owner check logic as in getWorkspaces
+    if (workspace.owner._id.toString() === userId.toString()) {
+      workspaceObj.userRole = 'owner';
+      workspaceObj.userPermissions = {
+        canView: true,
+        canEdit: true,
+        canAdd: true,
+        canDelete: true,
+        canInvite: true
+      };
+    } else {
+      workspaceObj.userRole = workspace.getUserRole(userId);
+      workspaceObj.userPermissions = workspace.getUserPermissions(userId);
+    }
 
-    // ✅ Wrap workspace to match frontend expectations
     res.status(200).json({
       success: true,
       data: {
         workspace: workspaceObj
       }
     });
-
   } catch (error) {
     console.error('Get workspace error:', error);
     res.status(500).json({

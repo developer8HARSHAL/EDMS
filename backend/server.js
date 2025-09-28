@@ -6,7 +6,7 @@ const path = require('path');
 const fileUpload = require('express-fileupload');
 const mongoose = require('mongoose'); // ✅ ADDED: Missing import for health check
 const connectDB = require('./config/db'); // Import the DB connection function
-
+const morgan = require('morgan');
 // Import routes
 const userRoutes = require('./routes/userRoutes');
 const documentRoutes = require('./routes/documentRoutes');
@@ -19,6 +19,7 @@ console.log("EMAIL_PASS exists?", !!process.env.EMAIL_PASS);
 
 // Initialize express app
 const app = express();
+app.use(morgan('dev')); // logs method, URL, status, response time
 
 // Enhanced CORS configuration for production
 const allowedOrigins = process.env.NODE_ENV === 'production' 

@@ -2,10 +2,10 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 
 // Protect routes
+// REPLACE the protect function with this enhanced version:
 exports.protect = async (req, res, next) => {
   let token;
 
-  // Get token from Authorization header
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
@@ -13,11 +13,13 @@ exports.protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   }
 
-  // Check if token exists
   if (!token) {
+    // REMOVE or comment out this line to reduce log noise:
+    // console.log('No token provided in request');
+    
     return res.status(401).json({
       success: false,
-      message: 'Not authorized to access this route'
+      message: 'Not authorized to access this route - no token provided'
     });
   }
 
@@ -26,13 +28,24 @@ exports.protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Get user from the token
-    req.user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id);
+    
+    // ADD THIS NULL CHECK
+    if (!user) {
+      console.log('No user found with provided token');
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized - user not found'
+      });
+    }
 
+    req.user = user;
     next();
   } catch (err) {
+    console.log('Token verification failed:', err.message);
     return res.status(401).json({
       success: false,
-      message: 'Not authorized to access this route'
+      message: 'Not authorized - token invalid'
     });
   }
 };

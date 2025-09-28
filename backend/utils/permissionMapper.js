@@ -47,15 +47,13 @@ const mapBackendToFrontend = (backendPermissions) => {
   if (!backendPermissions || typeof backendPermissions !== 'object') {
     return null;
   }
-
-  const permissionMap = {
-    canView: 'read',
-    canEdit: 'write',
-    canAdd: 'manage',
-    canDelete: 'delete',
-    canInvite: 'invite'
-  };
-
+const permissionMap = {
+  'read': 'canView',
+  'write': 'canEdit',
+  'delete': 'canDelete',
+  'manage': 'canAdd',
+  'invite': 'canInvite'
+};
   const frontendPermissions = {};
 
   // Map each backend permission to frontend equivalent
@@ -78,7 +76,7 @@ const getDefaultPermissionsForRole = (role) => {
       canAdd: true,
       canDelete: true,
       canInvite: true,
-      canManage: true // Special permission for owners
+      canManage: true
     },
     admin: {
       canView: true,
@@ -102,7 +100,6 @@ const getDefaultPermissionsForRole = (role) => {
       canInvite: false
     }
   };
-
   return rolePermissions[role] || rolePermissions.viewer;
 };
 

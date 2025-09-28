@@ -506,105 +506,152 @@ const getPendingInvitations = async (req, res) => {
 const acceptInvitation = async (req, res) => {
   try {
     const { token } = req.params;
+    console.log("-----[ACCEPT] Received token:", token);
 
     const invitation = await WorkspaceInvitation.findOne({ token })
       .populate('workspace')
       .populate('inviter', 'name email');
 
+    console.log("-----ACCEPT] Invitation found in DB:", invitation ? "YES" : "NO");
+
     if (!invitation) {
+      console.log("-----ACCEPT] No invitation with this token");
       return res.status(404).json({
         success: false,
         message: 'Invitation not found or invalid'
       });
     }
 
+    console.log("---ACCEPT] Invitation details:", {
+      id: invitation._id,
+      email: invitation.inviteeEmail,
+      status: invitation.status,
+      expiresAt: invitation.expiresAt
+    });
+
+    // ✅ Already accepted
+    if (invitation.status === 'accepted') {
+      console.log("-------ACCEPT] Invitation already accepted");
+      return res.status(200).json({
+        success: true,
+        message: `You are already a member of ${invitation.workspace.name}`,
+        alreadyAccepted: true
+      });
+    }
+
+    // ✅ Expired
     if (!invitation.isValid()) {
+      console.log("-----ACCEPT] Invitation expired at:", invitation.expiresAt);
       await WorkspaceInvitation.updateOne(
         { _id: invitation._id },
         { status: 'expired' }
       );
-      
       return res.status(400).json({
         success: false,
         message: 'Invitation has expired'
       });
     }
 
+    // ✅ Get or validate user
     let userId;
     if (req.user) {
-      userId = req.user.id;
-      
-      if (req.user.email.toLowerCase() !== invitation.inviteeEmail) {
+      console.log("-----ACCEPT] Authenticated user:", req.user.email);
+
+      if (req.user.email.toLowerCase() !== invitation.inviteeEmail.toLowerCase()) {
+        console.log("-------ACCEPT] Email mismatch:", {
+          expected: invitation.inviteeEmail,
+          got: req.user.email
+        });
         return res.status(403).json({
           success: false,
           message: 'This invitation is not for your email address'
         });
       }
+      userId = req.user.id;
     } else {
+      console.log("------ACCEPT] No authenticated user, looking up invitee...");
       const user = await User.findOne({ email: invitation.inviteeEmail });
       if (!user) {
+        console.log("-----ACCEPT] Invitee user not registered:", invitation.inviteeEmail);
         return res.status(404).json({
           success: false,
-          message: 'User account not found. Please register first.',
-          requiresRegistration: true,
-          inviteeEmail: invitation.inviteeEmail,
-          workspaceName: invitation.workspace.name
+          message: 'User not found, please register first',
+          requiresRegistration: true
         });
       }
+      console.log("----ACCEPT] Found invitee user:", user.email);
       userId = user._id;
     }
 
     const workspace = await Workspace.findById(invitation.workspace._id);
-    if (workspace.isMember(userId)) {
-      await invitation.accept();
-      return res.status(400).json({
-        success: false,
-        message: 'You are already a member of this workspace'
+    console.log("------ACCEPT] Workspace loaded:", workspace ? workspace.name : "NOT FOUND");
+
+    // ✅ Prevent duplicate member
+    const alreadyMember = workspace.members.some(m => m.user.toString() === userId.toString());
+    console.log("-----ACCEPT] Is already a member?", alreadyMember);
+
+    if (alreadyMember) {
+      if (invitation.status === 'pending') {
+        await invitation.accept();
+      }
+      console.log("------ACCEPT] User already member of workspace");
+      return res.status(200).json({
+        success: true,
+        message: `You are already a member of ${workspace.name}`,
+        alreadyMember: true
       });
     }
 
+    // Add member safely
+    console.log("-----ACCEPT] Adding user to workspace members...");
     workspace.members.push({
       user: userId,
       role: invitation.role,
       permissions: invitation.permissions,
       joinedAt: new Date()
     });
-
     await workspace.save();
-    await invitation.accept();
-    await workspace.populate('members.user', 'name email');
 
+    console.log("-----ACCEPT] Member added to workspace");
+
+    await invitation.accept();
+    console.log("-----ACCEPT] Invitation status updated to accepted");
+
+    // ✅ Prevent duplicate workspace in user
     const user = await User.findById(userId);
-    user.workspaces.push({
-      workspace: workspace._id,
-      role: invitation.role,
-      joinedAt: new Date()
-    });
-    await user.save();
+    const alreadyInUser = user.workspaces.some(ws => ws.workspace.toString() === workspace._id.toString());
+    console.log("-----ACCEPT] Workspace already in user profile?", alreadyInUser);
+
+    if (!alreadyInUser) {
+      user.workspaces.push({
+        workspace: workspace._id,
+        role: invitation.role,
+        joinedAt: new Date()
+      });
+      await user.save();
+      console.log("-----ACCEPT] Workspace added to user profile");
+    }
 
     res.status(200).json({
       success: true,
       message: `Successfully joined ${workspace.name}`,
-      data: {
-        workspace: {
-          id: workspace._id,
-          name: workspace.name,
-          description: workspace.description,
-          role: invitation.role,
-          permissions: invitation.permissions
-        }
+      workspace: {
+        id: workspace._id,
+        name: workspace.name,
+        role: invitation.role
       }
     });
-
-  } catch (error) {
-    console.error('Accept invitation error:', error);
+  } catch (err) {
+    console.error('-----ACCEPT] Error accepting invitation:', err);
     res.status(500).json({
       success: false,
       message: 'Error accepting invitation',
-      error: error.message
+      error: err.message
     });
   }
 };
+
+
 
 const rejectInvitation = async (req, res) => {
   try {
@@ -775,8 +822,13 @@ const getInvitationDetails = async (req, res) => {
     const { token } = req.params;
 
     const invitation = await WorkspaceInvitation.findOne({ token })
-      .populate('workspace', 'name description settings _id') // ✅ FIXED: Added _id
-      .populate('inviter', 'name email');
+      .populate({
+        path: 'workspace',
+        select: 'name description settings members',
+        options: { virtuals: false }
+      })
+      .populate('inviter', 'name email')
+      .lean(); // plain object
 
     if (!invitation) {
       return res.status(404).json({
@@ -785,59 +837,54 @@ const getInvitationDetails = async (req, res) => {
       });
     }
 
-    if (invitation.isExpired()) {
+if (invitation.status === 'accepted') {
+  return res.status(200).json({
+    success: true,
+    alreadyAccepted: true,
+    status: 'accepted',
+    data: {
+      workspace: {
+        id: invitation.workspace._id,
+        name: invitation.workspace.name,
+        description: invitation.workspace.description
+      },
+      role: invitation.role,
+      permissions: invitation.permissions,
+      invitedBy: invitation.inviter,
+      email: invitation.inviteeEmail  // <- add this line
+    }
+  });
+}
+
+    if (new Date(invitation.expiresAt) <= new Date()) {
       await WorkspaceInvitation.updateOne(
         { _id: invitation._id },
         { status: 'expired' }
       );
-      
       return res.status(400).json({
         success: false,
         message: 'Invitation has expired',
         expired: true
       });
     }
+res.status(200).json({
+  success: true,
+  data: {
+    ...invitation,
+    email: invitation.inviteeEmail  // <- add this line
+  }
+});
 
-    if (invitation.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Invitation has been ${invitation.status}`,
-        status: invitation.status
-      });
-    }
-
-    // ✅ FIXED: Match frontend expected structure exactly
-    res.status(200).json({
-      success: true,
-      data: {
-        workspace: {
-          _id: invitation.workspace._id,           // ✅ FIXED: Added _id
-          name: invitation.workspace.name,
-          description: invitation.workspace.description
-        },
-        invitedBy: {                              // ✅ FIXED: Changed from 'inviter' to 'invitedBy'
-          name: invitation.inviter.name,
-          email: invitation.inviter.email
-        },
-        role: invitation.role,
-        permissions: invitation.permissions,
-        customMessage: invitation.message,        // ✅ FIXED: Changed from 'message' to 'customMessage'
-        expiresAt: invitation.expiresAt,
-        email: invitation.inviteeEmail,          // ✅ FIXED: Changed from 'inviteeEmail' to 'email'
-        createdAt: invitation.createdAt,         // ✅ FIXED: Added createdAt
-        token: invitation.token                  // ✅ FIXED: Added token for reference
-      }
-    });
-
-  } catch (error) {
-    console.error('Get invitation details error:', error);
+  } catch (err) {
+    console.error('Get invitation details error:', err);
     res.status(500).json({
       success: false,
       message: 'Error fetching invitation details',
-      error: error.message
+      error: err.message
     });
   }
 };
+
 
 const cleanupExpiredInvitations = async (req, res) => {
   try {

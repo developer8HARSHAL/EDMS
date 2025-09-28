@@ -16,6 +16,18 @@ const { protect } = require('../middleware/auth');
 const { checkWorkspaceAccess, checkWorkspaceAdmin } = require('../middleware/workspaceAuth');
 
 const router = express.Router();
+// Add these imports at the top
+const {
+  getWorkspaceDocuments
+} = require('../controllers/documentController');
+
+// Add these routes after your existing routes, before module.exports
+// Workspace document routes
+router.get('/:id/documents', 
+  checkWorkspaceAccess(['canView']), 
+  getWorkspaceDocuments
+);
+
 
 // Apply authentication middleware to all routes
 router.use(protect);

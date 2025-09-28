@@ -18,7 +18,8 @@ const WorkspaceSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Workspace must have an owner']
   },
-  members: [{
+  members: {
+  type: [{
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -30,32 +31,17 @@ const WorkspaceSchema = new mongoose.Schema({
       default: 'viewer'
     },
     permissions: {
-      canView: {
-        type: Boolean,
-        default: true
-      },
-      canEdit: {
-        type: Boolean,
-        default: false
-      },
-      canAdd: {
-        type: Boolean,
-        default: false
-      },
-      canDelete: {
-        type: Boolean,
-        default: false
-      },
-      canInvite: {
-        type: Boolean,
-        default: false
-      }
+      canView: { type: Boolean, default: true },
+      canEdit: { type: Boolean, default: false },
+      canAdd: { type: Boolean, default: false },
+      canDelete: { type: Boolean, default: false },
+      canInvite: { type: Boolean, default: false }
     },
-    joinedAt: {
-      type: Date,
-      default: Date.now
-    }
+    joinedAt: { type: Date, default: Date.now }
   }],
+  default: [] // ensures members is never undefined
+},
+
   settings: {
     isPublic: {
       type: Boolean,
@@ -164,17 +150,22 @@ WorkspaceSchema.statics.findPublicWorkspaces = function() {
 };
 
 // Virtual for member count
+// Virtual for member count
 WorkspaceSchema.virtual('memberCount').get(function() {
-  return this.members.length;
+  return this.members?.length || 0;
 });
 
-// Virtual for document count (will be populated when documents are linked)
-WorkspaceSchema.virtual('documentCount', {
-  ref: 'Document',
-  localField: '_id',
-  foreignField: 'workspace',
-  count: true
+
+
+
+WorkspaceSchema.virtual('documentCount').get(function() {
+  return 0; // safe placeholder
 });
+
+WorkspaceSchema.methods.getDocumentCount = async function() {
+  const Document = require('./documentModel');
+  return await Document.countDocuments({ workspace: this._id });
+};
 
 // Ensure virtuals are included in JSON output
 WorkspaceSchema.set('toJSON', { virtuals: true });
