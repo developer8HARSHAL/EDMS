@@ -15,7 +15,7 @@ const PermissionGuard = ({
   showFallback = true,
   userId = null,
   requireOwnership = false,
-  requireAnyPermission = false, // true = OR logic, false = AND logic
+  requireAnyPermission = false,
   className = '',
   renderProps = false
 }) => {
@@ -23,10 +23,10 @@ const PermissionGuard = ({
   const { getUserRole, getUserPermissions, canPerformAction } = useWorkspaces();
   const routeParams = useParams();
 
-   const actualWorkspaceId = workspaceId || (workspaceIdParam ? routeParams[workspaceIdParam] : null);
+  // ✅ FIXED: Properly extract workspaceId from params
+  const actualWorkspaceId = workspaceId || (workspaceIdParam ? routeParams[workspaceIdParam] : null);
 
-
-    console.log('🔐 PermissionGuard Debug:', {
+  console.log('🔍 PermissionGuard Debug:', {
     workspaceId,
     workspaceIdParam, 
     routeParams,
@@ -34,16 +34,15 @@ const PermissionGuard = ({
     requiredPermissions,
     allowedRoles
   });
-
   
   // Get workspace and user data
   const workspace = useSelector(state => 
-    state.workspaces.workspaces.find(w => w._id === workspaceId)
+    state.workspaces.workspaces.find(w => w._id === actualWorkspaceId)
   );
   
   const targetUserId = userId || currentUser?.id;
-  const userRole = getUserRole(workspaceId, targetUserId);
-  const userPermissions = getUserPermissions(workspaceId, targetUserId);
+  const userRole = getUserRole(actualWorkspaceId, targetUserId);
+  const userPermissions = getUserPermissions(actualWorkspaceId, targetUserId);
 
   // Permission checking functions
   const checkRolePermission = () => {
@@ -62,20 +61,18 @@ const PermissionGuard = ({
     return true;
   };
 
-  // Replace your checkPermissions function in PermissionGuard with this:
-
 const checkPermissions = () => {
   if (requiredPermissions.length === 0) return true;
-  
+
   console.log('🔐 PermissionGuard checkPermissions debug:');
   console.log('- requiredPermissions:', requiredPermissions);
   console.log('- userPermissions:', userPermissions);
   console.log('- userPermissions type:', typeof userPermissions);
-  
-  // NEW: Handle object-based permissions (your actual format)
+
+  // Handle object-based permissions (your actual format)
   if (userPermissions && typeof userPermissions === 'object' && !Array.isArray(userPermissions)) {
     console.log('📋 Using object-based permission checking');
-    
+
     // Map permission names to object properties
     const permissionMap = {
       'read': 'canView',
@@ -89,7 +86,7 @@ const checkPermissions = () => {
       'invite': 'canInvite',
       'manage': 'canInvite'
     };
-    
+
     if (requireAnyPermission) {
       // OR logic - user needs at least one of the required permissions
       const result = requiredPermissions.some(permission => {
@@ -112,11 +109,11 @@ const checkPermissions = () => {
       return result;
     }
   }
-  
+
   // FALLBACK: Handle array-based permissions (if you ever use them)
   if (Array.isArray(userPermissions)) {
     console.log('📋 Using array-based permission checking');
-    
+
     if (requireAnyPermission) {
       return requiredPermissions.some(permission => 
         userPermissions.includes(permission)
@@ -127,12 +124,12 @@ const checkPermissions = () => {
       );
     }
   }
-  
-  console.log('❌ No valid permissions format found');
+
+  console.log('⚠️ No valid permissions format found');
   return false;
 };
 
-  const checkOwnership = () => {
+   const checkOwnership = () => {
     if (!requireOwnership) return true;
     if (!workspace || !currentUser) return false;
     
@@ -140,11 +137,11 @@ const checkPermissions = () => {
   };
 
   const checkWorkspaceAction = (action) => {
-    return canPerformAction(workspaceId, action, targetUserId);
+    return canPerformAction(actualWorkspaceId, action, targetUserId);
   };
 
   // Main permission check
-  const hasPermission = () => {
+   const hasPermission = () => {
     // Basic checks
     if (!currentUser || !workspace) return false;
     
@@ -368,6 +365,6 @@ export const usePermissions = (workspaceId, userId = null) => {
     isViewer: ['viewer', 'editor', 'admin', 'owner'].includes(userRole),
     hasAccess: !!userRole
   };
-};
+}
 
 export default PermissionGuard;

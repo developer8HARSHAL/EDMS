@@ -120,13 +120,14 @@ export const fetchWorkspaceStats = createAsyncThunk(
   async (workspaceId, { rejectWithValue }) => {
     try {
       const response = await workspaceService.getWorkspaceStats(workspaceId);
-      return { workspaceId, stats: response.data || response };
+      // response is already { success, data: {...} }
+      return { workspaceId, stats: response };
     } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch workspace stats';
-      return rejectWithValue(message);
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
+
 
 // NEW: Fetch recent activity
 export const fetchRecentActivity = createAsyncThunk(
@@ -258,6 +259,26 @@ export const uploadDocument = createAsyncThunk(
   }
 );
 
+export const updateDocument = createAsyncThunk(
+  'documents/updateDocument',
+  async ({ documentId, updates, workspaceId }, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await documentApi.updateDocument(documentId, updates);
+      const updatedDoc = response.data || response;
+      
+      // Don't use updateDocumentLocal - just force a full refresh
+      if (workspaceId) {
+        // Use immediate dispatch without setTimeout
+        await dispatch(fetchWorkspaceDocuments({ workspaceId })).unwrap();
+      }
+      
+      return updatedDoc;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to update document';
+      return rejectWithValue(message);
+    }
+  }
+);
 // Delete document
 export const deleteDocument = createAsyncThunk(
   'documents/deleteDocument',
@@ -490,7 +511,7 @@ const documentsSlice = createSlice({
     },
     
     // Update document in list
-    updateDocument: (state, action) => {
+    updateDocumentLocal: (state, action) => {
       const updatedDoc = action.payload;
       
       // Update in main documents list
@@ -620,11 +641,15 @@ builder
   });
 
     // NEW: Fetch workspace stats
-    builder
-      .addCase(fetchWorkspaceStats.fulfilled, (state, action) => {
-        const { workspaceId, stats } = action.payload;
-        state.workspaceStats[workspaceId] = stats;
-      });
+   builder
+.addCase(fetchWorkspaceStats.fulfilled, (state, action) => {
+  console.log('🔍 REDUCER RECEIVED:', action.payload);
+  const { workspaceId, stats } = action.payload;
+  console.log('📦 Stats object:', stats);
+  console.log('📦 Stats.data:', stats.data);
+    state.workspaceStats[workspaceId] = stats; 
+  console.log('✅ STORED IN REDUX:', state.workspaceStats[workspaceId]);
+});
 
     // NEW: Fetch recent activity
     builder
@@ -722,6 +747,42 @@ builder
         state.error = action.payload;
       });
 
+      builder
+  .addCase(updateDocument.pending, (state) => {
+    state.loading = true;
+    state.error = null;
+  })
+  .addCase(updateDocument.fulfilled, (state, action) => {
+    state.loading = false;
+    const updatedDoc = action.payload.data || action.payload;
+    
+    // Update in main documents list
+    const index = state.documents.findIndex(doc => doc._id === updatedDoc._id);
+    if (index !== -1) {
+      state.documents[index] = updatedDoc;
+    }
+    
+    // Update in workspace documents
+    if (updatedDoc.workspace && state.workspaceDocuments[updatedDoc.workspace]) {
+      const wsIndex = state.workspaceDocuments[updatedDoc.workspace]
+        .findIndex(doc => doc._id === updatedDoc._id);
+      if (wsIndex !== -1) {
+        state.workspaceDocuments[updatedDoc.workspace][wsIndex] = updatedDoc;
+      }
+    }
+    
+    // Update current document if it's the same
+    if (state.currentDocument?._id === updatedDoc._id) {
+      state.currentDocument = updatedDoc;
+    }
+    
+    state.error = null;
+  })
+  .addCase(updateDocument.rejected, (state, action) => {
+    state.loading = false;
+    state.error = action.payload;
+  });
+
     // NEW: Toggle favorite
     builder
       .addCase(toggleFavorite.fulfilled, (state, action) => {
@@ -785,7 +846,7 @@ export const {
   resetFilters,
   updatePagination,
   addDocument,
-  updateDocument,
+  updateDocumentLocal,
   removeDocument,
   updateDocumentFavorite
 } = documentsSlice.actions;

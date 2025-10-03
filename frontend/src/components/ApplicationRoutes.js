@@ -1,4 +1,4 @@
-// frontend/src/components/ApplicationRoutes.js - FIXED URL PATTERN
+// frontend/src/components/ApplicationRoutes.js - COMPLETE FIX
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -38,7 +38,7 @@ function DocumentPreviewWithPermission() {
   
   return (
     <PermissionGuard 
-      workspaceId={workspaceId}  // ← Direct prop
+      workspaceId={workspaceId}
       allowedRoles={['viewer', 'editor', 'admin', 'owner']}
       fallback={<Navigate to="/dashboard" replace />}
     >
@@ -87,7 +87,7 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* 🔥 FIXED: Changed from /invitations/:token to /invitation/:token */}
+      {/* ✅ FIXED: Invitation route */}
       <Route 
         path="/invitation/:token" 
         element={<InvitationPage />} 
@@ -133,14 +133,15 @@ const ApplicationRoutes = () => {
           </ProtectedRoute>
         } 
       />
+
       <Route 
-  path="/workspaces/:workspaceId/documents" 
-  element={
-    <ProtectedRoute>
-      <DocumentList />
-    </ProtectedRoute>
-  } 
-/>
+        path="/workspaces/:workspaceId/documents" 
+        element={
+          <ProtectedRoute>
+            <DocumentList />
+          </ProtectedRoute>
+        } 
+      />
       
       <Route 
         path="/documents/upload" 
@@ -160,7 +161,7 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Individual workspace routes */}
+      {/* ✅ MAIN WORKSPACE ROUTE */}
       <Route 
         path="/workspaces/:workspaceId" 
         element={
@@ -170,14 +171,14 @@ const ApplicationRoutes = () => {
         }
       />
 
-      {/* Workspace settings - Admin/Owner only */}
+      {/* ✅ FIXED: Workspace settings - Use allowedRoles instead of requiredPermissions */}
       <Route 
         path="/workspaces/:workspaceId/settings" 
         element={
           <ProtectedRoute>
             <PermissionGuard 
-              requiredPermissions={['admin']} 
               workspaceIdParam="workspaceId"
+              allowedRoles={['admin', 'owner']}
               fallback={<Navigate to="/dashboard" replace />}
             >
               <WorkspaceSettings />
@@ -185,9 +186,8 @@ const ApplicationRoutes = () => {
           </ProtectedRoute>
         } 
       />
-      
 
-      {/* Document preview within workspace context - SINGLE ROUTE ONLY */}
+      {/* ✅ FIXED: Document preview within workspace context */}
       <Route 
         path="/workspaces/:workspaceId/documents/:documentId" 
         element={
@@ -197,14 +197,14 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Upload document to specific workspace */}
+      {/* ✅ FIXED: Upload document to specific workspace */}
       <Route 
         path="/workspaces/:workspaceId/upload" 
         element={
           <ProtectedRoute>
             <PermissionGuard 
-              requiredPermissions={['write']} 
               workspaceIdParam="workspaceId"
+              allowedRoles={['editor', 'admin', 'owner']}
               fallback={<Navigate to="/dashboard" replace />}
             >
               <UploadDocument />
@@ -213,14 +213,14 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Workspace analytics - Admin/Owner only */}
+      {/* ✅ FIXED: Workspace analytics */}
       <Route 
         path="/workspaces/:workspaceId/analytics" 
         element={
           <ProtectedRoute>
             <PermissionGuard 
-              requiredPermissions={['admin']} 
               workspaceIdParam="workspaceId"
+              allowedRoles={['admin', 'owner']}
               fallback={<Navigate to="/dashboard" replace />}
             >
               <WorkspacePage />
@@ -229,7 +229,7 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Pending invitations management - CHANGED route to avoid conflict */}
+      {/* Pending invitations management */}
       <Route 
         path="/invitations" 
         element={
@@ -239,7 +239,7 @@ const ApplicationRoutes = () => {
         } 
       />
 
-      {/* Legacy redirects for backward compatibility */}
+      {/* ✅ FIXED: Legacy redirects for backward compatibility */}
       <Route 
         path="/documents/workspace/:workspaceId" 
         element={<WorkspaceDocumentsRedirect />} 

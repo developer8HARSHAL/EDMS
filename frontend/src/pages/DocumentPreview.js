@@ -17,6 +17,7 @@ import {
   selectAllWorkspaces,
 } from '../store/slices/workspaceSlice';
 
+
 const DocumentPreview = () => {
   const { documentId, workspaceId } = useParams();
   const navigate = useNavigate();

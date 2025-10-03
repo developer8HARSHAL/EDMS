@@ -58,16 +58,17 @@ const createWorkspace = async (req, res) => {
 // @desc    Get all workspaces for authenticated user
 // @route   GET /api/workspaces
 // @access  Private
+// @desc    Get all workspaces for authenticated user
+// @route   GET /api/workspaces
+// @access  Private
 const getWorkspaces = async (req, res) => {
   try {
-
     if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required - no user found'
       });
     }
-
 
     const userId = req.user.id;
     const { page = 1, limit = 10, search, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
@@ -105,42 +106,57 @@ const getWorkspaces = async (req, res) => {
       ]
     };
 
-// ⚠️ Make sure you fetch workspaces first
-const workspaces = await Workspace.paginate(query, options);
+    // Fetch workspaces
+    const workspaces = await Workspace.paginate(query, options);
 
-// Add user role and permissions for each workspace
-const workspacesWithRoles = workspaces.docs.map(workspace => {
-  const workspaceObj = workspace.toObject();
+    // ✅ FIX: Get document counts for all workspaces in one query
+    const workspaceIds = workspaces.docs.map(ws => ws._id);
+    const documentCounts = await Document.aggregate([
+      { $match: { workspace: { $in: workspaceIds } } },
+      { $group: { _id: '$workspace', count: { $sum: 1 } } }
+    ]);
 
-  if (workspace.owner._id.toString() === userId.toString()) {
-    workspaceObj.userRole = 'owner';
-    workspaceObj.userPermissions = {
-      canView: true,
-      canEdit: true,
-      canAdd: true,
-      canDelete: true,
-      canInvite: true
-    };
-  } else {
-    workspaceObj.userRole = workspace.getUserRole(userId);
-    workspaceObj.userPermissions = workspace.getUserPermissions(userId);
-  }
+    // Create a map for quick lookup
+    const countMap = documentCounts.reduce((acc, item) => {
+      acc[item._id.toString()] = item.count;
+      return acc;
+    }, {});
 
-  return workspaceObj;
-});
+    // Add user role, permissions, and document count for each workspace
+    const workspacesWithRoles = workspaces.docs.map(workspace => {
+      const workspaceObj = workspace.toObject();
 
-res.status(200).json({
-  success: true,
-  data: {
-    workspaces: workspacesWithRoles,
-    totalDocs: workspaces.totalDocs,
-    totalPages: workspaces.totalPages,
-    currentPage: workspaces.page,
-    hasNextPage: workspaces.hasNextPage,
-    hasPrevPage: workspaces.hasPrevPage
-  }
-});
+      // ✅ FIX: Add actual document count
+      workspaceObj.documentCount = countMap[workspace._id.toString()] || 0;
 
+      if (workspace.owner._id.toString() === userId.toString()) {
+        workspaceObj.userRole = 'owner';
+        workspaceObj.userPermissions = {
+          canView: true,
+          canEdit: true,
+          canAdd: true,
+          canDelete: true,
+          canInvite: true
+        };
+      } else {
+        workspaceObj.userRole = workspace.getUserRole(userId);
+        workspaceObj.userPermissions = workspace.getUserPermissions(userId);
+      }
+
+      return workspaceObj;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        workspaces: workspacesWithRoles,
+        totalDocs: workspaces.totalDocs,
+        totalPages: workspaces.totalPages,
+        currentPage: workspaces.page,
+        hasNextPage: workspaces.hasNextPage,
+        hasPrevPage: workspaces.hasPrevPage
+      }
+    });
 
   } catch (error) {
     console.error('Get workspaces error:', error);
@@ -166,7 +182,9 @@ const getWorkspace = async (req, res) => {
 
     const workspaceObj = workspace.toObject();
     
-    // ✅ FIXED: Add the same owner check logic as in getWorkspaces
+    // ✅ FIX: Add actual document count
+    workspaceObj.documentCount = await Document.countDocuments({ workspace: workspace._id });
+    
     if (workspace.owner._id.toString() === userId.toString()) {
       workspaceObj.userRole = 'owner';
       workspaceObj.userPermissions = {

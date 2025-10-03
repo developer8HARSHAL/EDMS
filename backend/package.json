@@ -4,6 +4,7 @@
   "description": "Enterprise Document Management System Backend",
   "main": "server.js",
   "scripts": {
+    "test:backend": "jest --testPathPatterns=test",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
@@ -23,6 +24,9 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "@babel/preset-env": "^7.28.3",
+    "jest": "^30.2.0",
+    "nodemon": "^2.0.22",
+    "supertest": "^7.1.4"
   }
 }

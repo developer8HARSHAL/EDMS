@@ -80,7 +80,7 @@ const WorkspaceCard = ({
         onViewMembers?.(workspace);
         break;
       case 'settings':
-        navigate(`/workspace/${workspace._id}/settings`);
+        navigate(`/workspaces/${workspace._id}/settings`);
         break;
       default:
         break;
@@ -212,7 +212,7 @@ const WorkspaceCard = ({
           
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
-            <span>{formatDocumentCount(workspace.documentCount || 0)}</span>
+            <span>{formatDocumentCount(workspace.documentCount ||  0)}</span>
           </div>
           
           <div className="flex items-center gap-2">

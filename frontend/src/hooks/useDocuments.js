@@ -14,6 +14,7 @@ import {
   fetchSharedDocuments,
   fetchDocument,
   uploadDocument,
+  updateDocument,
   deleteDocument,
   toggleFavorite,
   moveDocument,
@@ -293,6 +294,27 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       return false;
     }
   }, [dispatch, workspaceId, currentWorkspaceId, handleFetchWorkspaceDocuments]);
+
+
+  const handleUpdateDocument = useCallback(async (documentId, updates, targetWorkspaceId) => {
+  const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+  
+  try {
+    const result = await dispatch(updateDocument({ documentId, updates, workspaceId: wsId }));
+    
+    if (updateDocument.fulfilled.match(result)) {
+      toast.success('Document updated');
+      if (wsId) {
+        setTimeout(() => handleFetchWorkspaceDocuments(wsId), 500);
+      }
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Update document error:', error);
+    return false;
+  }
+}, [dispatch, workspaceId, currentWorkspaceId, handleFetchWorkspaceDocuments]);
 
 
   // Delete document with confirmation
@@ -695,6 +717,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
 
     // Document operations
     uploadDocument: handleUploadDocument,
+    updateDocument: handleUpdateDocument, 
     deleteDocument: handleDeleteDocument,
     toggleFavorite: handleToggleFavorite,
     moveDocument: handleMoveDocument,
@@ -871,7 +894,7 @@ export const useDocumentSearch = (workspaceId = null) => {
     loading,
     search: performSearch,
     updateFilters,
-    resetFilters
+    resetFilters,
   };
 };
 
@@ -897,6 +920,7 @@ export const useBulkDocumentOperations = (workspaceId = null) => {
   return {
     bulkDelete: performBulkDelete,
     loading: bulkOperationLoading
+    
   };
 };
 

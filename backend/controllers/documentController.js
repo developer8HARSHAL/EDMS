@@ -517,81 +517,136 @@ exports.getDocument = async (req, res) => {
 // @access  Private
 exports.updateDocument = async (req, res) => {
   try {
-    let document = await Document.findById(req.params.id);
+    console.log("------[updateDocument] Params:", req.params);
+    console.log("------[updateDocument] Body:", req.body);
+    console.log("------[updateDocument] User from token:", req.user);
 
+    const document = await Document.findById(req.params.id);
     if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
+      console.log("------Document not found:", req.params.id);
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    // ---- Fetch workspace ----
+    const workspace = await Workspace.findById(document.workspace);
+    if (!workspace) {
+      console.log("------Workspace not found for document:", document._id);
+      return res.status(404).json({ success: false, message: 'Workspace not found' });
+    }
+
+    // ---- Check if user is a member of the workspace ----
+    const member = workspace.members.find(m => m.user.equals(req.user._id));
+    if (!member) {
+      console.log("------User not a member of workspace:", req.user._id);
+      return res.status(403).json({ success: false, message: 'Not a member of this workspace' });
+    }
+
+    // ---- Check role-based permission ----
+ if (!member.permissions?.canEdit) {
+    console.log("------User cannot edit based on permissions:", req.user._id);
+    return res.status(403).json({ success: false, message: 'No permission to edit document' });
+}
+
+
+
+    console.log("------User authorized based on workspace role:", member.role);
+
+    const userId = req.user._id.toString();
+
+    // ---- Update fields ----
+    if (req.body.name) document.name = req.body.name;
+    if (req.body.description !== undefined) document.description = req.body.description;
+    if (req.body.tags) document.tags = req.body.tags;
+
+    // ---- Update content if provided ----
+    if (req.body.content && req.body.updateContent === true) {
+      const fileId = new ObjectId();
+      const fileName = `document_${userId}_${Date.now()}${path.extname(document.originalName)}`;
+
+      const writeStream = gfs.openUploadStreamWithId(fileId, fileName, {
+        contentType: document.type,
+        metadata: { originalName: document.originalName, ownerId: userId }
       });
-    }
 
-    // Check if user is owner or has write permission
-    const isOwner = document.owner.toString() === req.user.id;
-    const hasWritePermission = document.permissions.some(
-      permission => 
-        permission.user.toString() === req.user.id && 
-        permission.access === 'write'
-    );
+      writeStream.write(Buffer.from(req.body.content));
+      writeStream.end();
 
-    if (!isOwner && !hasWritePermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this document'
+      await new Promise((resolve, reject) => {
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
       });
+
+      try {
+        if (document.path) await gfs.delete(new ObjectId(document.path));
+      } catch (err) {
+        console.error('------Error deleting old file:', err);
+      }
+
+      document.path = fileId.toString();
+      document.size = Buffer.byteLength(req.body.content);
     }
 
-    // Update only allowed fields
-    if (req.body.name) {
-      document.name = req.body.name;
-    }
-
+    document.lastModifiedBy = userId;
     await document.save();
 
-    res.status(200).json({
-      success: true,
-      data: document
-    });
+    console.log("------Document updated successfully:", document._id);
+    res.status(200).json({ success: true, data: document });
+
   } catch (error) {
-    console.error('Error updating document:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Could not update document',
-      error: error.message
-    });
+    console.error('------Error updating document:', error);
+    res.status(500).json({ success: false, message: 'Could not update document' });
   }
 };
 
+
+
+// @desc    Delete document
+// @route   DELETE /api/documents/:id
+// @access  Private
+// @desc    Delete document
+// @route   DELETE /api/documents/:id
+// @access  Private
 // @desc    Delete document
 // @route   DELETE /api/documents/:id
 // @access  Private
 exports.deleteDocument = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
+    // Populate workspace members
+    const document = await Document.findById(req.params.id).populate("workspace");
 
     if (!document) {
       return res.status(404).json({
         success: false,
-        message: 'Document not found'
+        message: "Document not found"
       });
     }
 
-    // Check if user is owner
-    if (document.owner.toString() !== req.user.id) {
+    console.log("Delete request by:", req.user);
+    console.log("Document owner:", document.owner);
+    console.log("Workspace members:", document.workspace?.members);
+
+    // Unified: owner is also treated as admin
+    const isAdminOrOwner = document.workspace?.members?.some(
+      (member) =>
+        member.user.toString() === req.user.id &&
+        (member.role === "admin" || member.user.toString() === document.owner.toString())
+    );
+
+    if (!isAdminOrOwner) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to delete this document'
+        message: "Not authorized to delete this document"
       });
     }
 
-    // Delete file from GridFS
+    // Delete file from GridFS if exists
     try {
-      // The document.path contains the GridFS file ID
-      const fileId = new ObjectId(document.path);
-      await gfs.delete(fileId);
+      if (document.path) {
+        const fileId = new ObjectId(document.path); // GridFS file ID
+        await gfs.delete(fileId);
+      }
     } catch (fileError) {
-      console.error('Error deleting file from GridFS:', fileError);
-      // Continue with document deletion even if file deletion fails
+      console.error("Error deleting file from GridFS:", fileError);
     }
 
     // Remove document from database
@@ -599,17 +654,79 @@ exports.deleteDocument = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Document deleted successfully'
+      message: "Document deleted successfully"
     });
   } catch (error) {
-    console.error('Error deleting document:', error);
+    console.error("Error deleting document:", error);
     res.status(500).json({
       success: false,
-      message: 'Could not delete document',
+      message: "Could not delete document",
       error: error.message
     });
   }
 };
+// @desc    Delete document
+// @route   DELETE /api/documents/:id
+// @access  Private
+exports.deleteDocument = async (req, res) => {
+  try {
+    // Populate workspace members
+    const document = await Document.findById(req.params.id).populate("workspace");
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found"
+      });
+    }
+
+    console.log("Delete request by:", req.user);
+    console.log("Document owner:", document.owner);
+    console.log("Workspace members:", document.workspace?.members);
+
+    // Unified: owner is also treated as admin
+    const isAdminOrOwner = document.workspace?.members?.some(
+      (member) =>
+        member.user.toString() === req.user.id &&
+        (member.role === "admin" || member.user.toString() === document.owner.toString())
+    );
+
+    if (!isAdminOrOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to delete this document"
+      });
+    }
+
+    // Delete file from GridFS if exists
+    try {
+      if (document.path) {
+        const fileId = new ObjectId(document.path); // GridFS file ID
+        await gfs.delete(fileId);
+      }
+    } catch (fileError) {
+      console.error("Error deleting file from GridFS:", fileError);
+    }
+
+    // Remove document from database
+    await Document.deleteOne({ _id: req.params.id });
+
+    res.status(200).json({
+      success: true,
+      message: "Document deleted successfully"
+    });
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    res.status(500).json({
+      success: false,
+      message: "Could not delete document",
+      error: error.message
+    });
+  }
+};
+
+
+
 
 // @desc    Get document content for preview
 // @route   GET /api/documents/:id/preview

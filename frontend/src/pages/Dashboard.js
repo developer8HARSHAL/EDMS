@@ -1,10 +1,10 @@
 // frontend/src/pages/Dashboard.js - FIXED: Maximum update depth exceeded
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { 
-  DocumentIcon, 
-  CloudArrowUpIcon, 
-  UsersIcon, 
+import {
+  DocumentIcon,
+  CloudArrowUpIcon,
+  UsersIcon,
   ClockIcon,
   ArrowUpTrayIcon,
   PlusIcon,
@@ -20,9 +20,9 @@ import {
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 
-import jwtDecode  from 'jwt-decode';
+import jwtDecode from 'jwt-decode';
 import axios from 'axios';
-import apiService from '../services/apiService'; 
+import apiService from '../services/apiService';
 import workspaceService from '../services/workspaceService';
 
 import { useAuth } from '../hooks/useAuth';
@@ -39,7 +39,7 @@ import CreateWorkspaceModal from '../components/workspace/CreateWorkspaceModal';
 import WorkspaceSelector from '../components/workspace/WorkspaceSelector';
 import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
-import {Input} from '../components/ui/Input';
+import { Input } from '../components/ui/Input';
 
 
 
@@ -47,21 +47,21 @@ import {Input} from '../components/ui/Input';
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, tokenValidated } = useAuth();
-  
-  const { 
-    workspaces, 
-    loading: workspacesLoading, 
+
+  const {
+    workspaces,
+    loading: workspacesLoading,
     fetchWorkspaces,
     createWorkspace,
     getUserRole,
     getUserPermissions
   } = useWorkspaces();
-console.log("ðŸ” Dashboard Hook Check:", workspaces.length, workspaces);
+  console.log("ðŸ” Dashboard Hook Check:", workspaces.length, workspaces);
 
-  const { 
-    pendingInvitations, 
+  const {
+    pendingInvitations,
     fetchPendingInvitations,
-    acceptInvitation 
+    acceptInvitation
   } = useInvitations();
 
   // Original document state
@@ -74,41 +74,41 @@ console.log("ðŸ” Dashboard Hook Check:", workspaces.length, workspaces);
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // New workspace state
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [workspaceSearch, setWorkspaceSearch] = useState('');
-  
+
   const [activeTab, setActiveTab] = useState('overview'); // overview, workspaces, activity
   const [recentActivity, setRecentActivity] = useState([]);
 
   // âœ… FIX: Create stable reference for fetchData function
-const fetchData = useCallback(async () => {
-  setIsLoading(true);
-  try {
-    console.log('-----Fetching dashboard data...');
-    const response = await documentApi.getDashboardData();
-    console.log('----API Response:', response);
-    console.log('-----Stats from API:', response.data.stats);
-    
-    const newStats = {
-      totalDocs: response.data.stats.totalDocs.toString(),
-      uploads: response.data.stats.thisMonth.toString(),
-      shared: '0',
-      workspaces: workspaces.length.toString()
-    };
-    
-    console.log('-----Setting stats to:', newStats);
-    setDocuments(response.data.recentDocuments);
-    setStats(newStats);
-  } catch (err) {
-    console.error('-----Dashboard fetch error:', err);
-    setError("Failed to load dashboard data");
-  } finally {
-    setIsLoading(false);
-  }
-}, [workspaces.length]);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      console.log('-----Fetching dashboard data...');
+      const response = await documentApi.getDashboardData();
+      console.log('----API Response:', response);
+      console.log('-----Stats from API:', response.data.stats);
+
+      const newStats = {
+        totalDocs: response.data.stats.totalDocs.toString(),
+        uploads: response.data.stats.thisMonth.toString(),
+        shared: '0',
+        workspaces: workspaces.length.toString()
+      };
+
+      console.log('-----Setting stats to:', newStats);
+      setDocuments(response.data.recentDocuments);
+      setStats(newStats);
+    } catch (err) {
+      console.error('-----Dashboard fetch error:', err);
+      setError("Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [workspaces.length]);
 
 
 
@@ -118,21 +118,21 @@ const fetchData = useCallback(async () => {
 
   useEffect(() => {
     console.log('=== DASHBOARD AUTH DEBUG ===');
-    
+
     // Check localStorage token
     const token = localStorage.getItem('authToken');
     console.log('1. Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL');
-    
+
     // Check axios headers
     console.log('2. Axios auth header:', axios.defaults.headers.common['Authorization']);
-    
+
     // Check Redux auth state
-    console.log('3. Redux auth state:', { 
-      isAuthenticated, 
+    console.log('3. Redux auth state:', {
+      isAuthenticated,
       user: user ? { id: user.id, email: user.email } : null,
-      tokenValidated 
+      tokenValidated
     });
-    
+
     // Test token decode
     if (token) {
       try {
@@ -148,7 +148,7 @@ const fetchData = useCallback(async () => {
         console.error('4. Token decode error:', e);
       }
     }
-    
+
     // Test API call
     const testAPICall = async () => {
       try {
@@ -159,7 +159,7 @@ const fetchData = useCallback(async () => {
           }
         });
         console.log('5. API test response:', response.status, response.statusText);
-        
+
         if (response.ok) {
           const data = await response.json();
           console.log('5. API test data:', data);
@@ -171,11 +171,11 @@ const fetchData = useCallback(async () => {
         console.error('5. API test failed:', error);
       }
     };
-    
+
     if (isAuthenticated && token) {
       testAPICall();
     }
-    
+
     console.log('=== END AUTH DEBUG ===');
   }, [isAuthenticated, user, tokenValidated]);
 
@@ -200,9 +200,9 @@ const fetchData = useCallback(async () => {
 
 
 
-console.log('apiService:', apiService);
-console.log('apiService.default:', apiService.default);
-console.log('Available methods:', Object.keys(apiService));
+  console.log('apiService:', apiService);
+  console.log('apiService.default:', apiService.default);
+  console.log('Available methods:', Object.keys(apiService));
 
   // Filter workspaces based on search
   const filteredWorkspaces = useMemo(() => {
@@ -216,7 +216,7 @@ console.log('Available methods:', Object.keys(apiService));
   // âœ… FIX: Stable generate recent activity function
   const generateRecentActivity = useCallback((docs, workspaces) => {
     const activities = [];
-    
+
     // Recent document uploads
     docs.slice(0, 3).forEach(doc => {
       activities.push({
@@ -227,7 +227,7 @@ console.log('Available methods:', Object.keys(apiService));
         color: 'blue'
       });
     });
-    
+
     // Recent workspace joins
     workspaces.slice(0, 2).forEach(workspace => {
       activities.push({
@@ -238,7 +238,7 @@ console.log('Available methods:', Object.keys(apiService));
         color: 'green'
       });
     });
-    
+
     return activities.sort((a, b) => b.time - a.time).slice(0, 5);
   }, []); // âœ… No dependencies needed
 
@@ -246,10 +246,10 @@ console.log('Available methods:', Object.keys(apiService));
     try {
       console.log(`Attempting to download document: ${docName} (ID: ${docId})`);
       const response = await documentApi.downloadDocument(docId);
-      
+
       const blobData = response.data || response;
       const blob = new Blob([blobData]);
-      
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -275,12 +275,12 @@ console.log('Available methods:', Object.keys(apiService));
   };
 
 
-  
+
 
   const handleCreateWorkspace = async (workspaceData) => {
     try {
       console.log('ðŸ¢ Creating workspace:', workspaceData);
-      
+
       // Check auth state before creating workspace
       console.log('ðŸ” Auth check before workspace creation:', {
         isAuthenticated,
@@ -288,20 +288,20 @@ console.log('Available methods:', Object.keys(apiService));
         hasAxiosHeader: !!axios.defaults.headers.common['Authorization'],
         user: user ? { id: user.id, email: user.email } : null
       });
-      
+
       await createWorkspace(workspaceData);
       setShowCreateModal(false);
       console.log('âœ… Workspace created successfully');
     } catch (error) {
       console.error('âŒ Failed to create workspace:', error);
-      
+
       // Check if it's an auth error
       if (error.response?.status === 401) {
         console.error('âŒ 401 Unauthorized - Token issue detected');
         console.log('ðŸ” Current token:', localStorage.getItem('authToken'));
         console.log('ðŸ” Current axios header:', axios.defaults.headers.common['Authorization']);
       }
-      
+
       throw error;
     }
   };
@@ -309,11 +309,10 @@ console.log('Available methods:', Object.keys(apiService));
   const TabButton = ({ id, label, icon: Icon, active, onClick }) => (
     <button
       onClick={() => onClick(id)}
-      className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-        active
+      className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${active
           ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
           : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-      }`}
+        }`}
     >
       <Icon className="h-5 w-5" />
       <span>{label}</span>
@@ -338,11 +337,11 @@ console.log('Available methods:', Object.keys(apiService));
               </p>
             </div>
 
-            
-            
+
+
             <div className="flex space-x-3">
               <Button
-                onClick={() => setShowCreateModal(true)}workspaceList
+                onClick={() => setShowCreateModal(true)} workspaceList
                 leftIcon={<PlusIcon className="h-4 w-4" />}
               >
                 New Workspace
@@ -516,22 +515,51 @@ console.log('Available methods:', Object.keys(apiService));
                               </tr>
                             ))
                           ) : (
+
                             documents.map((doc) => {
                               const docId = doc._id || doc.id;
                               if (!docId) return null;
-                              
-                              const workspace = workspaces.find(w => w._id === doc.workspace);
-                              
+
+                              // ✅ FIX: Improved workspace lookup with multiple fallbacks
+                              let workspace = null;
+
+                              // Try different workspace ID formats
+                              if (doc.workspace) {
+                                workspace = workspaces.find(w =>
+                                  w._id === doc.workspace ||
+                                  w.id === doc.workspace ||
+                                  w._id === doc.workspace._id ||
+                                  w._id === doc.workspaceId
+                                );
+                              }
+
+                              // Also try workspaceId field if workspace field doesn't work
+                              if (!workspace && doc.workspaceId) {
+                                workspace = workspaces.find(w =>
+                                  w._id === doc.workspaceId ||
+                                  w.id === doc.workspaceId
+                                );
+                              }
+
+                              console.log('🔍 Workspace lookup debug:', {
+                                docId: docId,
+                                docWorkspace: doc.workspace,
+                                docWorkspaceId: doc.workspaceId,
+                                foundWorkspace: workspace?.name || 'Not found',
+                                availableWorkspaces: workspaces.map(w => ({ id: w._id, name: w.name }))
+                              });
+
                               return (
                                 <tr key={docId} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                   <td className="py-4 px-4">
                                     <div className="font-medium text-gray-900 dark:text-white">
-                                      {doc.name || 'Unnamed Document'}
+                                      {doc.name || doc.filename || 'Unnamed Document'}
                                     </div>
                                   </td>
                                   <td className="py-4 px-4">
-                                    <Badge variant="outline" size="sm">
-                                      {workspace?.name || 'Personal'}
+                                    
+                                    <Badge variant="outline" size="lg">
+                                      {workspace?.name || 'Personal'} {/* ✅ This will now work correctly */}
                                     </Badge>
                                   </td>
                                   <td className="py-4 px-4 text-gray-500 dark:text-gray-400">
@@ -623,6 +651,29 @@ console.log('Available methods:', Object.keys(apiService));
                       key={workspace._id}
                       workspace={workspace}
                       userRole={getUserRole(workspace._id)}
+                      onEdit={(workspace) => {
+                        // Add edit functionality or navigate to edit
+                        console.log('Edit workspace:', workspace.name);
+                      }}
+                      onDelete={async (workspace) => {
+                        if (window.confirm(`Delete "${workspace.name}"?`)) {
+                          try {
+                            // Add your delete workspace logic here
+                            console.log('Delete workspace:', workspace.name);
+                          } catch (error) {
+                            console.error('Delete failed:', error);
+                          }
+                        }
+                      }}
+                      onInviteMembers={(workspace) => {
+                        // Navigate to workspace and show invite modal
+                        navigate(`/workspaces/${workspace._id}`);
+                        // You could also set some state to open invite modal
+                      }}
+                      onViewMembers={(workspace) => {
+                        // Navigate to workspace members tab
+                        navigate(`/workspaces/${workspace._id}`);
+                      }}
                       onClick={() => navigate(`/workspaces/${workspace._id}`)}
                     />
                   ))}
@@ -634,7 +685,7 @@ console.log('Available methods:', Object.keys(apiService));
                     {workspaceSearch ? 'No workspaces found' : 'No workspaces yet'}
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-6">
-                    {workspaceSearch 
+                    {workspaceSearch
                       ? 'Try adjusting your search terms'
                       : 'Create your first workspace to start collaborating'
                     }
@@ -651,17 +702,17 @@ console.log('Available methods:', Object.keys(apiService));
               )}
 
               {/* Show more workspaces link */}
-{workspaces.length > 6 && !workspaceSearch && (
-  <div className="text-center">
-    <Button
-      as={RouterLink}    // âœ… Here
-      to="/workspaces"   // âœ… Add /workspaces
-      variant="outline"
-    >
-      View All Workspaces ({workspaces.length})
-    </Button>
-  </div>
-)}
+              {workspaces.length > 6 && !workspaceSearch && (
+                <div className="text-center">
+                  <Button
+                    as={RouterLink}    // âœ… Here
+                    to="/workspaces"   // âœ… Add /workspaces
+                    variant="outline"
+                  >
+                    View All Workspaces ({workspaces.length})
+                  </Button>
+                </div>
+              )}
             </>
           )}
 
@@ -716,14 +767,14 @@ console.log('Available methods:', Object.keys(apiService));
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <Button 
+                    <Button
                       onClick={() => setShowCreateModal(true)}
                       className="w-full justify-start"
                       leftIcon={<PlusIcon className="h-4 w-4" />}
                     >
                       Create New Workspace
                     </Button>
-                    <Button 
+                    <Button
                       as={RouterLink}
                       to="/documents/upload"
                       className="w-full justify-start"
@@ -732,14 +783,14 @@ console.log('Available methods:', Object.keys(apiService));
                       Upload New Document
                     </Button>
                     <Button
-  as={RouterLink}      // âœ… Here
-  to="/workspaces"      // âœ… Add /workspaces
-  variant="outline"
-  className="w-full justify-start"
-  leftIcon={<BuildingOfficeIcon className="h-4 w-4" />}
->
-  Browse All Workspaces
-</Button>
+                      as={RouterLink}      // âœ… Here
+                      to="/workspaces"      // âœ… Add /workspaces
+                      variant="outline"
+                      className="w-full justify-start"
+                      leftIcon={<BuildingOfficeIcon className="h-4 w-4" />}
+                    >
+                      Browse All Workspaces
+                    </Button>
                     <Button
                       as={RouterLink}
                       to="/profile"
@@ -752,7 +803,7 @@ console.log('Available methods:', Object.keys(apiService));
                   </div>
                 </CardContent>
               </Card>
-              
+
               {/* Storage Usage */}
               <Card>
                 <CardHeader>

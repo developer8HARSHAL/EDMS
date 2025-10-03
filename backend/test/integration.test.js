@@ -54,11 +54,12 @@ let testInvitationToken;
 describe('🧪 WORKSPACE COLLABORATION SYSTEM - BACKEND INTEGRATION TESTS', () => {
   
   // Database Setup & Cleanup
-  beforeAll(async () => {
-    console.log('🔧 Setting up test database...');
-    await mongoose.connect(TEST_DB_URI);
-    await clearDatabase();
-  });
+// test/integration.test.js
+beforeAll(async () => {
+  console.log('🔧 Setting up test database...');
+  await clearDatabase(); // Don’t call mongoose.connect here
+});
+
 
   afterAll(async () => {
     console.log('🧹 Cleaning up test database...');

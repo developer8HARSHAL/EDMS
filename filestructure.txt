@@ -29,6 +29,7 @@
         |-- integration.test.js
         |-- model-test.js
         |-- setup.js
+        |-- workspaceStats.test.js
     |-- uploads
         |-- .gitkeep
         |-- 2687872e-c172-4166-9076-a84e895d584d.txt
@@ -70,6 +71,7 @@
         |-- components
             |-- ApplicationRoutes.js
             |-- AuthStatus.js
+            |-- EditDocumentModal.js
             |-- ErrorBoundary.jsx
             |-- members
                 |-- InviteMemberModal.jsx
@@ -137,4 +139,5 @@
             |-- .gitkeep
             |-- AuthUtils.js
     |-- tailwind.config.js
+|-- mcp.json
 |-- workspace_feature.txt

@@ -21,39 +21,40 @@ const api = axios.create({
 const setupAxiosInterceptors = () => {
   // Request interceptor - Add auth headers
   api.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem('authToken');
-      
-      if (DEBUG) {
-        console.log('🔄 API Request:', config.method?.toUpperCase(), config.url);
-        console.log('📝 Token found:', !!token);
-      }
-      
-      if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
-        if (DEBUG) {
-          console.log('✅ Authorization header set');
-        }
-      } else {
-        if (DEBUG) {
-          console.warn('⚠️ No token found for request');
-        }
-      }
-      
-      // Ensure Content-Type is set for non-FormData requests
-      if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
-        config.headers['Content-Type'] = 'application/json';
-      }
-      
-      return config;
-    },
-    (error) => {
-      if (DEBUG) {
-        console.error('❌ Request Error:', error);
-      }
-      return Promise.reject(error);
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    
+    if (DEBUG) {
+      console.log('📤 API Request:', config.method?.toUpperCase(), config.url);
+      console.log('🔑 Token found:', !!token);
     }
-  );
+    
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+      if (DEBUG) {
+        console.log('✅ Authorization header set');
+      }
+    }
+    
+    // Ensure Content-Type is set for non-FormData requests
+    if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+    
+    // ✅ ADD THIS: Disable caching for all requests
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    config.headers['Pragma'] = 'no-cache';
+    config.headers['Expires'] = '0';
+    
+    return config;
+  },
+  (error) => {
+    if (DEBUG) {
+      console.error('❌ Request Error:', error);
+    }
+    return Promise.reject(error);
+  }
+);
 
   // Response interceptor - Handle auth errors
   api.interceptors.response.use(
@@ -404,16 +405,15 @@ export const documentApi = {
     }
   },
 
-  updateDocument: async (documentId, updates) => {
-    try {
-      const response = await api.put(`/documents/${documentId}`, updates);
-      return response.data;
-    } catch (error) {
-      console.error(`❌ Update document ${documentId} error:`, error);
-      throw error;
-    }
-  },
-
+updateDocument: async (documentId, updates) => {
+  try {
+    const response = await api.put(`/documents/${documentId}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Update document ${documentId} error:`, error);
+    throw error;
+  }
+},
   deleteDocument: async (documentId) => {
     try {
       const response = await api.delete(`/documents/${documentId}`);

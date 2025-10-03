@@ -87,7 +87,7 @@ const WorkspaceSidebar = ({
       id: 'dashboard',
       label: 'Dashboard',
       icon: Home,
-      path: `/workspace/${workspaceId}`,
+      path: `/workspaces/${workspaceId}`,
       badge: null,
       requiredPermission: 'read'
     },
@@ -95,7 +95,7 @@ const WorkspaceSidebar = ({
       id: 'documents',
       label: 'Documents',
       icon: FileText,
-      path: `/workspace/${workspaceId}/documents`,
+      path: `/workspaces/${workspaceId}/documents`,
       badge: documents?.length || 0,
       requiredPermission: 'read',
       expandable: true,
@@ -104,28 +104,28 @@ const WorkspaceSidebar = ({
           id: 'all-documents',
           label: 'All Documents',
           icon: FileText,
-          path: `/workspace/${workspaceId}/documents`,
+          path: `/workspaces/${workspaceId}/documents`,
           count: documents?.length || 0
         },
         {
           id: 'favorites',
           label: 'Favorites',
           icon: Star,
-          path: `/workspace/${workspaceId}/documents/favorites`,
+          path: `/workspaces/${workspaceId}/documents/favorites`,
           count: documents?.filter(d => d.isFavorite)?.length || 0
         },
         {
           id: 'recent',
           label: 'Recent',
           icon: Clock,
-          path: `/workspace/${workspaceId}/documents/recent`,
+          path: `/workspaces/${workspaceId}/documents/recent`,
           count: recentDocuments?.length || 0
         },
         {
           id: 'archived',
           label: 'Archived',
           icon: Archive,
-          path: `/workspace/${workspaceId}/documents/archived`,
+          path: `/workspaces/${workspaceId}/documents/archived`,
           count: documents?.filter(d => d.isArchived)?.length || 0
         }
       ]
@@ -134,7 +134,7 @@ const WorkspaceSidebar = ({
       id: 'members',
       label: 'Members',
       icon: Users,
-      path: `/workspace/${workspaceId}/members`,
+      path: `/workspaces/${workspaceId}/members`,
       badge: currentWorkspace?.members?.length || 0,
       requiredPermission: 'read'
     },
@@ -142,14 +142,14 @@ const WorkspaceSidebar = ({
       id: 'analytics',
       label: 'Analytics',
       icon: BarChart3,
-      path: `/workspace/${workspaceId}/analytics`,
+      path: `/workspaces/${workspaceId}/analytics`,
       requiredPermission: 'read'
     },
     {
       id: 'settings',
       label: 'Settings',
       icon: Settings,
-      path: `/workspace/${workspaceId}/settings`,
+      path: `/workspaces/${workspaceId}/settings`,
       requiredRole: 'admin'
     }
   ];
@@ -160,7 +160,7 @@ const WorkspaceSidebar = ({
       id: 'upload-document',
       label: 'Upload Document',
       icon: Plus,
-      action: () => navigate(`/workspace/${workspaceId}/upload`),
+      action: () => navigate(`/workspaces/${workspaceId}/upload`),
       requiredPermission: 'write',
       primary: true
     },
@@ -168,7 +168,7 @@ const WorkspaceSidebar = ({
       id: 'invite-member',
       label: 'Invite Member',
       icon: Users,
-      action: () => navigate(`/workspace/${workspaceId}/invite`),
+      action: () => navigate(`/workspaces/${workspaceId}/invite`),
       requiredRole: 'admin'
     }
   ];
@@ -326,7 +326,7 @@ const WorkspaceSidebar = ({
   const renderCategory = (category) => (
     <button
       key={category.id}
-      onClick={() => navigate(`/workspace/${workspaceId}/documents?category=${category.id}`)}
+      onClick={() => navigate(`/workspaces/${workspaceId}/documents?category=${category.id}`)}
       className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
     >
       <div className="flex items-center space-x-3">
@@ -466,7 +466,7 @@ const WorkspaceSidebar = ({
             {recentDocuments.slice(0, 3).map((doc) => (
               <button
                 key={doc._id}
-                onClick={() => navigate(`/workspace/${workspaceId}/documents/${doc._id}`)}
+                onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)}
                 className="w-full flex items-center space-x-2 p-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />

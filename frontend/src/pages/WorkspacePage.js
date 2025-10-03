@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -14,6 +15,13 @@ import { useWorkspaces } from '../hooks/useWorkspaces';
 import { useDocuments } from '../hooks/useDocuments';
 import { useInvitations } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
+import EditDocumentModal from '../components/EditDocumentModal';
+
+import {
+  selectCurrentWorkspaceId,
+  selectWorkspaceStats,
+  selectWorkspaceDocuments
+} from '../store/slices/documentsSlice';
 import {
   FolderIcon,
   DocumentIcon,
@@ -26,7 +34,9 @@ import {
   ArrowDownTrayIcon,
   ShareIcon,
   StarIcon,
-  PlusIcon
+  PlusIcon,
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import {
   StarIcon as StarIconSolid
@@ -36,6 +46,13 @@ const WorkspacePage = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+
+
+
+const [showEditModal, setShowEditModal] = useState(false);
+const [editingDocument, setEditingDocument] = useState(null);
+
 
   const {
     currentWorkspace,
@@ -49,9 +66,7 @@ const WorkspacePage = () => {
     getWorkspaceById
   } = useWorkspaces();
 
-  const {
-    workspaceDocuments,
-    workspaceStats,
+const {
     recentActivity,
     popularDocuments,
     loading: documentsLoading,
@@ -64,14 +79,14 @@ const WorkspacePage = () => {
     toggleFavorite
   } = useDocuments(workspaceId);
 
+const workspaceDocuments = useSelector(state =>
+  selectWorkspaceDocuments(state, workspaceId)
+);
   // Add this debugging right after the useDocuments call
-  console.log('🔍 WorkspacePage Debug:', {
-    workspaceId,
-    workspaceDocuments,
-    documentsCount: workspaceDocuments?.length || 0,
-    documentsLoading
-  });
-
+ 
+const workspaceStats = useSelector(state => 
+  selectWorkspaceStats(state, workspaceId)
+);
 
   const {
     workspaceInvitations,
@@ -92,6 +107,43 @@ const WorkspacePage = () => {
 
   // Load data based on whether we're in list or detail view
 // In WorkspacePage.js, REPLACE all the duplicate useEffect hooks with this single one:
+
+
+
+
+
+
+
+
+
+// Get the current workspace ID
+
+// Get stats for the current workspace
+
+
+// Get documents for the current workspace
+const documentStats = workspaceStats?.documents || {};
+const memberStats = workspaceStats?.members || {};
+
+const memberCount = memberStats.total || 0;
+const documentCount = documentStats.total || 0;
+const storageUsed = documentStats.totalSize || 0;
+const recentUploads = documentStats.recentUploads || 0;
+
+
+
+
+
+console.log('📊 WorkspacePage Stats:', {
+  workspaceStats,
+  documentStats,
+  memberStats,
+  calculatedValues: { memberCount, documentCount, storageUsed, recentUploads }
+});
+
+
+
+
 
 useEffect(() => {
   if (workspaceId && workspaceId !== ':workspaceId' && workspaceId !== 'undefined') {
@@ -118,6 +170,19 @@ useEffect(() => {
 }, [workspaceId]); // Remove all the function dependencies to avoid infinite loops
 
 
+const { deleteDocument } = useDocuments(workspaceId);
+
+const handleDeleteDocument = async (docId) => {
+  if (!window.confirm("Are you sure you want to delete this document?")) return;
+  try {
+    await deleteDocument(docId);
+    console.log("✅ Document deleted:", docId);
+    fetchWorkspaceDocuments(workspaceId); // refresh after delete
+  } catch (error) {
+    console.error("❌ Delete failed:", error);
+    alert("Failed to delete document.");
+  }
+};
 
   // Handle invitation submission
   const handleInviteSubmit = async (invitationData) => {
@@ -228,7 +293,7 @@ useEffect(() => {
                   <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
                     <div className="flex items-center">
                       <UserPlusIcon className="h-4 w-4 mr-1" />
-                      {(workspace.members?.length || 0) + 1} members
+                       {(workspace.members?.length || 0) } members
                     </div>
                     <div className="flex items-center">
                       <CalendarIcon className="h-4 w-4 mr-1" />
@@ -383,6 +448,15 @@ useEffect(() => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+
+console.log('📊 STATS DEBUG:', {
+  workspaceStats,
+  fullStructure: JSON.stringify(workspaceStats, null, 2),
+  documentsPath: workspaceStats?.documents,
+  membersPath: workspaceStats?.members
+});
+
+  
   const renderOverviewTab = () => (
     <div className="space-y-6">
       {/* Workspace Header */}
@@ -414,6 +488,9 @@ useEffect(() => {
                 <ClockIcon className="h-4 w-4 mr-1" />
                 Updated {formatDate(currentWorkspace.updatedAt)}
               </div>
+
+
+
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -445,68 +522,71 @@ useEffect(() => {
                 Settings
               </Button>
             </PermissionGuard>
+
+
+
           </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <DocumentIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Documents</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {workspaceStats?.totalDocuments || 0}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <FolderIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Storage Used</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {formatFileSize(workspaceStats?.totalSize || 0)}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <UserPlusIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Members</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {(currentWorkspace.members?.length || 0) + 1}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
-              <ChartBarIcon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">This Month</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {workspaceStats?.documentsThisMonth || 0}
-              </p>
-            </div>
-          </div>
-        </Card>
+     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+  <Card className="p-6">
+    <div className="flex items-center">
+      <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+        <DocumentIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
       </div>
+      <div className="ml-4">
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Documents</p>
+        <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {documentCount}
+        </p>
+      </div>
+    </div>
+  </Card>
+
+  <Card className="p-6">
+    <div className="flex items-center">
+      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+        <FolderIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
+      </div>
+      <div className="ml-4">
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Storage Used</p>
+        <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {formatFileSize(storageUsed)}
+        </p>
+      </div>
+    </div>
+  </Card>
+
+  <Card className="p-6">
+    <div className="flex items-center">
+      <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+        <UserPlusIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+      </div>
+      <div className="ml-4">
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Members</p>
+        <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {memberCount}
+        </p>
+      </div>
+    </div>
+  </Card>
+
+  <Card className="p-6">
+    <div className="flex items-center">
+      <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+        <ChartBarIcon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+      </div>
+      <div className="ml-4">
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">This Month</p>
+        <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {recentUploads}
+        </p>
+      </div>
+    </div>
+  </Card>
+</div>
 
       {/* Recent Documents and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -530,7 +610,7 @@ useEffect(() => {
                   <DocumentIcon className="h-5 w-5 text-gray-400 mr-3" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {doc.filename}
+                      {doc.name}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {formatDate(doc.uploadDate)} • {formatFileSize(doc.size)}
@@ -557,6 +637,8 @@ useEffect(() => {
                 </div>
               </div>
             ))}
+
+            
             {(!workspaceDocuments || workspaceDocuments.length === 0) && (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <DocumentIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -612,107 +694,133 @@ useEffect(() => {
       </div>
     </div>
   );
-  const renderDocumentsTab = () => {
-    return (
-      <div className="space-y-6">
-        {/* Documents Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Documents ({workspaceDocuments.length})
-            </h2>
-            <p className="text-gray-600 dark:text-gray-300">
-              Manage documents in this workspace
-            </p>
-          </div>
-          <PermissionGuard permissions={['write']} workspaceId={workspaceId}>
-            <Button onClick={() => navigate(`/workspaces/${workspaceId}/upload`)}>
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Upload Document
-            </Button>
-          </PermissionGuard>
+const renderDocumentsTab = () => {
+  return (
+    <div className="space-y-6">
+      {/* Documents Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Documents ({workspaceDocuments.length})
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            Manage documents in this workspace
+          </p>
         </div>
-
-        {/* Documents Grid/List */}
-        <div className={viewMode === 'grid'
-          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-          : 'space-y-4'
-        }>
-          {workspaceDocuments.map((doc) => (
-            <Card key={doc._id} className="p-4 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                    {doc.filename || doc.originalName || doc.name}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {formatFileSize(doc.size)} • {formatDate(doc.uploadDate || doc.createdAt)}
-                  </p>
-                </div>
-                <button
-                  onClick={() => toggleFavorite(doc._id)}
-                  className="text-gray-400 hover:text-yellow-500"
-                >
-                  {doc.isFavorite ? (
-                    <StarIconSolid className="h-5 w-5 text-yellow-500" />
-                  ) : (
-                    <StarIcon className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-
-              {doc.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
-                  {doc.description}
-                </p>
-              )}
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  {doc.category && (
-                    <Badge variant="secondary" size="sm">
-                      {doc.category}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)}
-                    >
-                      <EyeIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadDocument(doc)}  // ← Use the same handler!
-                    >
-                      <ArrowDownTrayIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <PermissionGuard permissions={['write']} workspaceId={workspaceId}>
+          <Button onClick={() => navigate(`/workspaces/${workspaceId}/upload`)}>
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Upload Document
+          </Button>
+        </PermissionGuard>
       </div>
-    );
-  };
+
+      {/* Documents Grid/List */}
+      <div className={viewMode === 'grid'
+        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+        : 'space-y-4'
+      }>
+        {workspaceDocuments.map((doc) => (
+          <Card key={doc._id} className="p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                  {doc.filename || doc.name}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {formatFileSize(doc.size)} • {formatDate(doc.uploadDate || doc.createdAt)}
+                </p>
+              </div>
+              <button
+                onClick={() => toggleFavorite(doc._id)}
+                className="text-gray-400 hover:text-yellow-500"
+              >
+                {doc.isFavorite ? (
+                  <StarIconSolid className="h-5 w-5 text-yellow-500" />
+                ) : (
+                  <StarIcon className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+
+            {doc.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
+                {doc.description}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {doc.category && (
+                  <Badge variant="secondary" size="sm">
+                    {doc.category}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)}
+                >
+                  <EyeIcon className="h-4 w-4" />
+                </Button>
+                
+                {/* ✅ EDIT BUTTON - CORRECT PLACEMENT */}
+                <PermissionGuard permissions={['edit']} workspaceId={workspaceId}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingDocument(doc);
+                      setShowEditModal(true);
+                    }}
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                  </Button>
+                </PermissionGuard>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadDocument(doc)}
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4" />
+                </Button>
+
+
+                <PermissionGuard permissions={['delete']} workspaceId={workspaceId}>
+    <Button
+      variant="outline"
+      size="sm"
+      className="text-red-600 hover:text-red-800"
+      onClick={() => handleDeleteDocument(doc._id)}
+    >
+      <TrashIcon className="h-4 w-4" />
+    </Button>
+  </PermissionGuard>
+
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div> 
+  );
+};
 
 
   const renderMembersTab = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Members
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            {(currentWorkspace.members?.length || 0) + 1} members in this workspace
-          </p>
-        </div>
+       <div>
+  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+    Members
+  </h2>
+  <p className="text-gray-600 dark:text-gray-300">
+    {memberCount} members in this workspace
+  </p>
+</div>
         <PermissionGuard permissions={['invite']} workspaceId={workspaceId}>
           <Button
             onClick={() => setShowInviteModal(true)}
@@ -779,6 +887,21 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      <EditDocumentModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingDocument(null);
+        }}
+        document={editingDocument}
+        workspaceId={workspaceId}
+        onSuccess={() => {
+          fetchWorkspaceDocuments(workspaceId);
+          setShowEditModal(false);
+          setEditingDocument(null);
+        }}
+      />
 
       {/* Invite Member Modal */}
       <InviteMemberModal

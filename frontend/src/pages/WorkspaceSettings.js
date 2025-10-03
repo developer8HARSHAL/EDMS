@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import {useSelector} from 'react-redux';
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
-import  Avatar  from '../components/ui/Avatar';
+import Avatar from '../components/ui/Avatar';
 import { Alert } from '../components/ui/Alert';
-import Modal  from '../components/ui/Modal';
-import  MemberList  from '../components/members/MemberList';
-import  InviteMemberModal  from '../components/members/InviteMemberModal';
-import  PermissionGuard  from '../components/permissions/PermissionGuard';
+import Modal from '../components/ui/Modal';
+import MemberList from '../components/members/MemberList';
+import InviteMemberModal from '../components/members/InviteMemberModal';
+import PermissionGuard from '../components/permissions/PermissionGuard';
 import { useWorkspaces } from '../hooks/useWorkspaces';
 import { useInvitations } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
@@ -26,6 +28,12 @@ import {
   CalendarIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
+import {
+  selectCurrentWorkspaceId,
+  selectWorkspaceStats,
+  selectWorkspaceDocuments
+} from '../store/slices/documentsSlice';
+
 
 const WorkspaceSettings = () => {
   const { workspaceId } = useParams();
@@ -34,19 +42,16 @@ const WorkspaceSettings = () => {
 
   const {
     currentWorkspace,
-    workspaceMembers,
-    workspaceStats,
-    userRole,
     isLoading: workspaceLoading,
-    error: workspaceError,
+    hasError: workspaceError,
     fetchWorkspace,
-    fetchWorkspaceMembers,
-    fetchWorkspaceStats,
+    fetchStats,
     updateWorkspace,
     deleteWorkspace,
     removeMember,
     updateMemberRole,
-    leaveWorkspace
+    leaveWorkspace,
+    getUserRole
   } = useWorkspaces();
 
   const {
@@ -54,11 +59,24 @@ const WorkspaceSettings = () => {
     invitationStats,
     isLoading: invitationsLoading,
     fetchWorkspaceInvitations,
-    fetchInvitationStats,
     cancelInvitation,
     resendInvitation,
-    cleanupExpiredInvitations
+    cleanupExpired,
+    sendInvitation
   } = useInvitations();
+const workspaceStats = useSelector(state => 
+  selectWorkspaceStats(state, workspaceId)
+);
+
+const documentStats = workspaceStats?.documents || {};
+const documentCount = documentStats.total || 0;
+
+
+  // Extract members from currentWorkspace
+  const workspaceMembers = currentWorkspace?.members || [];
+  
+  // Get user role for this workspace
+  const userRole = getUserRole(workspaceId);
 
   // Local state
   const [activeTab, setActiveTab] = useState('general');
@@ -79,12 +97,15 @@ const WorkspaceSettings = () => {
   useEffect(() => {
     if (workspaceId) {
       fetchWorkspace(workspaceId);
-      fetchWorkspaceMembers(workspaceId);
-      fetchWorkspaceStats(workspaceId);
+      
+      // Try to fetch stats but don't fail if it errors
+      fetchStats(workspaceId).catch(err => {
+        console.warn('Could not fetch workspace stats:', err);
+      });
+      
       fetchWorkspaceInvitations(workspaceId);
-      fetchInvitationStats(workspaceId);
     }
-  }, [workspaceId]);
+  }, [workspaceId, fetchWorkspace, fetchStats, fetchWorkspaceInvitations]);
 
   // Update form when workspace data loads
   useEffect(() => {
@@ -108,7 +129,7 @@ const WorkspaceSettings = () => {
 
     setIsUpdating(true);
     try {
-      await updateWorkspace(workspaceId, workspaceForm);
+      await updateWorkspace({ workspaceId, updates: workspaceForm });
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
     } catch (error) {
@@ -163,11 +184,23 @@ const WorkspaceSettings = () => {
 
   const handleCleanupExpired = async () => {
     try {
-      await cleanupExpiredInvitations(workspaceId);
+      await cleanupExpired(workspaceId);
       fetchWorkspaceInvitations(workspaceId);
-      fetchInvitationStats(workspaceId);
     } catch (error) {
       console.error('Failed to cleanup expired invitations:', error);
+    }
+  };
+
+  // Handle send invitation - matches InviteMemberModal's onSendInvitation prop
+  const handleSendInvitation = async (invitationData) => {
+    try {
+      console.log('Sending invitation from WorkspaceSettings:', invitationData);
+      await sendInvitation(invitationData);
+      await fetchWorkspaceInvitations(workspaceId);
+      setShowInviteModal(false);
+    } catch (error) {
+      console.error('Failed to send invitation:', error);
+      throw error; // Re-throw so modal can handle it
     }
   };
 
@@ -306,7 +339,7 @@ const WorkspaceSettings = () => {
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Documents</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {workspaceStats?.totalDocuments || 0}
+                   {documentCount}
                 </p>
               </div>
             </div>
@@ -356,12 +389,7 @@ const WorkspaceSettings = () => {
           Workspace Information
         </h3>
         <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Workspace ID</span>
-            <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-              {currentWorkspace._id}
-            </code>
-          </div>
+         
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Visibility</span>
             <Badge variant={currentWorkspace.isPublic ? 'success' : 'gray'}>
@@ -464,10 +492,12 @@ const WorkspaceSettings = () => {
         <MemberList
           members={workspaceMembers}
           workspaceId={workspaceId}
+          currentUserId={user?.id}
           currentUserRole={userRole}
           isLoading={workspaceLoading}
-          onRemoveMember={removeMember}
-          onUpdateRole={updateMemberRole}
+          onRemoveMember={(memberId) => removeMember(workspaceId, memberId)}
+          onUpdateRole={(memberId, roleData) => updateMemberRole(workspaceId, memberId, roleData)}
+          onInviteMembers={() => setShowInviteModal(true)}
         />
       </Card>
     </div>
@@ -862,15 +892,11 @@ const WorkspaceSettings = () => {
       <InviteMemberModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
-        workspaceId={workspaceId}
-        workspaceName={currentWorkspace?.name}
-        onInviteSent={() => {
-          fetchWorkspaceInvitations(workspaceId);
-          fetchInvitationStats(workspaceId);
-        }}
+        workspace={currentWorkspace}
+        onSendInvitation={handleSendInvitation}
       />
     </div>
   );
 };
 
-export default WorkspaceSettings;
+export default WorkspaceSettings

@@ -490,7 +490,7 @@ async createWorkspace(workspaceData) {
 
       // ✅ FIXED: Use workspaceApi.getWorkspaceStats directly
       const response = await workspaceApi.getWorkspaceStats(workspaceId);
-      return response.data.workspace || response.data;
+     return response.data;  
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch workspace statistics');
     }
