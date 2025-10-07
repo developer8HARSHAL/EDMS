@@ -206,15 +206,26 @@ getWorkspace: async (workspaceId) => {
     }
   },
 
-  updateWorkspace: async (workspaceId, updates) => {
-    try {
-      const response = await api.put(`/workspaces/${workspaceId}`, updates);
-      return response.data;
-    } catch (error) {
-      console.error('Update workspace error:', error);
-      throw error;
+updateWorkspace: async (workspaceId, updates) => {
+  try {
+    const response = await api.put(`/workspaces/${workspaceId}`, updates);
+
+    // ✅ Handle 204 No Content or missing JSON body gracefully
+    if (response.status === 204 || !response.data) {
+      return { success: true };
     }
-  },
+
+    return response.data;
+  } catch (error) {
+    console.error('Update workspace error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;
+  }
+},
+
 
   deleteWorkspace: async (workspaceId) => {
     try {
@@ -330,7 +341,7 @@ getWorkspace: async (workspaceId) => {
 // Add this to temporarily bypass other failing API calls
 export const mockApiCall = async (endpoint) => {
   console.log(`🔧 Mock API call to ${endpoint}`);
-  await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise(resolve => setTimeout(resolve, 400));
   return { data: { success: true, data: [] } };
 };
 

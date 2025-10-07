@@ -36,9 +36,14 @@ import {
 
 
 const WorkspaceSettings = () => {
-  const { workspaceId } = useParams();
+ const { workspaceId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  console.log('🔍 WorkspaceSettings mounted');
+  console.log('📋 workspaceId from params:', workspaceId);
+  console.log('👤 user:', user);
+
 
   const {
     currentWorkspace,
@@ -105,7 +110,7 @@ const documentCount = documentStats.total || 0;
       
       fetchWorkspaceInvitations(workspaceId);
     }
-  }, [workspaceId, fetchWorkspace, fetchStats, fetchWorkspaceInvitations]);
+  }, [workspaceId]);
 
   // Update form when workspace data loads
   useEffect(() => {
@@ -123,22 +128,40 @@ const documentCount = documentStats.total || 0;
   const isOwner = userRole === 'owner';
 
   // Handle workspace update
-  const handleUpdateWorkspace = async (e) => {
-    e.preventDefault();
-    if (!isAdmin) return;
+const handleUpdateWorkspace = async (e) => {
+  e.preventDefault();
+  if (!isAdmin) return;
 
-    setIsUpdating(true);
-    try {
-      await updateWorkspace({ workspaceId, updates: workspaceForm });
-      setUpdateSuccess(true);
-      setTimeout(() => setUpdateSuccess(false), 3000);
-    } catch (error) {
-      console.error('Failed to update workspace:', error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+  setIsUpdating(true);
+  setUpdateSuccess(false); // Clear previous success state
+  
+  try {
+    // ✅ CORRECT: Pass workspaceId and updates as separate parameters
+    await updateWorkspace(workspaceId, {
+      name: workspaceForm.name,
+      description: workspaceForm.description,
+      settings: {
+        isPublic: workspaceForm.isPublic,
+      }
+    });
 
+    // ✅ CRITICAL: Refetch workspace to get updated data
+    await fetchWorkspace(workspaceId);
+    
+    // Show success message
+    setUpdateSuccess(true);
+
+    // Keep success message visible longer (2 seconds)
+    setTimeout(() => setUpdateSuccess(false), 2000);
+    
+    console.log('✅ Workspace updated successfully');
+  } catch (error) {
+    console.error('❌ Failed to update workspace:', error);
+    // TODO: Add error toast notification here
+  } finally {
+    setIsUpdating(false);
+  }
+};
   // Handle workspace deletion
   const handleDeleteWorkspace = async () => {
     if (!isOwner) return;
@@ -216,37 +239,43 @@ const documentCount = documentStats.total || 0;
   };
 
   // Loading state
-  if (workspaceLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    );
-  }
+ if (workspaceLoading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full"></div>
+    </div>
+  );
+}
 
-  // Error state
-  if (workspaceError || !currentWorkspace) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <Card className="max-w-md mx-auto text-center p-6">
-          <div className="text-red-600 mb-4">
-            <ExclamationTriangleIcon className="h-12 w-12 mx-auto" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Access Denied
-          </h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            You don't have permission to access workspace settings.
-          </p>
-          <Button onClick={() => navigate(`/workspaces/${workspaceId}`)}>
-            Back to Workspace
-          </Button>
-        </Card>
-      </div>
-    );
-  }
+if (workspaceError) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Card className="max-w-md mx-auto text-center p-6">
+        <div className="text-red-600 mb-4">
+          <ExclamationTriangleIcon className="h-12 w-12 mx-auto" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Access Denied
+        </h3>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
+          You don't have permission to access workspace settings.
+        </p>
+        <Button onClick={() => navigate(`/workspaces/${workspaceId}`)}>
+          Back to Workspace
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+if (!currentWorkspace) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-gray-600">Loading workspace...</p>
+    </div>
+  );
+}
+
 
   const renderGeneralTab = () => (
     <div className="space-y-6">

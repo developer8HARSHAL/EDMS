@@ -1,6 +1,8 @@
 // frontend/src/pages/Dashboard.js - FIXED: Maximum update depth exceeded
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+
 import {
   DocumentIcon,
   CloudArrowUpIcon,
@@ -44,7 +46,11 @@ import { Input } from '../components/ui/Input';
 
 
 
+
 const Dashboard = () => {
+
+
+
   const navigate = useNavigate();
   const { user, isAuthenticated, tokenValidated } = useAuth();
 
@@ -80,7 +86,34 @@ const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [workspaceSearch, setWorkspaceSearch] = useState('');
 
-  const [activeTab, setActiveTab] = useState('overview'); // overview, workspaces, activity
+  // Initialize tab from URL
+const getInitialTab = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabParam = urlParams.get('tab');
+  if (tabParam && ['overview', 'workspaces', 'activity'].includes(tabParam)) {
+    return tabParam;
+  }
+  return 'overview';
+};
+
+const [activeTab, setActiveTab] = useState(getInitialTab);
+const [searchParams, setSearchParams] = useSearchParams();
+
+// Update tab when URL changes
+useEffect(() => {
+  const tabParam = searchParams.get('tab');
+  if (tabParam && ['overview', 'workspaces', 'activity'].includes(tabParam)) {
+    setActiveTab(tabParam);
+  }
+}, [searchParams]);
+
+// Handler to change tabs
+const handleTabChange = (tabId) => {
+  setActiveTab(tabId);
+  setSearchParams({ tab: tabId }, { replace: true });
+};
+
+// overview, workspaces, activity
   const [recentActivity, setRecentActivity] = useState([]);
 
   // âœ… FIX: Create stable reference for fetchData function
@@ -308,7 +341,7 @@ const Dashboard = () => {
 
   const TabButton = ({ id, label, icon: Icon, active, onClick }) => (
     <button
-      onClick={() => onClick(id)}
+      onClick={() => handleTabChange(id)}
       className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${active
           ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
           : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
@@ -341,7 +374,7 @@ const Dashboard = () => {
 
             <div className="flex space-x-3">
               <Button
-                onClick={() => setShowCreateModal(true)} workspaceList
+                onClick={() => setShowCreateModal(true)}
                 leftIcon={<PlusIcon className="h-4 w-4" />}
               >
                 New Workspace

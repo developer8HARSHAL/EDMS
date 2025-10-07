@@ -482,19 +482,24 @@ async createWorkspace(workspaceData) {
    * @param {string} workspaceId - Workspace ID
    * @returns {Promise} API response
    */
-  async getWorkspaceStats(workspaceId) {
-    try {
-      if (!workspaceId) {
-        throw new Error('Workspace ID is required');
-      }
-
-      // ✅ FIXED: Use workspaceApi.getWorkspaceStats directly
-      const response = await workspaceApi.getWorkspaceStats(workspaceId);
-     return response.data;  
-    } catch (error) {
-      throw this.handleError(error, 'Failed to fetch workspace statistics');
+async getWorkspaceStats(workspaceId) {
+  try {
+    if (!workspaceId) {
+      throw new Error('Workspace ID is required');
     }
+
+    const response = await workspaceApi.getWorkspaceStats(workspaceId);
+    
+    // ✅ Return the inner data object, not the wrapper
+    if (response.success && response.data) {
+      return response.data;
+    }
+    
+    throw new Error('Invalid stats response format');
+  } catch (error) {
+    throw this.handleError(error, 'Failed to fetch workspace statistics');
   }
+}
 
   /**
    * Get workspace documents

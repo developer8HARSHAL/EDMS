@@ -308,12 +308,12 @@ const handleDropdownToggle = useCallback((dropdownName) => {
                       >
                         My Profile
                       </RouterLink>
-                      <RouterLink
+                      {/* <RouterLink
                         to="/settings"
                         className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
                       >
                         Settings
-                      </RouterLink>
+                      </RouterLink> */}
                       {invitationData.pendingInvitations.length > 0 && (
                         <RouterLink
                           to="/invitations"
@@ -478,7 +478,7 @@ const DesktopNav = React.memo(({
           {
             label: 'Browse Workspaces',
             subLabel: 'View all your workspaces',
-            href: '/workspaces',
+            href: '/dashboard?tab=workspaces',
             icon: BuildingOfficeIcon,
           },
           ...workspaces.slice(0, 5).map(workspace => ({
@@ -490,7 +490,7 @@ const DesktopNav = React.memo(({
           ...(workspaces.length > 5 ? [{
             label: 'View All',
             subLabel: `+${workspaces.length - 5} more workspaces`,
-            href: '/workspaces',
+             href: '/dashboard#workspaces',
             icon: ChevronRightIcon,
           }] : []),
         ],

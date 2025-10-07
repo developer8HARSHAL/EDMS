@@ -28,8 +28,8 @@ const WorkspaceCard = ({
   const [showDropdown, setShowDropdown] = useState(false);
 
   // Determine if user can perform admin actions
-  const canEdit = userRole === 'admin' || userRole === 'owner';
-  const canDelete = userRole === 'owner';
+  const canEdit = userRole === 'admin' || userRole === 'owner' || userRole === 'editor';
+  const canDelete = userRole === 'owner'|| userRole === 'admin';
   const canInvite = userRole === 'admin' || userRole === 'owner';
 
   // Format member count
@@ -55,36 +55,47 @@ const WorkspaceCard = ({
   // Handle card click to navigate to workspace
   const handleCardClick = (e) => {
     // Don't navigate if clicking on dropdown or action buttons
-    if (e.target.closest('.dropdown-container') || e.target.closest('.action-button')) {
+    if (e.target.closest('.dropdown-container') || 
+        e.target.closest('.action-button') ||
+        e.target.closest('.dropdown-menu')) {
       return;
     }
     navigate(`/workspaces/${workspace._id}`);
   };
 
-  // Handle dropdown actions
+  // Handle dropdown actions - FIXED VERSION
   const handleAction = (action, e) => {
+    e.preventDefault();
     e.stopPropagation();
     setShowDropdown(false);
     
-    switch (action) {
-      case 'edit':
-        onEdit?.(workspace);
-        break;
-      case 'delete':
-        onDelete?.(workspace);
-        break;
-      case 'invite':
-        onInviteMembers?.(workspace);
-        break;
-      case 'members':
-        onViewMembers?.(workspace);
-        break;
-      case 'settings':
-        navigate(`/workspaces/${workspace._id}/settings`);
-        break;
-      default:
-        break;
-    }
+    // Use setTimeout to ensure state updates before navigation/actions
+    setTimeout(() => {
+      switch (action) {
+        case 'edit':
+          if (onEdit) onEdit(workspace);
+          navigate(`/workspaces/${workspace._id}`);
+          
+          
+
+          break;
+        case 'delete':
+          if (onDelete) onDelete(workspace);
+          break;
+        case 'invite':
+          if (onInviteMembers) onInviteMembers(workspace);
+          break;
+        case 'members':
+          if (onViewMembers) onViewMembers(workspace);
+          break;
+        case 'settings':
+          console.log('Navigating to settings:', `/workspaces/${workspace._id}/settings`);
+          navigate(`/workspaces/${workspace._id}/settings`);
+          break;
+        default:
+          break;
+      }
+    }, 0);
   };
 
   return (
@@ -129,9 +140,11 @@ const WorkspaceCard = ({
             <button
               className="action-button p-2 hover:bg-gray-100 rounded-lg transition-colors"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setShowDropdown(!showDropdown);
               }}
+              onMouseDown={(e) => e.stopPropagation()}
             >
               <MoreVertical className="w-4 h-4 text-gray-500" />
             </button>
@@ -141,14 +154,18 @@ const WorkspaceCard = ({
                 {/* Backdrop */}
                 <div 
                   className="fixed inset-0 z-10"
-                  onClick={() => setShowDropdown(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDropdown(false);
+                  }}
                 />
                 
                 {/* Dropdown Menu */}
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                <div className="dropdown-menu absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
                   <button
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                     onClick={(e) => handleAction('members', e)}
+                    onMouseDown={(e) => e.stopPropagation()}
                   >
                     <Eye className="w-4 h-4" />
                     View Members
@@ -158,6 +175,7 @@ const WorkspaceCard = ({
                     <button
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                       onClick={(e) => handleAction('invite', e)}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
                       <UserPlus className="w-4 h-4" />
                       Invite Members
@@ -170,6 +188,7 @@ const WorkspaceCard = ({
                       <button
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                         onClick={(e) => handleAction('edit', e)}
+                        onMouseDown={(e) => e.stopPropagation()}
                       >
                         <Edit className="w-4 h-4" />
                         Edit Workspace
@@ -178,6 +197,7 @@ const WorkspaceCard = ({
                       <button
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                         onClick={(e) => handleAction('settings', e)}
+                        onMouseDown={(e) => e.stopPropagation()}
                       >
                         <Settings className="w-4 h-4" />
                         Settings
@@ -191,6 +211,7 @@ const WorkspaceCard = ({
                       <button
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
                         onClick={(e) => handleAction('delete', e)}
+                        onMouseDown={(e) => e.stopPropagation()}
                       >
                         <Trash2 className="w-4 h-4" />
                         Delete Workspace
@@ -212,7 +233,7 @@ const WorkspaceCard = ({
           
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
-            <span>{formatDocumentCount(workspace.documentCount ||  0)}</span>
+            <span>{formatDocumentCount(workspace.documentCount || 0)}</span>
           </div>
           
           <div className="flex items-center gap-2">

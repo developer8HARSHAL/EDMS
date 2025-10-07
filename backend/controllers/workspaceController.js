@@ -223,10 +223,12 @@ const getWorkspace = async (req, res) => {
 const updateWorkspace = async (req, res) => {
   try {
     const { name, description, settings } = req.body;
-    // Workspace is already attached by middleware and permission checked
     const workspace = req.workspace;
 
-    // Check name uniqueness if name is being changed
+    if (!workspace) {
+      return res.status(404).json({ success: false, message: 'Workspace not found' });
+    }
+
     if (name && name.trim() !== workspace.name) {
       const existingWorkspace = await Workspace.findOne({
         name: name.trim(),
@@ -245,29 +247,40 @@ const updateWorkspace = async (req, res) => {
       }
     }
 
-    // Update workspace
     const updateData = {};
     if (name) updateData.name = name.trim();
     if (description !== undefined) updateData.description = description?.trim();
     if (settings) updateData.settings = { ...workspace.settings, ...settings };
 
-    const updatedWorkspace = await Workspace.findByIdAndUpdate(
-      workspace._id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate('owner', 'name email')
-     .populate('members.user', 'name email');
+const updatedWorkspace = await Workspace.findByIdAndUpdate(
+  workspace._id,
+  updateData,
+  { new: true, runValidators: true }
+)
+  .populate({
+    path: 'owner',
+    select: 'name email',
+    options: { strictPopulate: false }
+  })
+  .populate({
+    path: 'members.user',
+    select: 'name email',
+    options: { strictPopulate: false }
+  })
+   // <-- converts to plain JS object, avoids circular refs
+
+    if (!updatedWorkspace) {
+      return res.status(404).json({ success: false, message: 'Workspace not found after update' });
+    }
 
     res.status(200).json({
-  success: true,
-  message: 'Workspace updated successfully',
-  data: {
-    workspace: updatedWorkspace
-  }
-});
+      success: true,
+      message: 'Workspace updated successfully',
+      data: { workspace: updatedWorkspace }
+    });
 
   } catch (error) {
-    console.error('Update workspace error:', error);
+    console.error('❌ Update workspace error:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating workspace',
@@ -275,6 +288,7 @@ const updateWorkspace = async (req, res) => {
     });
   }
 };
+
 
 // ✅ FIXED: Delete workspace - Middleware handles admin check
 // @desc    Delete workspace

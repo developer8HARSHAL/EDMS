@@ -48,13 +48,13 @@ const DocumentList = () => {
     isLoading: documentsLoading = false,
     error: documentsError = null,
     searchQuery = '',
-    setSearchQuery = () => {},
+    setSearchQuery = () => { },
     filters: documentFilters = {},
-    updateFilters = () => {},
-    fetchDocuments = () => {},
-    fetchWorkspaceDocuments = () => {},
-    toggleFavorite = () => {},
-    deleteDocument = () => {}
+    updateFilters = () => { },
+    fetchDocuments = () => { },
+    fetchWorkspaceDocuments = () => { },
+    toggleFavorite = () => { },
+    deleteDocument = () => { }
   } = documentsHookResult || {};
 
   const {
@@ -63,8 +63,8 @@ const DocumentList = () => {
     userRole = null,
     userPermissions = {},
     isLoading: workspacesLoading = false,
-    fetchWorkspaces = () => {},
-    fetchWorkspace = () => {}
+    fetchWorkspaces = () => { },
+    fetchWorkspace = () => { }
   } = workspacesHookResult || {};
 
   // Create a proper setDocumentFilters function if updateFilters doesn't work as expected
@@ -85,34 +85,34 @@ const DocumentList = () => {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Initialize filters from URL params
-useEffect(() => {
-  const category = searchParams.get('category') || '';
-  const tag = searchParams.get('tag') || '';
-  const type = searchParams.get('type') || '';
-  const favorite = searchParams.get('favorite') === 'true';
+  useEffect(() => {
+    const category = searchParams.get('category') || '';
+    const tag = searchParams.get('tag') || '';
+    const type = searchParams.get('type') || '';
+    const favorite = searchParams.get('favorite') === 'true';
 
-  // Only update if we have actual changes
-  setDocumentFilters(prev => {
-    const current = prev || {};
-    if (
-      current.category === category &&
-      current.tag === tag &&
-      current.type === type &&
-      current.favorite === favorite
-    ) {
-      return current; // Return same object reference to prevent re-render
-    }
-    return { ...current, category, tag, type, favorite };
-  });
-}, [searchParams]); // Remove setDocumentFilters from here
+    // Only update if we have actual changes
+    setDocumentFilters(prev => {
+      const current = prev || {};
+      if (
+        current.category === category &&
+        current.tag === tag &&
+        current.type === type &&
+        current.favorite === favorite
+      ) {
+        return current; // Return same object reference to prevent re-render
+      }
+      return { ...current, category, tag, type, favorite };
+    });
+  }, [searchParams]); // Remove setDocumentFilters from here
 
   // Redirect unauthenticated users to login
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login', { 
-        state: { 
-          from: workspaceId ? `/workspaces/${workspaceId}/documents` : '/documents' 
-        } 
+      navigate('/login', {
+        state: {
+          from: workspaceId ? `/workspaces/${workspaceId}/documents` : '/documents'
+        }
       });
     }
   }, [isAuthenticated, navigate, workspaceId]);
@@ -120,7 +120,7 @@ useEffect(() => {
   // Load data based on context (workspace or all documents)
   useEffect(() => {
     if (!isAuthenticated) return;
-    
+
     if (workspaceId) {
       if (typeof fetchWorkspaceDocuments === 'function') {
         fetchWorkspaceDocuments(workspaceId);
@@ -390,29 +390,7 @@ useEffect(() => {
     <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="container mx-auto px-4 py-8">
         {/* Debug Button - Remove in production */}
-        <div className="mb-4">
-          <button 
-            onClick={async () => {
-              try {
-                console.log('Testing direct API call...');
-                const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-                const result = await fetch('/api/documents', {
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                const data = await result.json();
-                console.log('Direct API result:', data);
-              } catch (err) {
-                console.error('Direct API error:', err);
-              }
-            }}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Test Direct API
-          </button>
-        </div>
+       
 
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 space-y-4 lg:space-y-0">
@@ -480,9 +458,9 @@ useEffect(() => {
 
             {/* Upload Button */}
             <PermissionGuard
-              permissions={['write']}
+              requiredPermissions={['write']}  // ✅ Changed from 'permissions'
               workspaceId={workspaceId}
-              fallback={!workspaceId}
+              showFallback={false}  // ✅ Don't show warning, just hide button
             >
               <Button
                 onClick={() => navigate(
@@ -674,9 +652,9 @@ useEffect(() => {
                   }
                 </p>
                 <PermissionGuard
-                  permissions={['write']}
+                  requiredPermissions={['write']}  // ✅ Changed from 'permissions'
                   workspaceId={workspaceId}
-                  fallback={!workspaceId}
+                  showFallback={false}
                 >
                   <Button
                     onClick={() => navigate(
@@ -721,7 +699,7 @@ useEffect(() => {
                     <DocumentIcon className={`h-8 w-8 ${getFileTypeIcon(doc.mimeType || doc.fileType)}`} />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {doc.filename || 'Unnamed Document'}
+                        {doc.name || 'Unnamed Document'}
                       </h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {formatFileSize(doc.size)}
@@ -807,13 +785,13 @@ useEffect(() => {
                       <ArrowDownTrayIcon className="h-4 w-4" />
                     </button>
                     <PermissionGuard
-                      permissions={['write']}
+                      requiredPermissions={['delete']}  // ✅ Changed from 'permissions'
                       workspaceId={workspaceId}
-                      fallback={isOwner(doc)}
+                      showFallback={false}
                     >
                       <button
                         onClick={() => handleDeleteDocument(doc._id || doc.id)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                        className="text-red-600 dark:text-red-400 hover:text-red-800"
                         title="Delete"
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -884,7 +862,7 @@ useEffect(() => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center">
                               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                {doc.filename || 'Unnamed Document'}
+                                {doc.name || 'Unnamed Document'}
                               </p>
                               <button
                                 onClick={() => handleToggleFavorite(doc._id || doc.id)}
@@ -971,13 +949,13 @@ useEffect(() => {
                             <ArrowDownTrayIcon className="h-4 w-4" />
                           </button>
                           <PermissionGuard
-                            permissions={['write']}
+                            requiredPermissions={['delete']}  // ✅ Changed from 'permissions'
                             workspaceId={workspaceId}
-                            fallback={isOwner(doc)}
+                            showFallback={false}
                           >
                             <button
                               onClick={() => handleDeleteDocument(doc._id || doc.id)}
-                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                              className="text-red-600 dark:text-red-400 hover:text-red-800"
                               title="Delete"
                             >
                               <TrashIcon className="h-4 w-4" />

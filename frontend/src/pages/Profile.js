@@ -7,7 +7,7 @@ import {Alert} from '../components/ui/Alert';
 import {Card} from '../components/ui/Card';
 
 const Profile = () => {
-  const { user, updateUserProfile, error } = useAuth();
+  const { user, updateProfile, error } = useAuth();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -91,7 +91,7 @@ const Profile = () => {
       }
       
       // Call API to update profile
-      await updateUserProfile(profileData);
+      await updateProfile(profileData);
       
       setSuccessMessage('Your profile has been successfully updated');
       

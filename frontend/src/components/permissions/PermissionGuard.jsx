@@ -44,6 +44,9 @@ const PermissionGuard = ({
   const userRole = getUserRole(actualWorkspaceId, targetUserId);
   const userPermissions = getUserPermissions(actualWorkspaceId, targetUserId);
 
+
+
+
   // Permission checking functions
   const checkRolePermission = () => {
     if (!userRole) return false;
@@ -141,25 +144,21 @@ const checkPermissions = () => {
   };
 
   // Main permission check
-   const hasPermission = () => {
-    // Basic checks
-    if (!currentUser || !workspace) return false;
-    
-    // Check if user is member of workspace
-    if (!userRole) return false;
-    
-    // Check ownership requirement
-    if (!checkOwnership()) return false;
-    
-    // Check role-based permissions
-    if (!checkRolePermission()) return false;
-    
-    // Check specific permissions
-    if (!checkPermissions()) return false;
-    
-    return true;
-  };
+const hasPermission = () => {
+  // ✅ Non-workspace context: use fallback prop
+    if (!actualWorkspaceId) { 
+    return fallback === true || fallback === null;
+  }
 
+  // ✅ Workspace context: check permissions
+  if (!currentUser || !workspace) return false;
+  if (!userRole) return false;
+  if (!checkOwnership()) return false;
+  if (!checkRolePermission()) return false;
+  if (!checkPermissions()) return false;
+  
+  return true;
+};
   // Role hierarchy helper
   const getRoleHierarchy = () => {
     const hierarchy = ['viewer', 'editor', 'admin', 'owner'];

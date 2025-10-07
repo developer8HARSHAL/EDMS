@@ -600,19 +600,20 @@ exports.updateDocument = async (req, res) => {
 
 
 
-// @desc    Delete document
-// @route   DELETE /api/documents/:id
-// @access  Private
-// @desc    Delete document
-// @route   DELETE /api/documents/:id
-// @access  Private
+
 // @desc    Delete document
 // @route   DELETE /api/documents/:id
 // @access  Private
 exports.deleteDocument = async (req, res) => {
   try {
-    // Populate workspace members
-    const document = await Document.findById(req.params.id).populate("workspace");
+    // Populate workspace with members to check permissions
+    const document = await Document.findById(req.params.id).populate({
+      path: 'workspace',
+      populate: {
+        path: 'members.user',
+        select: '_id'
+      }
+    });
 
     if (!document) {
       return res.status(404).json({
@@ -621,36 +622,64 @@ exports.deleteDocument = async (req, res) => {
       });
     }
 
-    console.log("Delete request by:", req.user);
-    console.log("Document owner:", document.owner);
-    console.log("Workspace members:", document.workspace?.members);
+    console.log("Delete request by user:", req.user.id);
+    console.log("Document workspace:", document.workspace?._id);
 
-    // Unified: owner is also treated as admin
-    const isAdminOrOwner = document.workspace?.members?.some(
-      (member) =>
-        member.user.toString() === req.user.id &&
-        (member.role === "admin" || member.user.toString() === document.owner.toString())
-    );
+    // For workspace documents, check role-based permissions
+    if (document.workspace) {
+      // Check if user is workspace owner
+      const isWorkspaceOwner = document.workspace.owner.toString() === req.user.id;
+      
+      console.log("Is workspace owner?", isWorkspaceOwner);
 
-    if (!isAdminOrOwner) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to delete this document"
-      });
+      // Find member in workspace
+      const member = document.workspace.members.find(
+        m => {
+          const memberId = m.user._id ? m.user._id.toString() : m.user.toString();
+          return memberId === req.user.id;
+        }
+      );
+
+      console.log("Member found:", member);
+      console.log("Member permissions:", member?.permissions);
+      console.log("Member role:", member?.role);
+
+      // Check permissions
+      const canDelete = member?.permissions?.canDelete === true;
+      const isAdmin = member?.role === 'admin';
+
+      console.log("Can delete?", canDelete);
+      console.log("Is admin?", isAdmin);
+
+      if (!isWorkspaceOwner && !canDelete && !isAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to delete this document"
+        });
+      }
+    } else {
+      // For non-workspace documents, check ownership
+      if (document.owner.toString() !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to delete this document"
+        });
+      }
     }
 
-    // Delete file from GridFS if exists
+    // Delete file from GridFS
     try {
       if (document.path) {
-        const fileId = new ObjectId(document.path); // GridFS file ID
+        const fileId = new ObjectId(document.path);
         await gfs.delete(fileId);
+        console.log("File deleted from GridFS");
       }
     } catch (fileError) {
       console.error("Error deleting file from GridFS:", fileError);
     }
 
-    // Remove document from database
     await Document.deleteOne({ _id: req.params.id });
+    console.log("Document deleted from database");
 
     res.status(200).json({
       success: true,
@@ -665,66 +694,6 @@ exports.deleteDocument = async (req, res) => {
     });
   }
 };
-// @desc    Delete document
-// @route   DELETE /api/documents/:id
-// @access  Private
-exports.deleteDocument = async (req, res) => {
-  try {
-    // Populate workspace members
-    const document = await Document.findById(req.params.id).populate("workspace");
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found"
-      });
-    }
-
-    console.log("Delete request by:", req.user);
-    console.log("Document owner:", document.owner);
-    console.log("Workspace members:", document.workspace?.members);
-
-    // Unified: owner is also treated as admin
-    const isAdminOrOwner = document.workspace?.members?.some(
-      (member) =>
-        member.user.toString() === req.user.id &&
-        (member.role === "admin" || member.user.toString() === document.owner.toString())
-    );
-
-    if (!isAdminOrOwner) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to delete this document"
-      });
-    }
-
-    // Delete file from GridFS if exists
-    try {
-      if (document.path) {
-        const fileId = new ObjectId(document.path); // GridFS file ID
-        await gfs.delete(fileId);
-      }
-    } catch (fileError) {
-      console.error("Error deleting file from GridFS:", fileError);
-    }
-
-    // Remove document from database
-    await Document.deleteOne({ _id: req.params.id });
-
-    res.status(200).json({
-      success: true,
-      message: "Document deleted successfully"
-    });
-  } catch (error) {
-    console.error("Error deleting document:", error);
-    res.status(500).json({
-      success: false,
-      message: "Could not delete document",
-      error: error.message
-    });
-  }
-};
-
 
 
 

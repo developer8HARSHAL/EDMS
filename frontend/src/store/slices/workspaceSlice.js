@@ -252,11 +252,20 @@ export const fetchWorkspaceStats = createAsyncThunk(
   async (workspaceId, { rejectWithValue }) => {
     try {
       const response = await workspaceService.getWorkspaceStats(workspaceId);
-      if (response.success && response.data) {
+      
+      // Check what we actually received
+      console.log('📊 Stats response:', response);
+      
+      // If response has data property, return that
+      if (response.data) {
         return response.data;
       }
-      throw new Error(response.message || 'Failed to fetch workspace stats');
+      
+      // Otherwise return response directly (service might have unwrapped it)
+      return response;
+      
     } catch (error) {
+      console.error('❌ Stats error:', error);
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch workspace stats');
     }
   }
