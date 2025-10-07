@@ -258,6 +258,7 @@ updateWorkspace: async (workspaceId, updates) => {
   },
 
   updateMemberRole: async (workspaceId, memberId, roleData) => {
+    
     try {
       const response = await api.put(`/workspaces/${workspaceId}/members/${memberId}`, roleData);
       return response.data;

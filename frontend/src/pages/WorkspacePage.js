@@ -58,16 +58,18 @@ const WorkspacePage = () => {
 
 
   const {
-    currentWorkspace,
-    workspaces, // Add this for list view
-    isLoading: workspaceLoading,
-    hasError: workspaceError,
-    fetchWorkspace,
-    fetchWorkspaces, // Add this for list view
-    getUserRole,
-    getUserPermissions,
-    getWorkspaceById
-  } = useWorkspaces();
+  currentWorkspace,
+  workspaces,
+  isLoading: workspaceLoading,
+  hasError: workspaceError,
+  fetchWorkspace,
+  fetchWorkspaces,
+  getUserRole,
+  getUserPermissions,
+  getWorkspaceById,
+  updateMemberRole,  // ✅ Add this
+  removeMember       // ✅ Add this
+} = useWorkspaces();
 
   const {
     recentActivity,
@@ -210,6 +212,44 @@ const WorkspacePage = () => {
       throw error;
     }
   };
+
+  // Handle member role update
+const handleUpdateMemberRole = async (memberId, roleData) => {
+  try {
+    console.log('🔄 Updating member role:', { memberId, roleData });
+    
+    await updateMemberRole(workspaceId, memberId, roleData);
+    
+    console.log('✅ Member role updated successfully');
+    
+    // Refresh workspace data to show updated role
+    await fetchWorkspace(workspaceId);
+    
+  } catch (error) {
+    console.error('❌ Failed to update member role:', error);
+    alert(error.message || 'Failed to update member role. Please try again.');
+    throw error; // Re-throw so MemberList can handle it
+  }
+};
+
+// Handle member removal
+const handleRemoveMember = async (memberId) => {
+  try {
+    console.log('🗑️ Removing member:', memberId);
+    
+    await removeMember(workspaceId, memberId);
+    
+    console.log('✅ Member removed successfully');
+    
+    // Refresh workspace data to update member list
+    await fetchWorkspace(workspaceId);
+    
+  } catch (error) {
+    console.error('❌ Failed to remove member:', error);
+    alert(error.message || 'Failed to remove member. Please try again.');
+    throw error; // Re-throw so MemberList can handle it
+  }
+};
   console.log('🔍 Debug Loading State:', {
 
     workspaceLoading,
@@ -825,37 +865,41 @@ const WorkspacePage = () => {
 
 
   const renderMembersTab = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Members
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            {memberCount} members in this workspace
-          </p>
-        </div>
-        <PermissionGuard permissions={['invite']} workspaceId={workspaceId}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center"
-              >
-                <UserPlusIcon className="h-4 w-4 mr-2" />
-                Invite Members
-              </Button>
-            </PermissionGuard>
+  <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          Members
+        </h2>
+        <p className="text-gray-600 dark:text-gray-300">
+          {memberCount} members in this workspace
+        </p>
       </div>
-
-      <MemberList
-        members={currentWorkspace.members || []}
-        workspaceId={workspaceId}
-        currentUserRole={userRole}
-        isLoading={workspaceLoading}
-      />
+      <PermissionGuard permissions={['invite']} workspaceId={workspaceId}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowInviteModal(true)}
+          className="flex items-center"
+        >
+          <UserPlusIcon className="h-4 w-4 mr-2" />
+          Invite Members
+        </Button>
+      </PermissionGuard>
     </div>
-  );
+
+  <MemberList
+  members={currentWorkspace.members || []}
+  workspaceId={workspaceId}
+  currentUserId={user?._id}
+  currentUserRole={userRole}
+  onUpdateMemberRole={handleUpdateMemberRole}
+  onRemoveMember={handleRemoveMember}
+  onInviteMembers={() => setShowInviteModal(true)}
+  isLoading={workspaceLoading}
+/>
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

@@ -7,6 +7,7 @@ import Avatar from '../components/ui/Avatar';
 import { Alert } from '../components/ui/Alert';
 import { useInvitations } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
+import { useWorkspaces } from '../hooks/useWorkspaces';
 import {
   EnvelopeIcon,
   CheckCircleIcon,
@@ -25,7 +26,6 @@ import {
   CheckCircleIcon as CheckCircleIconSolid,
   XCircleIcon as XCircleIconSolid
 } from '@heroicons/react/24/solid';
-
 const InvitationPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -40,6 +40,8 @@ const InvitationPage = () => {
     acceptInvitation,
     rejectInvitation
   } = useInvitations();
+const { fetchWorkspaces } = useWorkspaces();
+
 
   // Local state
   const [isAccepting, setIsAccepting] = useState(false);
@@ -101,7 +103,7 @@ useEffect(() => {
   }, [isAuthenticated, invitationDetails, isAutoAccept, autoAcceptAttempted, handleAutoAccept]);
 
   // ✅ FIXED: Handle invitation acceptance - updated to use unwrapped result
- const handleAcceptInvitation = async () => {
+const handleAcceptInvitation = async () => {
   if (!isAuthenticated) {
     console.log('User not authenticated for accept action');
     setShowLoginPrompt(true);
@@ -120,39 +122,66 @@ useEffect(() => {
 
   setIsAccepting(true);
   try {
-    console.log('Accepting invitation with token:', token);
+    console.log('✅ Accepting invitation with token:', token);
     
     const result = await acceptInvitation(token).unwrap();
-    console.log('Invitation accepted successfully:', result);
+    console.log('✅ Invitation accepted successfully:', result);
     
-    // ✅ FIXED: Handle already accepted/member responses
+    // ✅ CRITICAL FIX: Refresh workspace data immediately after accepting
+    console.log('🔄 Refreshing workspace data...');
+    try {
+      // Fetch updated workspaces to reflect the new membership
+      await fetchWorkspaces();
+      console.log('✅ Workspace data refreshed');
+    } catch (refreshError) {
+      console.warn('⚠️ Failed to refresh workspace data:', refreshError);
+      // Don't fail the whole operation if refresh fails
+    }
+    
+    // Handle already accepted/member responses
     if (result.alreadyAccepted || result.alreadyMember) {
+      console.log('ℹ️ User already accepted or is already a member');
       setActionResult('accepted');
     } else {
       setActionResult('accepted');
     }
 
-    // Redirect to workspace after success message
+    // ✅ CRITICAL FIX: Redirect with a slight delay to allow state updates
     setTimeout(() => {
-      const workspaceId = result.data?.workspace?.id || invitationDetails?.workspace?._id;
+      const workspaceId = result.data?.workspace?.id || 
+                         result.workspace?.id || 
+                         invitationDetails?.workspace?._id;
+      
       if (workspaceId) {
-        console.log('Redirecting to workspace:', workspaceId);
-        navigate(`/workspaces/${workspaceId}`);
+        console.log('🚀 Redirecting to workspace:', workspaceId);
+        // Force a hard navigation to ensure fresh data
+        window.location.href = `/workspaces/${workspaceId}`;
       } else {
-        navigate('/dashboard');
+        console.log('🚀 Redirecting to dashboard');
+        window.location.href = '/dashboard';
       }
-    }, 2000);
+    }, 1500); // Slightly shorter delay
     
   } catch (error) {
-    console.error('Accept invitation error:', error);
+    console.error('❌ Accept invitation error:', error);
     
-    // ✅ FIXED: Handle specific error cases
+    // Handle specific error cases
     if (error.data?.alreadyAccepted || error.data?.alreadyMember) {
+      console.log('ℹ️ Handling already accepted case from error');
       setActionResult('accepted');
+      
+      // Still refresh and redirect
+      try {
+        await fetchWorkspaces();
+      } catch (refreshError) {
+        console.warn('⚠️ Failed to refresh after error:', refreshError);
+      }
+      
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
+        window.location.href = '/dashboard';
+      }, 1500);
     } else {
+      console.error('❌ Setting error state');
       setActionResult('error');
     }
   } finally {

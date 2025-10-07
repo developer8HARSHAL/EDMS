@@ -1,7 +1,8 @@
 const Workspace = require('../models/workspaceModel');
 const User = require('../models/userModel');
 const Document = require('../models/documentModel');
-const { getRolePermissions, normalizePermissions } = require('../utils/permissionMapper');
+const { getDefaultPermissionsForRole} = require('../utils/permissionMapper');
+
 
 // @desc    Create new workspace
 // @route   POST /api/workspaces
@@ -398,12 +399,20 @@ const removeMember = async (req, res) => {
   }
 };
 
+
 // ✅ FIXED: Update member role - Middleware handles permission check
 // @desc    Update member role/permissions
 // @route   PUT /api/workspaces/:id/members/:memberId
 // @access  Private
 const updateMemberRole = async (req, res) => {
+ 
+
   try {
+     console.log("-----updateMemberRole Debug:");
+console.log("- workspace:", req.workspace ? req.workspace._id : "undefined");
+console.log("- memberId:", req.params.memberId);
+console.log("- role:", req.body.role);
+console.log("- workspace members:", req.workspace?.members);
     const memberId = req.params.memberId;
     const { role, permissions } = req.body;
     // Workspace is already attached by middleware and permission checked
@@ -435,7 +444,8 @@ const updateMemberRole = async (req, res) => {
       
       // ✅ FIXED: Auto-update permissions when role changes
       if (!permissions) {
-        workspace.members[memberIndex].permissions = getRolePermissions(role);
+        workspace.members[memberIndex].permissions = getDefaultPermissionsForRole(role);
+
       }
     }
 
@@ -551,11 +561,35 @@ const getWorkspaceStats = async (req, res) => {
       return acc;
     }, {});
 
+    // ✅ FIXED: Correct member count calculation
+    // The members array already includes the owner (added by pre-save hook)
+    // So we just count the members array length
+    const totalMembers = workspace.members.length;
+    
+    // ✅ FIXED: Correct role breakdown
+    // Count roles from members array only (owner is already in there)
+    const roleBreakdown = workspace.members.reduce((acc, member) => {
+      acc[member.role] = (acc[member.role] || 0) + 1;
+      return acc;
+    }, {});
+
+    console.log('📊 Stats Calculation Debug:', {
+      workspaceName: workspace.name,
+      membersArrayLength: workspace.members.length,
+      totalMembers: totalMembers,
+      roleBreakdown: roleBreakdown,
+      ownerId: workspace.owner.toString(),
+      memberIds: workspace.members.map(m => ({
+        id: m.user.toString(),
+        role: m.role
+      }))
+    });
+
     const response = {
       workspace: {
         id: workspace._id,
         name: workspace.name,
-        memberCount: workspace.members.length + 1, // +1 for owner
+        memberCount: totalMembers,  // ✅ FIXED: Just the members array length
         createdAt: workspace.createdAt,
         lastActivity: workspace.updatedAt
       },
@@ -567,13 +601,12 @@ const getWorkspaceStats = async (req, res) => {
         typeBreakdown: typeStats
       },
       members: {
-        total: workspace.members.length + 1,
-        byRole: workspace.members.reduce((acc, member) => {
-          acc[member.role] = (acc[member.role] || 0) + 1;
-          return acc;
-        }, { owner: 1 })
+        total: totalMembers,  // ✅ FIXED: Correct total
+        byRole: roleBreakdown  // ✅ FIXED: No double counting
       }
     };
+
+    console.log('✅ Final stats response:', response);
 
     res.status(200).json({
       success: true,
@@ -581,7 +614,7 @@ const getWorkspaceStats = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get workspace stats error:', error);
+    console.error('❌ Get workspace stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching workspace statistics',

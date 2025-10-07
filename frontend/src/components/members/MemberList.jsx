@@ -99,26 +99,55 @@ const MemberList = ({
   };
 
   // Handle role change
-  const handleRoleChange = async (memberId, newRole) => {
-    try {
-      await onUpdateMemberRole(memberId, { role: newRole });
-      setShowDropdown(null);
-    } catch (error) {
-      console.error('Failed to update member role:', error);
+// Handle role change
+const handleRoleChange = async (memberId, newRole) => {
+  try {
+    // ✅ Find the member to get their user ID
+    const member = members.find(m => m._id === memberId);
+    const userId = member?.user?._id || member?.user;
+    
+    console.log('🔄 Role change:', { 
+      memberRecordId: memberId, 
+      userId, 
+      newRole 
+    });
+    
+    if (!userId) {
+      throw new Error('Could not find user ID for member');
     }
-  };
+    
+    await onUpdateMemberRole(userId, { role: newRole });
+    setShowDropdown(null);
+  } catch (error) {
+    console.error('Failed to update member role:', error);
+  }
+};
 
   // Handle member removal
-  const handleRemoveMember = async (memberId) => {
-    if (window.confirm('Are you sure you want to remove this member from the workspace?')) {
-      try {
-        await onRemoveMember(memberId);
-        setShowDropdown(null);
-      } catch (error) {
-        console.error('Failed to remove member:', error);
+// Handle member removal
+const handleRemoveMember = async (memberId) => {
+  if (window.confirm('Are you sure you want to remove this member from the workspace?')) {
+    try {
+      // ✅ Find the member to get their user ID
+      const member = members.find(m => m._id === memberId);
+      const userId = member?.user?._id || member?.user;
+      
+      console.log('🗑️ Member removal:', { 
+        memberRecordId: memberId, 
+        userId 
+      });
+      
+      if (!userId) {
+        throw new Error('Could not find user ID for member');
       }
+      
+      await onRemoveMember(userId);
+      setShowDropdown(null);
+    } catch (error) {
+      console.error('Failed to remove member:', error);
     }
-  };
+  }
+};
 
   // Handle dropdown click
   const handleDropdownClick = (e, memberId) => {

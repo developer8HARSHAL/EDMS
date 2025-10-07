@@ -29,6 +29,8 @@
         |-- invitationRoutes.js
         |-- userRoutes.js
         |-- workspaceRoutes.js
+    |-- scripts
+        |-- cleanDuplicateMembers.js
     |-- server.js
     |-- test
         |-- integration.test.js

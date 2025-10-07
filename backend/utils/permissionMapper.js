@@ -66,9 +66,11 @@ const permissionMap = {
 
   return frontendPermissions;
 };
+// const getRolePermissions = getDefaultPermissionsForRole;
 
 // ✅ Get default permissions for a role (backend format)
 const getDefaultPermissionsForRole = (role) => {
+  
   const rolePermissions = {
     owner: {
       canView: true,
@@ -297,5 +299,6 @@ module.exports = {
   transformPermissionsMiddleware,
   transformResponsePermissions,
   hasPermission,
-  addPermissionHelpers
+  addPermissionHelpers,
+  getDefaultPermissionsForRole
 };

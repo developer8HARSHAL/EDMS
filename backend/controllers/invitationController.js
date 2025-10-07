@@ -503,6 +503,8 @@ const getPendingInvitations = async (req, res) => {
   }
 };
 
+
+
 const acceptInvitation = async (req, res) => {
   try {
     const { token } = req.params;
@@ -512,36 +514,42 @@ const acceptInvitation = async (req, res) => {
       .populate('workspace')
       .populate('inviter', 'name email');
 
-    console.log("-----ACCEPT] Invitation found in DB:", invitation ? "YES" : "NO");
+    console.log("-----[ACCEPT] Invitation found in DB:", invitation ? "YES" : "NO");
 
     if (!invitation) {
-      console.log("-----ACCEPT] No invitation with this token");
+      console.log("-----[ACCEPT] No invitation with this token");
       return res.status(404).json({
         success: false,
         message: 'Invitation not found or invalid'
       });
     }
 
-    console.log("---ACCEPT] Invitation details:", {
+    console.log("-----[ACCEPT] Invitation details:", {
       id: invitation._id,
       email: invitation.inviteeEmail,
       status: invitation.status,
       expiresAt: invitation.expiresAt
     });
 
-    // ✅ Already accepted
+    // ✅ Already accepted - return success immediately
     if (invitation.status === 'accepted') {
-      console.log("-------ACCEPT] Invitation already accepted");
+      console.log("-----[ACCEPT] Invitation already accepted");
       return res.status(200).json({
         success: true,
         message: `You are already a member of ${invitation.workspace.name}`,
-        alreadyAccepted: true
+        alreadyAccepted: true,
+        data: {
+          workspace: {
+            id: invitation.workspace._id,
+            name: invitation.workspace.name
+          }
+        }
       });
     }
 
     // ✅ Expired
     if (!invitation.isValid()) {
-      console.log("-----ACCEPT] Invitation expired at:", invitation.expiresAt);
+      console.log("-----[ACCEPT] Invitation expired at:", invitation.expiresAt);
       await WorkspaceInvitation.updateOne(
         { _id: invitation._id },
         { status: 'expired' }
@@ -555,10 +563,10 @@ const acceptInvitation = async (req, res) => {
     // ✅ Get or validate user
     let userId;
     if (req.user) {
-      console.log("-----ACCEPT] Authenticated user:", req.user.email);
+      console.log("-----[ACCEPT] Authenticated user:", req.user.email);
 
       if (req.user.email.toLowerCase() !== invitation.inviteeEmail.toLowerCase()) {
-        console.log("-------ACCEPT] Email mismatch:", {
+        console.log("-----[ACCEPT] Email mismatch:", {
           expected: invitation.inviteeEmail,
           got: req.user.email
         });
@@ -569,80 +577,111 @@ const acceptInvitation = async (req, res) => {
       }
       userId = req.user.id;
     } else {
-      console.log("------ACCEPT] No authenticated user, looking up invitee...");
+      console.log("-----[ACCEPT] No authenticated user, looking up invitee...");
       const user = await User.findOne({ email: invitation.inviteeEmail });
       if (!user) {
-        console.log("-----ACCEPT] Invitee user not registered:", invitation.inviteeEmail);
+        console.log("-----[ACCEPT] Invitee user not registered:", invitation.inviteeEmail);
         return res.status(404).json({
           success: false,
           message: 'User not found, please register first',
           requiresRegistration: true
         });
       }
-      console.log("----ACCEPT] Found invitee user:", user.email);
+      console.log("-----[ACCEPT] Found invitee user:", user.email);
       userId = user._id;
     }
 
+    // ✅ Load workspace with proper error handling
     const workspace = await Workspace.findById(invitation.workspace._id);
-    console.log("------ACCEPT] Workspace loaded:", workspace ? workspace.name : "NOT FOUND");
+    if (!workspace) {
+      console.log("-----[ACCEPT] Workspace not found");
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found'
+      });
+    }
+    
+    console.log("-----[ACCEPT] Workspace loaded:", workspace.name);
 
-    // ✅ Prevent duplicate member
-    const alreadyMember = workspace.members.some(m => m.user.toString() === userId.toString());
-    console.log("-----ACCEPT] Is already a member?", alreadyMember);
+    // ✅ CRITICAL FIX: Use addMemberSafely (synchronous - no await!)
+    console.log("-----[ACCEPT] Checking for existing member and adding safely...");
+    const addResult = workspace.addMemberSafely(
+      userId,
+      invitation.role,
+      invitation.permissions
+    );
+    
+    console.log("-----[ACCEPT] Add member result:", addResult);
 
-    if (alreadyMember) {
+    // ✅ Handle already existing member case
+    if (addResult.alreadyExists && !addResult.added) {
+      // Member already exists - just mark invitation as accepted
       if (invitation.status === 'pending') {
         await invitation.accept();
+        console.log("-----[ACCEPT] Marked invitation as accepted (user already member)");
       }
-      console.log("------ACCEPT] User already member of workspace");
+      
       return res.status(200).json({
         success: true,
         message: `You are already a member of ${workspace.name}`,
-        alreadyMember: true
+        alreadyMember: true,
+        data: {
+          workspace: {
+            id: workspace._id,
+            name: workspace.name
+          },
+          role: workspace.members.find(m => m.user.toString() === userId.toString())?.role || invitation.role
+        }
       });
     }
 
-    // Add member safely
-    console.log("-----ACCEPT] Adding user to workspace members...");
-    workspace.members.push({
-      user: userId,
-      role: invitation.role,
-      permissions: invitation.permissions,
-      joinedAt: new Date()
-    });
+    // ✅ Save workspace (member was added)
     await workspace.save();
+    console.log("-----[ACCEPT] Workspace saved with new member");
 
-    console.log("-----ACCEPT] Member added to workspace");
-
+    // ✅ Mark invitation as accepted
     await invitation.accept();
-    console.log("-----ACCEPT] Invitation status updated to accepted");
+    console.log("-----[ACCEPT] Invitation status updated to accepted");
 
-    // ✅ Prevent duplicate workspace in user
+    // ✅ Check for duplicate workspace in user profile
     const user = await User.findById(userId);
-    const alreadyInUser = user.workspaces.some(ws => ws.workspace.toString() === workspace._id.toString());
-    console.log("-----ACCEPT] Workspace already in user profile?", alreadyInUser);
+    const workspaceExistsInUser = user.workspaces.some(
+      ws => ws.workspace.toString() === workspace._id.toString()
+    );
+    
+    console.log("-----[ACCEPT] Workspace in user profile check:", {
+      found: workspaceExistsInUser
+    });
 
-    if (!alreadyInUser) {
+    if (!workspaceExistsInUser) {
       user.workspaces.push({
         workspace: workspace._id,
         role: invitation.role,
         joinedAt: new Date()
       });
       await user.save();
-      console.log("-----ACCEPT] Workspace added to user profile");
+      console.log("-----[ACCEPT] Workspace added to user profile");
+    } else {
+      console.log("-----[ACCEPT] Workspace already in user profile, skipping");
     }
 
+    // ✅ Return success with workspace data
     res.status(200).json({
       success: true,
       message: `Successfully joined ${workspace.name}`,
-      workspace: {
-        id: workspace._id,
-        name: workspace.name,
-        role: invitation.role
+      data: {
+        workspace: {
+          id: workspace._id,
+          name: workspace.name,
+          description: workspace.description
+        },
+        role: invitation.role,
+        permissions: invitation.permissions
       }
     });
+    
   } catch (err) {
-    console.error('-----ACCEPT] Error accepting invitation:', err);
+    console.error('-----[ACCEPT] Error accepting invitation:', err);
     res.status(500).json({
       success: false,
       message: 'Error accepting invitation',

@@ -116,6 +116,33 @@ WorkspaceSchema.methods.getUserRole = function(userId) {
   return member ? member.role : null;
 };
 
+// ✅ FIXED: Add this method with CORRECT schema name (WorkspaceSchema, not workspaceSchema)
+WorkspaceSchema.methods.addMemberSafely = function(userId, role, permissions) {
+  // Check if member already exists
+  const existingMemberIndex = this.members.findIndex(
+    m => m.user.toString() === userId.toString()
+  );
+  
+  if (existingMemberIndex !== -1) {
+    console.log('-----[WORKSPACE] Member already exists, updating role instead');
+    // Update existing member
+    this.members[existingMemberIndex].role = role;
+    this.members[existingMemberIndex].permissions = permissions;
+    return { alreadyExists: true, updated: true };
+  }
+  
+  console.log('-----[WORKSPACE] Adding new member');
+  // Add new member
+  this.members.push({
+    user: userId,
+    role: role,
+    permissions: permissions,
+    joinedAt: new Date()
+  });
+  
+  return { alreadyExists: false, added: true };
+};
+
 // Instance method to get user's permissions in workspace
 WorkspaceSchema.methods.getUserPermissions = function(userId) {
   const member = this.members.find(member => 
