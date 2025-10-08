@@ -4,9 +4,10 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fileUpload = require('express-fileupload');
-const mongoose = require('mongoose'); // ✅ ADDED: Missing import for health check
-const connectDB = require('./config/db'); // Import the DB connection function
+const mongoose = require('mongoose');
+const connectDB = require('./config/db');
 const morgan = require('morgan');
+
 // Import routes
 const userRoutes = require('./routes/userRoutes');
 const documentRoutes = require('./routes/documentRoutes');
@@ -19,25 +20,38 @@ console.log("EMAIL_PASS exists?", !!process.env.EMAIL_PASS);
 
 // Initialize express app
 const app = express();
-app.use(morgan('dev')); // logs method, URL, status, response time
+app.use(morgan('dev'));
 
-// Enhanced CORS configuration for production
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [
-      process.env.FRONTEND_URL || 'https://your-edms-app.netlify.app', // Use env variable if available
-      'https://edms-document-app.netlify.app' // Add your expected Netlify domain here
-    ] 
-  : ['http://localhost:3000']; // In development, allow localhost
-
+// ✅ FIXED: CORS configuration for Vercel deployments
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
+    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
+    // In production, allow Vercel domains
+    if (process.env.NODE_ENV === 'production') {
+      // Allow specific FRONTEND_URL if set
+      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+        console.log('✅ CORS allowed (FRONTEND_URL):', origin);
+        return callback(null, true);
+      }
+      
+      // Allow all Vercel preview URLs (*.vercel.app)
+      if (origin.match(/https:\/\/.*\.vercel\.app$/)) {
+        console.log('✅ CORS allowed (Vercel):', origin);
+        return callback(null, true);
+      }
+      
+      console.log('🚫 CORS blocked origin:', origin);
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
+    
+    // In development, allow localhost
+    if (origin === 'http://localhost:3000' || origin === 'http://localhost:3001') {
+      return callback(null, true);
+    }
+    
     return callback(null, true);
   },
   credentials: true
@@ -46,38 +60,37 @@ app.use(cors({
 // Middleware
 app.use(express.json());
 app.use(fileUpload({
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB file size limit
+  limits: { fileSize: 50 * 1024 * 1024 },
   createParentPath: true
 }));
 
 // Static directory for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Connect to MongoDB using our config function
+// Connect to MongoDB
 connectDB()
   .then(() => console.log('MongoDB Connected Successfully'))
   .catch(err => {
     console.error('Failed to connect to MongoDB:', err);
-    // We're not exiting the process here because connectDB already handles that
   });
 
-// Routes - Order matters for middleware
+// Routes
 app.use('/api/users', userRoutes);
-app.use('/api/workspaces', workspaceRoutes); // ✅ FIXED: Moved before documents for proper middleware order
+app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/invitations', invitationRoutes);
 
-// Basic route for testing
+// Basic route
 app.get('/', (req, res) => {
   res.send('EDMS API Running');
 });
 
-// Health check endpoint for monitoring
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     env: process.env.NODE_ENV,
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', // ✅ FIXED: Now mongoose is imported
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString()
   });
 });
