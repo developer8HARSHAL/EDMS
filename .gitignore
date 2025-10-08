@@ -1,0 +1,16 @@
+
+# Deployment artifacts
+.codeviz/
+features.txt
+flow.txt
+flow_done.txt
+workspace_feature.txt
+deployment_guide/
+
+# Test files
+backend/test/*.test.js
+backend/test/setup.js
+
+# Uploaded files
+backend/uploads/*
+!backend/uploads/.gitkeep
