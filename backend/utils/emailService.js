@@ -1,82 +1,66 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
 /**
- * Email Service for Workspace Invitations
+ * Email Service for Workspace Invitations (SendGrid)
  * Handles sending invitation emails with beautiful HTML templates
  */
 class EmailService {
   constructor() {
-    this.transporter = null;
-    this.initialized = false; // ✅ ADD: Flag to track initialization
-    // ✅ REMOVE: this.initializeTransporter(); - Don't run immediately
+    this.initialized = false;
   }
 
-  // ✅ ADD: New lazy initialization method
+  /**
+   * Lazy initialization method
+   */
   ensureInitialized() {
     if (!this.initialized) {
-      this.initializeTransporter();
+      this.initializeSendGrid();
       this.initialized = true;
     }
   }
 
   /**
-   * Initialize nodemailer transporter
+   * Initialize SendGrid
    */
-  initializeTransporter() {
+  initializeSendGrid() {
     try {
-      // 🔥 IMPROVED VALIDATION - More robust checking
-      const emailUser = process.env.EMAIL_USER?.trim();
-      const emailPass = process.env.EMAIL_PASS?.trim();
+      const apiKey = process.env.SENDGRID_API_KEY?.trim();
+      const fromEmail = process.env.EMAIL_USER?.trim();
       
-      console.log('🔍 Email Service Debug:', {
-        EMAIL_USER: emailUser ? `${emailUser.substring(0, 5)}***@${emailUser.split('@')[1] || 'unknown'}` : 'MISSING',
-        EMAIL_PASS_LENGTH: emailPass ? emailPass.length : 0,
-        EMAIL_PASS_EXISTS: !!emailPass,
-        EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail'
+      console.log('📧 SendGrid Service Debug:', {
+        API_KEY_EXISTS: !!apiKey,
+        API_KEY_LENGTH: apiKey ? apiKey.length : 0,
+        API_KEY_PREFIX: apiKey ? apiKey.substring(0, 7) + '***' : 'MISSING',
+        EMAIL_USER: fromEmail || 'MISSING',
+        ENVIRONMENT: process.env.NODE_ENV || 'development'
       });
 
-      if (!emailUser || emailUser.length === 0) {
-        console.error('❌ EMAIL_USER is missing or empty');
-        console.error('Current EMAIL_USER value:', JSON.stringify(process.env.EMAIL_USER));
+      if (!apiKey || apiKey.length === 0) {
+        console.error('❌ SENDGRID_API_KEY is missing or empty');
+        console.error('Please set SENDGRID_API_KEY in your environment variables');
         return;
       }
 
-      if (!emailPass || emailPass.length === 0) {
-        console.error('❌ EMAIL_PASS is missing or empty');
-        console.error('EMAIL_PASS exists in env?', 'EMAIL_PASS' in process.env);
-        console.error('EMAIL_PASS length:', process.env.EMAIL_PASS?.length || 0);
+      if (!fromEmail || fromEmail.length === 0) {
+        console.error('❌ EMAIL_USER is missing or empty');
+        console.error('Please set EMAIL_USER in your environment variables');
         return;
       }
 
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailUser)) {
-        console.error('❌ EMAIL_USER is not a valid email format:', emailUser);
+      if (!emailRegex.test(fromEmail)) {
+        console.error('❌ EMAIL_USER is not a valid email format:', fromEmail);
         return;
       }
 
-      console.log('✅ Email credentials validation passed');
-
-    this.transporter = nodemailer.createTransport({  // ✅ REMOVE the 'er' - it's createTransport, not createTransporter
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: emailUser,
-    pass: emailPass
-  }
-});
-
-      // Verify connection
-      this.transporter.verify((error, success) => {
-        if (error) {
-          console.error('❌ Email service connection failed:', error.message);
-          console.error('Full error:', error);
-        } else {
-          console.log('✅ Email service ready and verified');
-        }
-      });
+      // Set SendGrid API key
+      sgMail.setApiKey(apiKey);
+      
+      console.log('✅ SendGrid initialized successfully');
 
     } catch (error) {
-      console.error('❌ Failed to initialize email service:', error);
+      console.error('❌ Failed to initialize SendGrid:', error);
       console.error('Stack trace:', error.stack);
     }
   }
@@ -327,39 +311,39 @@ class EmailService {
   /**
    * Send workspace invitation email
    */
- async sendInvitationEmail(invitationData) {
-  try {
-    this.ensureInitialized();
+  async sendInvitationEmail(invitationData) {
+    try {
+      this.ensureInitialized();
 
-    if (!this.transporter) {
-      throw new Error(
-        'Email service not initialized - check your EMAIL_USER and EMAIL_PASS environment variables'
-      );
-    }
+      if (!process.env.SENDGRID_API_KEY) {
+        throw new Error(
+          'SendGrid not configured - check your SENDGRID_API_KEY environment variable'
+        );
+      }
 
-    const { recipientEmail, inviterName, workspaceName, token } = invitationData;
+      const { recipientEmail, inviterName, workspaceName, token } = invitationData;
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const acceptUrl = `${frontendUrl}/invitation/${token}?action=accept`;
-    const rejectUrl = `${frontendUrl}/invitation/${token}?action=reject`;
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const acceptUrl = `${frontendUrl}/invitation/${token}?action=accept`;
+      const rejectUrl = `${frontendUrl}/invitation/${token}?action=reject`;
 
-    const emailData = {
-      ...invitationData,
-      acceptUrl,
-      rejectUrl
-    };
+      const emailData = {
+        ...invitationData,
+        acceptUrl,
+        rejectUrl
+      };
 
-    const htmlContent = this.generateInvitationEmailTemplate(emailData);
+      const htmlContent = this.generateInvitationEmailTemplate(emailData);
 
-    const mailOptions = {
-      from: {
-        name: `${process.env.APP_NAME || 'Document Management'} - ${inviterName}`,
-        address: process.env.EMAIL_USER
-      },
-      to: recipientEmail,
-      subject: `🎉 You're invited to join "${workspaceName}" workspace`,
-      html: htmlContent,
-      text: `
+      const msg = {
+        to: recipientEmail,
+        from: {
+          email: process.env.EMAIL_USER,
+          name: `${process.env.APP_NAME || 'Document Management'} - ${inviterName}`
+        },
+        subject: ` You're invited to join "${workspaceName}" workspace`,
+        html: htmlContent,
+        text: `
 Hi there!
 
 ${inviterName} has invited you to join the "${workspaceName}" workspace.
@@ -373,48 +357,55 @@ This invitation expires on ${new Date(invitationData.expiresAt).toLocaleDateStri
 
 Best regards,
 ${process.env.APP_NAME || 'Document Management System'}
-      `.trim()
-    };
+        `.trim()
+      };
 
-    // ✅ Send email with detailed debugging
-    const result = await this.transporter.sendMail(mailOptions);
-    console.log('✅ Invitation email sent successfully:', {
-      messageId: result.messageId,
-      envelope: result.envelope,
-      response: result.response,
-      recipient: recipientEmail
-    });
+      console.log('📧 Sending email via SendGrid to:', recipientEmail);
 
-    return {
-      success: true,
-      messageId: result.messageId
-    };
+      // Send email with timeout
+      const sendWithTimeout = Promise.race([
+        sgMail.send(msg),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Email send timeout after 30s')), 30000)
+        )
+      ]);
 
-  } catch (error) {
-    console.error('❌ EMAIL SEND ERROR');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Stack:', error.stack);
-    throw error;
+      const result = await sendWithTimeout;
+
+      console.log('✅ Email sent successfully via SendGrid:', {
+        statusCode: result[0].statusCode,
+        recipient: recipientEmail,
+        messageId: result[0].headers['x-message-id']
+      });
+
+      return {
+        success: true,
+        messageId: result[0].headers['x-message-id'],
+        statusCode: result[0].statusCode
+      };
+
+    } catch (error) {
+      console.error('❌ SENDGRID EMAIL SEND ERROR:');
+      console.error('Error Message:', error.message);
+      console.error('Error Code:', error.code);
+      console.error('Response Body:', error.response?.body);
+      console.error('Stack:', error.stack);
+      
+      throw new Error(`SendGrid email failed: ${error.message}`);
+    }
   }
-}
-
 
   /**
    * Send invitation reminder email
    */
- async sendReminderEmail(invitationData) {
-  try {
-    this.ensureInitialized(); // ✅ ADD: Ensure initialization before use
-    
-    const modifiedData = {
-      ...invitationData,
-      isReminder: true
-    };
-
-      const originalSubject = `🎉 You're invited to join "${invitationData.workspaceName}" workspace`;
-      const reminderSubject = `🔔 Reminder: ${originalSubject}`;
+  async sendReminderEmail(invitationData) {
+    try {
+      this.ensureInitialized();
+      
+      const modifiedData = {
+        ...invitationData,
+        isReminder: true
+      };
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const acceptUrl = `${frontendUrl}/invitation/${invitationData.token}?action=accept`;
@@ -428,13 +419,13 @@ ${process.env.APP_NAME || 'Document Management System'}
 
       const htmlContent = this.generateInvitationEmailTemplate(emailData);
 
-      const mailOptions = {
-        from: {
-          name: `${process.env.APP_NAME || 'Document Management'} - ${invitationData.inviterName}`,
-          address: process.env.EMAIL_USER
-        },
+      const msg = {
         to: invitationData.recipientEmail,
-        subject: reminderSubject,
+        from: {
+          email: process.env.EMAIL_USER,
+          name: `${process.env.APP_NAME || 'Document Management'} - ${invitationData.inviterName}`
+        },
+        subject: `🔔 Reminder: You're invited to join "${invitationData.workspaceName}" workspace`,
         html: htmlContent,
         text: `
 Reminder: ${invitationData.inviterName} has invited you to join the "${invitationData.workspaceName}" workspace.
@@ -446,11 +437,12 @@ This invitation expires on ${new Date(invitationData.expiresAt).toLocaleDateStri
         `.trim()
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await sgMail.send(msg);
       
       return {
         success: true,
-        messageId: result.messageId
+        messageId: result[0].headers['x-message-id'],
+        statusCode: result[0].statusCode
       };
     } catch (error) {
       console.error('❌ Failed to send reminder email:', error);
@@ -459,20 +451,25 @@ This invitation expires on ${new Date(invitationData.expiresAt).toLocaleDateStri
   }
 
   /**
-   * Test email service connection
+   * Test SendGrid connection
    */
- async testConnection() {
-  try {
-    this.ensureInitialized(); // ✅ ADD: Ensure initialization before use
-    
-    if (!this.transporter) {
-      throw new Error('Email service not initialized - check your EMAIL_USER and EMAIL_PASS environment variables');
-    }
+  async testConnection() {
+    try {
+      this.ensureInitialized();
+      
+      if (!process.env.SENDGRID_API_KEY) {
+        throw new Error('SendGrid not configured - check your SENDGRID_API_KEY environment variable');
+      }
 
-      await this.transporter.verify();
-      return { success: true, message: 'Email service connection successful' };
+      // SendGrid doesn't have a verify method, so we just check if API key is set
+      console.log('✅ SendGrid API key is configured');
+      
+      return { 
+        success: true, 
+        message: 'SendGrid API key is configured. Send a test email to verify.' 
+      };
     } catch (error) {
-      console.error('❌ Email service test failed:', error);
+      console.error('❌ SendGrid test failed:', error);
       return { success: false, error: error.message };
     }
   }
