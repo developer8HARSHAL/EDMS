@@ -327,42 +327,39 @@ class EmailService {
   /**
    * Send workspace invitation email
    */
-  async sendInvitationEmail(invitationData) {
+ async sendInvitationEmail(invitationData) {
   try {
-    this.ensureInitialized(); // ✅ ADD: Ensure initialization before use
-    
+    this.ensureInitialized();
+
     if (!this.transporter) {
-      throw new Error('Email service not initialized - check your EMAIL_USER and EMAIL_PASS environment variables');
+      throw new Error(
+        'Email service not initialized - check your EMAIL_USER and EMAIL_PASS environment variables'
+      );
     }
 
-      const {
-        recipientEmail,
-        inviterName,
-        workspaceName,
-        token
-      } = invitationData;
+    const { recipientEmail, inviterName, workspaceName, token } = invitationData;
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const acceptUrl = `${frontendUrl}/invitation/${token}?action=accept`;
-      const rejectUrl = `${frontendUrl}/invitation/${token}?action=reject`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const acceptUrl = `${frontendUrl}/invitation/${token}?action=accept`;
+    const rejectUrl = `${frontendUrl}/invitation/${token}?action=reject`;
 
-      const emailData = {
-        ...invitationData,
-        acceptUrl,
-        rejectUrl
-      };
+    const emailData = {
+      ...invitationData,
+      acceptUrl,
+      rejectUrl
+    };
 
-      const htmlContent = this.generateInvitationEmailTemplate(emailData);
+    const htmlContent = this.generateInvitationEmailTemplate(emailData);
 
-      const mailOptions = {
-        from: {
-          name: `${process.env.APP_NAME || 'Document Management'} - ${inviterName}`,
-          address: process.env.EMAIL_USER
-        },
-        to: recipientEmail,
-        subject: `🎉 You're invited to join "${workspaceName}" workspace`,
-        html: htmlContent,
-        text: `
+    const mailOptions = {
+      from: {
+        name: `${process.env.APP_NAME || 'Document Management'} - ${inviterName}`,
+        address: process.env.EMAIL_USER
+      },
+      to: recipientEmail,
+      subject: `🎉 You're invited to join "${workspaceName}" workspace`,
+      html: htmlContent,
+      text: `
 Hi there!
 
 ${inviterName} has invited you to join the "${workspaceName}" workspace.
@@ -376,27 +373,33 @@ This invitation expires on ${new Date(invitationData.expiresAt).toLocaleDateStri
 
 Best regards,
 ${process.env.APP_NAME || 'Document Management System'}
-        `.trim()
-      };
+      `.trim()
+    };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      
-      console.log('✅ Invitation email sent successfully:', {
-        messageId: result.messageId,
-        recipient: recipientEmail,
-        workspace: workspaceName,
-        acceptUrl: acceptUrl
-      });
+    // ✅ Send email with detailed debugging
+    const result = await this.transporter.sendMail(mailOptions);
+    console.log('✅ Invitation email sent successfully:', {
+      messageId: result.messageId,
+      envelope: result.envelope,
+      response: result.response,
+      recipient: recipientEmail
+    });
 
-      return {
-        success: true,
-        messageId: result.messageId
-      };
-    } catch (error) {
-      console.error('❌ Failed to send invitation email:', error);
-      throw error;
-    }
+    return {
+      success: true,
+      messageId: result.messageId
+    };
+
+  } catch (error) {
+    console.error('❌ EMAIL SEND ERROR');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Stack:', error.stack);
+    throw error;
   }
+}
+
 
   /**
    * Send invitation reminder email
