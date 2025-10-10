@@ -103,6 +103,7 @@
             |-- DocumentList.js
             |-- DocumentPreview.js
             |-- InvitationPage.js
+            |-- LandingPage.js
             |-- Login.js
             |-- Profile.js
             |-- Register.js

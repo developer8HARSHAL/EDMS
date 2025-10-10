@@ -1,300 +1,277 @@
-// ===== FIXED Login.js =====
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link as RouterLink, useLocation, useSearchParams } from 'react-router-dom';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+// frontend/src/pages/Login.js
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Alert } from '../components/ui/Alert';
-import { Card } from '../components/ui/Card';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formErrors, setFormErrors] = useState({});
-  const [toastMessage, setToastMessage] = useState(null);
   const navigate = useNavigate();
-  const location = useLocation();
-  
-  // ✅ FIXED: Properly declare invitation handling hooks
-  const [searchParams] = useSearchParams();
-  const invitationToken = searchParams.get('invitation');
-  const invitationAction = searchParams.get('action'); // 'accept' or 'view'
-  const redirectPath = searchParams.get('redirect');
-  
-  const { login, error, clearError, isAuthenticated, user, loading } = useAuth();
+  const { login, isAuthenticated, loading, error: authError, clearError } = useAuth();
 
-  // ✅ FIXED: Handle login success with invitation redirect
-  const handleLoginSuccess = useCallback(() => {
-    console.log('Login successful, checking invitation redirect...');
-    
-    if (invitationToken && redirectPath) {
-      console.log('Redirecting to invitation page after login:', redirectPath);
-      navigate(redirectPath);
-    } else if (invitationToken) {
-      // Construct invitation URL with action parameter
-      const invitationUrl = `/invitations/${invitationToken}${invitationAction ? `?action=${invitationAction}` : ''}`;
-      console.log('Redirecting to invitation with token:', invitationUrl);
-      navigate(invitationUrl);
-    } else {
-      console.log('Normal login flow - redirecting to dashboard');
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-    }
-  }, [invitationToken, invitationAction, redirectPath, navigate, location]);
+  // Form state
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
 
-  // Redirect if user is already authenticated
+  // UI state
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && user && !loading) {
-      handleLoginSuccess();
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, user, loading, handleLoginSuccess]);
+  }, [isAuthenticated, navigate]);
 
-  // Clear previous errors when component mounts ONLY
+  // Clear errors when auth error changes
   useEffect(() => {
-    if (typeof clearError === 'function') {
-      clearError();
+    if (authError) {
+      setSubmitError(authError);
     }
-    setFormErrors({});
-  }, []); // Empty dependency array - only run on mount
+  }, [authError]);
 
-  // Clear form errors when user types
+  // Auto-dismiss error messages after 5 seconds
   useEffect(() => {
-    if (formErrors.email && email) {
-      setFormErrors(prev => ({ ...prev, email: undefined }));
-    }
-  }, [email, formErrors.email]);
-
-  useEffect(() => {
-    if (formErrors.password && password) {
-      setFormErrors(prev => ({ ...prev, password: undefined }));
-    }
-  }, [password, formErrors.password]);
-
-  // Auto-hide toast after 5 seconds
-  useEffect(() => {
-    if (toastMessage) {
+    if (submitError) {
       const timer = setTimeout(() => {
-        setToastMessage(null);
+        setSubmitError('');
+        clearError();
       }, 5000);
+      
       return () => clearTimeout(timer);
     }
-  }, [toastMessage]);
+  }, [submitError, clearError]);
 
-  const validateForm = useCallback(() => {
-    const errors = {};
-    
-    if (!email) {
-      errors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errors.email = 'Email is invalid';
+  // Auto-dismiss success messages after 3 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      
+      return () => clearTimeout(timer);
     }
-    
-    if (!password) {
-      errors.password = 'Password is required';
+  }, [successMessage]);
+
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Clear field-specific error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
     }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  }, [email, password]);
 
-  const showToast = useCallback((message, type = 'error') => {
-    setToastMessage({ message, type });
-  }, []);
+    // Clear submit error when user starts typing
+    if (submitError) {
+      setSubmitError('');
+      clearError();
+    }
+  };
 
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form before submission
+
+    // Clear previous messages
+    setSubmitError('');
+    setSuccessMessage('');
+
+    // Validate form
     if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
-      console.log('Attempting to login with:', { email });
-      const success = await login(email, password);
-      
-      if (success) {
-        console.log('Login successful, will redirect via useEffect');
-        // Navigation handled by handleLoginSuccess in useEffect
-      } else {
-        console.log('Login failed');
-        showToast('Please check your credentials and try again');
-      }
+      // Call login function from useAuth hook
+      await login(formData.email, formData.password);
+
+      // Show success message
+      setSuccessMessage('Login successful! Redirecting to dashboard...');
+
+      // Redirect to dashboard after short delay
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 1000);
+
     } catch (error) {
-      console.error('Login process error:', error);
-      
-      let errorMessage = 'An unexpected error occurred';
-      
-      if (error.response) {
-        if (error.response.data?.message) {
-          errorMessage = error.response.data.message;
-        } else {
-          switch (error.response.status) {
-            case 401:
-              errorMessage = 'Invalid email or password';
-              break;
-            case 403:
-              errorMessage = 'Your account is locked or disabled';
-              break;
-            case 429:
-              errorMessage = 'Too many failed attempts. Please try again later';
-              break;
-            case 500:
-              errorMessage = 'Server error. Please try again later';
-              break;
-            default:
-              errorMessage = 'Login failed';
-          }
-        }
-      } else if (error.request) {
-        errorMessage = 'No response from server. Please check your internet connection';
+      console.error('Login error:', error);
+
+      // Handle specific error messages
+      if (error.message) {
+        setSubmitError(error.message);
+      } else if (error.response?.data?.message) {
+        setSubmitError(error.response.data.message);
+      } else if (error.response?.status === 401) {
+        setSubmitError('Invalid email or password. Please try again.');
+      } else if (error.response?.status === 500) {
+        setSubmitError('Server error. Please try again later.');
+      } else if (!error.response) {
+        setSubmitError('Cannot connect to server. Please check your internet connection.');
       } else {
-        errorMessage = error.message || 'Login request failed';
+        setSubmitError('Login failed. Please try again.');
       }
-      
-      showToast(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRegisterClick = useCallback(() => {
-    console.log('Register link clicked');
-    
-    // ✅ FIXED: Preserve invitation context when going to register
-    if (invitationToken) {
-      const registerParams = new URLSearchParams();
-      registerParams.set('invitation', invitationToken);
-      if (invitationAction) registerParams.set('action', invitationAction);
-      if (redirectPath) registerParams.set('redirect', redirectPath);
-      
-      navigate(`/register?${registerParams.toString()}`);
-    } else {
-      navigate('/register');
-    }
-  }, [navigate, invitationToken, invitationAction, redirectPath]);
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <Card className="p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+    <div className="min-h-screen flex items-center justify-center bg-[#1a1f2e] px-4">
+      <div className="w-full max-w-md">
+        {/* Card Container - Reduced padding */}
+        <div className="bg-[#2a3441] rounded-lg p-6 shadow-xl">
+          {/* Header - Reduced spacing */}
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-white">
               Log in to your account
             </h2>
-            {/* ✅ FIXED: Show invitation context */}
-            {invitationToken && (
-              <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                {invitationAction === 'accept' 
-                  ? 'Sign in to accept your workspace invitation'
-                  : 'Sign in to view your workspace invitation'
-                }
-              </p>
-            )}
           </div>
-          
-          {/* Toast Notification */}
-          {toastMessage && (
-            <div className="mb-6">
-              <Alert variant={toastMessage.type}>
-                {toastMessage.message}
-              </Alert>
-            </div>
+
+          {/* Success Message */}
+          {successMessage && (
+            <Alert variant="success" className="mb-3">
+              {successMessage}
+            </Alert>
           )}
-          
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-6">
-              <Alert variant="error">
-                {error}
-              </Alert>
-            </div>
+
+          {/* Error Message */}
+          {submitError && (
+            <Alert variant="error" className="mb-3">
+              {submitError}
+            </Alert>
           )}
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* Login Form - Reduced spacing */}
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Email Input */}
             <div>
-              <Input
-                label="Email address"
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
+                Email address
+              </label>
+              <input
+                id="email"
+                name="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                error={formErrors.email}
-                isRequired
-                autoComplete="email"
-                data-testid="email-input"
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="Enter your email"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2.5 bg-[#374151] border border-transparent rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               />
+              {errors.email && (
+                <p className="mt-1 text-xs text-red-400">{errors.email}</p>
+              )}
             </div>
-            
+
+            {/* Password Input */}
             <div>
-              <Input
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                error={formErrors.password}
-                isRequired
-                autoComplete="current-password"
-                data-testid="password-input"
-                placeholder="Enter your password"
-                rightIcon={
-                  <button
-                    type="button"
-                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? (
-                      <EyeSlashIcon className="h-5 w-5" />
-                    ) : (
-                      <EyeIcon className="h-5 w-5" />
-                    )}
-                  </button>
-                }
-              />
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Enter your password"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2.5 bg-[#374151] border border-transparent rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed pr-10 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeSlashIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="mt-1 text-xs text-red-400">{errors.password}</p>
+              )}
             </div>
-            
-            <div className="flex items-center justify-end">
-              <RouterLink
-                to="/forgot-password"
-                className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-              >
-                Forgot Password?
-              </RouterLink>
-            </div>
-            
-            <div>
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                isLoading={isSubmitting || loading}
-                loadingText="Logging in"
-                data-testid="login-button"
-              >
-                Sign in
-              </Button>
-            </div>
-          </form>
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
+
+            {/* Forgot Password Link */}
+            <div className="text-right">
               <button
                 type="button"
-                onClick={handleRegisterClick}
-                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors underline bg-transparent border-none cursor-pointer"
+                className="text-sm text-blue-400 hover:text-blue-300 focus:outline-none"
               >
-                Register
+                Forgot Password?
               </button>
-            </p>
-          </div>
-        </Card>
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full"
+              disabled={isSubmitting || loading}
+            >
+              {isSubmitting || loading ? 'Signing in...' : 'Sign in'}
+            </Button>
+
+            {/* Sign Up Link */}
+            <div className="text-center mt-4">
+              <p className="text-sm text-gray-400">
+                Don't have an account?{' '}
+                <Link
+                  to="/register"
+                  className="text-blue-400 hover:text-blue-300 font-medium"
+                >
+                  Register
+                </Link>
+              </p>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

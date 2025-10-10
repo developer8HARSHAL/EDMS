@@ -1,6 +1,6 @@
 // frontend/src/components/ApplicationRoutes.js - COMPLETE FIX
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 // Import existing pages
@@ -18,6 +18,7 @@ import ProtectedRoute from './ProtectedRoute';
 import WorkspacePage from '../pages/WorkspacePage';
 import WorkspaceSettings from '../pages/WorkspaceSettings';
 import InvitationPage from '../pages/InvitationPage';
+import LandingPage from '../pages/LandingPage';
 
 import { useParams } from 'react-router-dom';
 // Import permission guard for workspace routes
@@ -35,9 +36,9 @@ function WorkspaceDocumentsRedirect() {
 
 function DocumentPreviewWithPermission() {
   const { workspaceId } = useParams();
-  
+
   return (
-    <PermissionGuard 
+    <PermissionGuard
       workspaceId={workspaceId}
       allowedRoles={['viewer', 'editor', 'admin', 'owner']}
       fallback={<Navigate to="/dashboard" replace />}
@@ -62,108 +63,129 @@ const ApplicationRoutes = () => {
     );
   }
 
+  function PublicRouteWrapper({ children }) {
+    const location = useLocation();
+    const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+
+    if (isAuthenticated && !isAuthPage) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+  }
+
   return (
     <Routes>
       {/* Public routes - only show if user is NOT authenticated */}
-      <Route 
-        path="/login" 
+      <Route
+        path="/"
+        element={
+          <PublicRouteWrapper>
+            <LandingPage />
+          </PublicRouteWrapper>
+        }
+      />
+
+
+      <Route
+        path="/login"
         element={
           isAuthenticated ? (
             <Navigate to="/dashboard" replace />
           ) : (
             <Login />
           )
-        } 
+        }
       />
-      
-      <Route 
-        path="/register" 
+
+      <Route
+        path="/register"
         element={
           isAuthenticated ? (
             <Navigate to="/dashboard" replace />
           ) : (
             <Register />
           )
-        } 
+        }
       />
 
       {/* ✅ FIXED: Invitation route */}
-      <Route 
-        path="/invitation/:token" 
-        element={<InvitationPage />} 
+      <Route
+        path="/invitation/:token"
+        element={<InvitationPage />}
       />
 
       {/* Root route redirect */}
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           isAuthenticated ? (
             <Navigate to="/dashboard" replace />
           ) : (
             <Navigate to="/login" replace />
           )
-        } 
+        }
       />
 
       {/* Protected routes - using ProtectedRoute wrapper */}
-      <Route 
-        path="/dashboard" 
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/profile" 
+
+      <Route
+        path="/profile"
         element={
           <ProtectedRoute>
             <Profile />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Document routes */}
-      <Route 
-        path="/documents" 
+      <Route
+        path="/documents"
         element={
           <ProtectedRoute>
             <DocumentList />
           </ProtectedRoute>
-        } 
+        }
       />
 
-      <Route 
-        path="/workspaces/:workspaceId/documents" 
+      <Route
+        path="/workspaces/:workspaceId/documents"
         element={
           <ProtectedRoute>
             <DocumentList />
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/documents/upload" 
+
+      <Route
+        path="/documents/upload"
         element={
           <ProtectedRoute>
             <UploadDocument />
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/documents/preview/:documentId" 
+
+      <Route
+        path="/documents/preview/:documentId"
         element={
           <ProtectedRoute>
             <DocumentPreview />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* ✅ MAIN WORKSPACE ROUTE */}
-      <Route 
-        path="/workspaces/:workspaceId" 
+      <Route
+        path="/workspaces/:workspaceId"
         element={
           <ProtectedRoute>
             <WorkspacePage />
@@ -172,11 +194,11 @@ const ApplicationRoutes = () => {
       />
 
       {/* ✅ FIXED: Workspace settings - Use allowedRoles instead of requiredPermissions */}
-      <Route 
-        path="/workspaces/:workspaceId/settings" 
+      <Route
+        path="/workspaces/:workspaceId/settings"
         element={
           <ProtectedRoute>
-            <PermissionGuard 
+            <PermissionGuard
               workspaceIdParam="workspaceId"
               allowedRoles={['admin', 'owner']}
               fallback={<Navigate to="/dashboard" replace />}
@@ -184,25 +206,25 @@ const ApplicationRoutes = () => {
               <WorkspaceSettings />
             </PermissionGuard>
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* ✅ FIXED: Document preview within workspace context */}
-      <Route 
-        path="/workspaces/:workspaceId/documents/:documentId" 
+      <Route
+        path="/workspaces/:workspaceId/documents/:documentId"
         element={
           <ProtectedRoute>
-            <DocumentPreviewWithPermission />  
+            <DocumentPreviewWithPermission />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* ✅ FIXED: Upload document to specific workspace */}
-      <Route 
-        path="/workspaces/:workspaceId/upload" 
+      <Route
+        path="/workspaces/:workspaceId/upload"
         element={
           <ProtectedRoute>
-            <PermissionGuard 
+            <PermissionGuard
               workspaceIdParam="workspaceId"
               allowedRoles={['editor', 'admin', 'owner']}
               fallback={<Navigate to="/dashboard" replace />}
@@ -210,15 +232,15 @@ const ApplicationRoutes = () => {
               <UploadDocument />
             </PermissionGuard>
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* ✅ FIXED: Workspace analytics */}
-      <Route 
-        path="/workspaces/:workspaceId/analytics" 
+      <Route
+        path="/workspaces/:workspaceId/analytics"
         element={
           <ProtectedRoute>
-            <PermissionGuard 
+            <PermissionGuard
               workspaceIdParam="workspaceId"
               allowedRoles={['admin', 'owner']}
               fallback={<Navigate to="/dashboard" replace />}
@@ -226,28 +248,28 @@ const ApplicationRoutes = () => {
               <WorkspacePage />
             </PermissionGuard>
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Pending invitations management */}
-      <Route 
-        path="/invitations" 
+      <Route
+        path="/invitations"
         element={
           <ProtectedRoute>
             <InvitationPage />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* ✅ FIXED: Legacy redirects for backward compatibility */}
-      <Route 
-        path="/documents/workspace/:workspaceId" 
-        element={<WorkspaceDocumentsRedirect />} 
+      <Route
+        path="/documents/workspace/:workspaceId"
+        element={<WorkspaceDocumentsRedirect />}
       />
 
-      <Route 
-        path="/workspace/:workspaceId" 
-        element={<WorkspaceRedirect />} 
+      <Route
+        path="/workspace/:workspaceId"
+        element={<WorkspaceRedirect />}
       />
 
       {/* Catch-all route */}

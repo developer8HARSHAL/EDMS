@@ -1,369 +1,363 @@
-// ===== FIXED Register.js =====
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link as RouterLink, useSearchParams } from 'react-router-dom';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+// frontend/src/pages/Register.js
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Alert } from '../components/ui/Alert';
-import { Card } from '../components/ui/Card';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 const Register = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const navigate = useNavigate();
+  const { register, login, isAuthenticated, loading, error: authError, clearError } = useAuth();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+  // UI state
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
-  const [emailError, setEmailError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
-  
-  // ✅ FIXED: Properly declare invitation handling hooks
-  const [searchParams] = useSearchParams();
-  const invitationToken = searchParams.get('invitation');
-  const invitationAction = searchParams.get('action'); // 'accept' or 'view'
-  const redirectPath = searchParams.get('redirect');
-  
-  const { register, error, clearError, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  // ✅ FIXED: Handle registration success with invitation redirect
-  const handleRegisterSuccess = useCallback(() => {
-    console.log('Registration successful, checking invitation redirect...');
-    
-    if (invitationToken && redirectPath) {
-      console.log('Redirecting to invitation page after registration:', redirectPath);
-      navigate(redirectPath);
-    } else if (invitationToken) {
-      // Construct invitation URL with action parameter
-      const invitationUrl = `/invitations/${invitationToken}${invitationAction ? `?action=${invitationAction}` : ''}`;
-      console.log('Redirecting to invitation with token:', invitationUrl);
-      navigate(invitationUrl);
-    } else {
-      console.log('Normal registration flow - redirecting to dashboard');
-      navigate('/dashboard');
-    }
-  }, [invitationToken, invitationAction, redirectPath, navigate]);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      handleRegisterSuccess();
+      navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, handleRegisterSuccess]);
+  }, [isAuthenticated, navigate]);
 
-  // Clear previous errors when component mounts ONLY
+  // Clear errors when auth error changes
   useEffect(() => {
-    if (typeof clearError === 'function') {
-      clearError();
+    if (authError) {
+      setSubmitError(authError);
     }
-  }, []); // Empty dependency array - only run on mount
+  }, [authError]);
 
-  // Auto-hide toast after 5 seconds
+  // Auto-dismiss error messages after 5 seconds
   useEffect(() => {
-    if (toastMessage) {
+    if (submitError) {
       const timer = setTimeout(() => {
-        setToastMessage(null);
+        setSubmitError('');
+        clearError();
       }, 5000);
+      
       return () => clearTimeout(timer);
     }
-  }, [toastMessage]);
+  }, [submitError, clearError]);
 
-  const validateEmail = useCallback((email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }, []);
-
-  const validateForm = useCallback(() => {
-    let isValid = true;
-    
-    // Reset previous errors
-    setPasswordError('');
-    setEmailError('');
-    
-    // Validate email
-    if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address');
-      isValid = false;
+  // Auto-dismiss success messages after 3 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      
+      return () => clearTimeout(timer);
     }
-    
-    // Check if passwords match
-    if (password !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      isValid = false;
-    }
-    
-    // Check password strength (at least 8 characters with mix of letters, numbers)
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      setPasswordError('Password must be at least 8 characters long and include both letters and numbers');
-      isValid = false;
-    }
-    
-    return isValid;
-  }, [email, password, confirmPassword, validateEmail]);
+  }, [successMessage]);
 
-  const showToast = useCallback((message, type = 'error') => {
-    setToastMessage({ message, type });
-  }, []);
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
+    // Clear field-specific error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+
+    // Clear submit error when user starts typing
+    if (submitError) {
+      setSubmitError('');
+      clearError();
+    }
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters';
+    } else if (formData.name.trim().length > 50) {
+      newErrors.name = 'Name must not exceed 50 characters';
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])/.test(formData.password)) {
+      newErrors.password = 'Password must contain both uppercase and lowercase letters';
+    } else if (!/(?=.*\d)/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one number';
+    }
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Clear previous messages
+    setSubmitError('');
+    setSuccessMessage('');
+
+    // Validate form
     if (!validateForm()) {
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      console.log('Attempting to register...');
-      await register(name, email, password);
+      // Call register function from useAuth hook
+      await register(formData.name, formData.email, formData.password);
       
-      // Show success toast
-      showToast('Registration successful! You can now log in with your credentials.', 'success');
+      // Show success message
+      setSuccessMessage('Registration successful! Logging you in...');
       
-      // ✅ FIXED: Handle invitation redirect or normal flow
-      if (invitationToken) {
-        console.log('Registration successful with invitation - redirecting to invitation page');
-        // Small delay to show success message, then redirect to invitation
+      // Automatically log in the user after registration
+      try {
+        await login(formData.email, formData.password);
+        
+        // Redirect to dashboard after short delay
         setTimeout(() => {
-          handleRegisterSuccess();
+          navigate('/dashboard', { replace: true });
         }, 1000);
-      } else {
-        // Navigate to login page after successful registration (normal flow)
+      } catch (loginError) {
+        // If auto-login fails, redirect to login page
+        setSuccessMessage('Registration successful! Please log in.');
         setTimeout(() => {
-          navigate('/login');
+          navigate('/login', { replace: true });
         }, 2000);
       }
-    } catch (err) {
-      // Error handling is done via the error state in AuthContext
-      // But we'll add an additional toast for unexpected errors
-      if (!error) {
-        showToast(err.message || 'An unexpected error occurred');
+      
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      // Handle specific error messages
+      if (error.message) {
+        setSubmitError(error.message);
+      } else if (error.response?.data?.message) {
+        // Backend sends "User already exists" message
+        setSubmitError(error.response.data.message);
+      } else if (error.response?.status === 400) {
+        setSubmitError('User already exists with this email address');
+      } else if (error.response?.status === 500) {
+        setSubmitError('Server error. Please try again later.');
+      } else if (!error.response) {
+        setSubmitError('Cannot connect to server. Please check your internet connection.');
+      } else {
+        setSubmitError('Registration failed. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleLoginClick = useCallback(() => {
-    console.log('Login link clicked');
-    
-    // ✅ FIXED: Preserve invitation context when going to login
-    if (invitationToken) {
-      const loginParams = new URLSearchParams();
-      loginParams.set('invitation', invitationToken);
-      if (invitationAction) loginParams.set('action', invitationAction);
-      if (redirectPath) loginParams.set('redirect', redirectPath);
-      
-      navigate(`/login?${loginParams.toString()}`);
-    } else {
-      navigate('/login');
-    }
-  }, [navigate, invitationToken, invitationAction, redirectPath]);
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <Card className="p-8 bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+    <div className="min-h-screen flex items-center justify-center bg-[#1a1f2e] px-4">
+      <div className="w-full max-w-md">
+        {/* Card Container - Reduced padding and size */}
+        <div className="bg-[#2a3441] rounded-lg p-6 shadow-xl">
+          {/* Header - Reduced spacing */}
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-white">
               Create your account
             </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-white">
+            <p className="mt-1 text-sm text-gray-400">
               Join us and start managing your documents
             </p>
-            {/* ✅ FIXED: Show invitation context */}
-            {invitationToken && (
-              <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                {invitationAction === 'accept' 
-                  ? 'Create an account to accept your workspace invitation'
-                  : 'Create an account to view your workspace invitation'
-                }
-              </p>
-            )}
           </div>
 
-          {/* Toast Notification */}
-          {toastMessage && (
-            <div className="mb-6">
-              <Alert variant={toastMessage.type === 'success' ? 'success' : 'error'}>
-                <div className="flex items-center">
-                  {toastMessage.type === 'success' ? (
-                    <svg className="w-5 h-5 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 mr-2 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                  {toastMessage.message}
-                </div>
-              </Alert>
-            </div>
+          {/* Success Message */}
+          {successMessage && (
+            <Alert variant="success" className="mb-3">
+              {successMessage}
+            </Alert>
           )}
 
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-6">
-              <Alert variant="error">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </div>
-              </Alert>
-            </div>
+          {/* Error Message */}
+          {submitError && (
+            <Alert variant="error" className="mb-3">
+              {submitError}
+            </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Registration Form - Reduced spacing */}
+          <form className="space-y-3" onSubmit={handleSubmit}>
+            {/* Full Name Input */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2 dark:text-white">
-                Full Name *
+              <label htmlFor="name" className="block text-sm font-medium text-gray-200 mb-1">
+                Full Name <span className="text-red-400">*</span>
               </label>
-              <Input
+              <input
                 id="name"
+                name="name"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={formData.name}
+                onChange={handleChange}
                 placeholder="Enter your full name"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 bg-[#3d4a5c] border border-[#4a5568] rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               />
-            </div>
-            
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2 dark:text-white">
-                Email address *
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                autoComplete="email"
-                required
-                className={`w-full px-3 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
-                  emailError 
-                    ? 'border-red-500 focus:ring-red-500' 
-                    : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
-                }`}
-              />
-              {emailError && (
-                <p className="mt-1 text-sm text-red-600">{emailError}</p>
+              {errors.name && (
+                <p className="mt-1 text-xs text-red-400">{errors.name}</p>
               )}
             </div>
-            
+
+            {/* Email Input */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2 dark:text-white">
-                Password *
+              <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-1">
+                Email address <span className="text-red-400">*</span>
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 bg-[#3d4a5c] border border-[#4a5568] rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              />
+              {errors.email && (
+                <p className="mt-1 text-xs text-red-400">{errors.email}</p>
+              )}
+            </div>
+
+            {/* Password Input */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-1">
+                Password <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <Input
+                <input
                   id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={handleChange}
                   placeholder="Create a password"
-                  autoComplete="new-password"
-                  required
-                  className={`w-full px-3 py-2 pr-10 border rounded-lg shadow-sm focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    passwordError 
-                      ? 'border-red-500 focus:ring-red-500' 
-                      : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
-                  }`}
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 bg-[#3d4a5c] border border-[#4a5568] rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed pr-10 text-sm"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-lg transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 focus:outline-none"
+                  tabIndex={-1}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                    <EyeSlashIcon className="h-4 w-4" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
+                    <EyeIcon className="h-4 w-4" />
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-white">
-                Must be at least 8 characters with letters and numbers
-              </p>
-              {passwordError && (
-                <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+              {errors.password ? (
+                <p className="mt-1 text-xs text-red-400">{errors.password}</p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">
+                  Must be 8+ characters with letters and numbers
+                </p>
               )}
             </div>
-            
+
+            {/* Confirm Password Input */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2 dark:text-white">
-                Confirm Password *
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-1">
+                Confirm Password <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <Input
+                <input
                   id="confirmPassword"
+                  name="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
                   placeholder="Confirm your password"
-                  autoComplete="new-password"
-                  required
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 bg-[#3d4a5c] border border-[#4a5568] rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed pr-10 text-sm"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-lg transition-colors"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 focus:outline-none"
+                  tabIndex={-1}
                 >
                   {showConfirmPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                    <EyeSlashIcon className="h-4 w-4" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
+                    <EyeIcon className="h-4 w-4" />
                   )}
                 </button>
               </div>
+              {errors.confirmPassword && (
+                <p className="mt-1 text-xs text-red-400">{errors.confirmPassword}</p>
+              )}
             </div>
-            
-            <div>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Creating account...
-                  </div>
-                ) : (
-                  'Register'
-                )}
-              </Button>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full mt-4"
+              disabled={isSubmitting || loading}
+            >
+              {isSubmitting || loading ? 'Creating account...' : 'Register'}
+            </Button>
+
+            {/* Sign In Link */}
+            <div className="text-center mt-4">
+              <p className="text-sm text-gray-400">
+                Already have an account?{' '}
+                <Link
+                  to="/login"
+                  className="text-[#5b8def] hover:text-[#4a7ad8] font-medium"
+                >
+                  Sign in
+                </Link>
+              </p>
             </div>
           </form>
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-white">
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={handleLoginClick}
-                className="text-blue-600 hover:text-blue-800 font-medium transition-colors underline bg-transparent border-none cursor-pointer"
-              >
-                Sign in
-              </button>
-            </p>
-          </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

@@ -406,11 +406,11 @@ const DesktopNav = React.memo(({
     if (!isAuthenticated) {
       return [
         {
-          label: 'Features',
+          // label: 'Features',
           href: '/features',
         },
         {
-          label: 'Pricing',
+          // label: 'Pricing',
           href: '/pricing',
         },
       ];
