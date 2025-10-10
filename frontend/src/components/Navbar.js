@@ -187,7 +187,8 @@ const handleDropdownToggle = useCallback((dropdownName) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0">
-              <span className="text-xl font-bold text-gray-800 dark:text-white">
+              
+              <span className="text-xl font-bold text-gray-900 dark:text-white">
                 DocManager
               </span>
             </div>
@@ -220,6 +221,10 @@ const handleDropdownToggle = useCallback((dropdownName) => {
 
           {/* Logo & Workspace Context */}
           <div className="flex items-center space-x-4">
+            <div className="w-10 h-10? rounded-lg flex items-center justify-center">
+                  <img src="/logo.png" alt="Logo" className="w-18 h-10" />
+                  {/* <FileText className="w-6 h-6 text-white" /> */}
+                </div>
             <RouterLink
               to="/"
               className="text-xl font-bold text-gray-800 dark:text-white hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
