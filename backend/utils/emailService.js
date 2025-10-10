@@ -309,7 +309,7 @@ class EmailService {
   }
 
   /**
-   * Send workspace invitation email
+   * 🔥 CRITICAL FIX: Send workspace invitation email with FRONTEND URL
    */
   async sendInvitationEmail(invitationData) {
     try {
@@ -323,9 +323,21 @@ class EmailService {
 
       const { recipientEmail, inviterName, workspaceName, token } = invitationData;
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      // 🔥 CRITICAL FIX: Use FRONTEND_URL for invitation links
+      // Frontend is on Vercel, Backend is on Render
+      const frontendUrl = process.env.FRONTEND_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+      
+      // ✅ FIXED: These URLs now point to FRONTEND (Vercel), not BACKEND (Render)
       const acceptUrl = `${frontendUrl}/invitation/${token}?action=accept`;
       const rejectUrl = `${frontendUrl}/invitation/${token}?action=reject`;
+
+      console.log('📧 Email URL Configuration:', {
+        FRONTEND_URL: process.env.FRONTEND_URL,
+        VERCEL_URL: process.env.VERCEL_URL,
+        frontendUrl: frontendUrl,
+        acceptUrl: acceptUrl,
+        rejectUrl: rejectUrl
+      });
 
       const emailData = {
         ...invitationData,
@@ -341,7 +353,7 @@ class EmailService {
           email: process.env.EMAIL_USER,
           name: `${process.env.APP_NAME || 'Document Management'} - ${inviterName}`
         },
-        subject: ` You're invited to join "${workspaceName}" workspace`,
+        subject: `🎉 You're invited to join "${workspaceName}" workspace`,
         html: htmlContent,
         text: `
 Hi there!
@@ -396,7 +408,7 @@ ${process.env.APP_NAME || 'Document Management System'}
   }
 
   /**
-   * Send invitation reminder email
+   * 🔥 FIXED: Send invitation reminder email
    */
   async sendReminderEmail(invitationData) {
     try {
@@ -407,7 +419,8 @@ ${process.env.APP_NAME || 'Document Management System'}
         isReminder: true
       };
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      // 🔥 FIXED: Use FRONTEND URL
+      const frontendUrl = process.env.FRONTEND_URL || process.env.VERCEL_URL || 'http://localhost:3000';
       const acceptUrl = `${frontendUrl}/invitation/${invitationData.token}?action=accept`;
       const rejectUrl = `${frontendUrl}/invitation/${invitationData.token}?action=reject`;
 
