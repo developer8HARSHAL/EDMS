@@ -1,0 +1,63 @@
+# ============================
+# Root-level
+# ============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+# ============================
+# Backend
+# ============================
+# Environment
+backend/.env
+backend/.env.local
+backend/.env.production
+
+# Node / dependencies
+backend/node_modules/
+backend/package-lock.json
+
+# Uploaded files (keep only .gitkeep)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Test files (optional if you don’t want them in repo)
+backend/test/*.test.js
+backend/test/setup.js
+
+# Deployment / build artifacts
+backend/.codeviz/
+backend/deployment_guide/
+backend/features.txt
+backend/flow.txt
+backend/flow_done.txt
+backend/workspace_feature.txt
+
+# ============================
+# Frontend
+# ============================
+# Environment
+frontend/.env.development
+frontend/.env.production
+
+# Node / dependencies
+frontend/node_modules/
+frontend/package-lock.json
+
+# Build / output
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/.vercel/
+
+# Test files
+frontend/src/App.test.js
+frontend/src/setupTests.js
+
+# Editor / OS junk
+frontend/.vscode/
+frontend/.idea/
+
