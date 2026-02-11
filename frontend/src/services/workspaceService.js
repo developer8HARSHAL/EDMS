@@ -71,67 +71,6 @@ async getWorkspaces(params = {}) {
    */
 // REPLACE this method in your workspaceService.js file
 
-async getWorkspaces(params = {}) {
-  try {
-    const queryParams = {
-      page: params.page || 1,
-      limit: params.limit || 10,
-      search: params.search || '',
-      role: params.role || '',
-      sortBy: params.sortBy || 'updatedAt',
-      sortOrder: params.sortOrder || 'desc'
-    };
-
-    console.log('🔍 WorkspaceService: Calling API with params:', queryParams);
-    
-    const response = await workspaceApi.getWorkspaces(queryParams);
-    console.log('📡 WorkspaceService: Raw API response:', response);
-
-    // ✅ CRITICAL FIX: Handle the EXACT backend response format
-    // Backend returns: { success: true, data: { workspaces: [...], totalDocs: 7, ... } }
-    
-    if (response && response.success && response.data) {
-      const responseData = response.data;
-      
-      console.log('📦 WorkspaceService: Parsed response data:', responseData);
-      
-      return {
-        success: true,
-        data: {
-          workspaces: responseData.workspaces || [],
-          totalDocs: responseData.totalDocs || 0,
-          totalPages: responseData.totalPages || 1,
-          currentPage: responseData.currentPage || params.page || 1,
-          hasNextPage: responseData.hasNextPage || false,
-          hasPrevPage: responseData.hasPrevPage || false
-        }
-      };
-    }
-
-    // Handle direct array response (fallback)
-    if (Array.isArray(response)) {
-      return {
-        success: true,
-        data: {
-          workspaces: response,
-          totalDocs: response.length,
-          totalPages: 1,
-          currentPage: 1,
-          hasNextPage: false,
-          hasPrevPage: false
-        }
-      };
-    }
-
-    console.error('❌ Invalid response structure:', response);
-    throw new Error('Invalid response format from server');
-    
-  } catch (error) {
-    console.error('❌ WorkspaceService getWorkspaces error:', error);
-    throw this.handleError(error, 'Failed to fetch workspaces');
-  }
-}
-
 
 // ADD this method to your workspaceService.js file after the getWorkspaces method
 
