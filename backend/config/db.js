@@ -6,8 +6,18 @@ const connectDB = async () => {
     console.log("=== DATABASE CONNECTION ===");
     console.log("Environment:", process.env.NODE_ENV);
     
+    // ✅ FIXED: Validate MONGO_URI exists
+    if (!process.env.MONGO_URI) {
+      const error = new Error('MONGO_URI environment variable is required');
+      console.error('❌ DATABASE CONNECTION ERROR:', error.message);
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      }
+      throw error;
+    }
+    
     // Log partial connection string for debugging (hiding credentials)
-    const connectionString = process.env.MONGO_URI || 'No connection string found';
+    const connectionString = process.env.MONGO_URI;
     const redactedString = connectionString.includes('@') 
       ? connectionString.substring(0, connectionString.indexOf('://') + 3) + 
         '***:***@' + 

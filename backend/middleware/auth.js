@@ -24,6 +24,15 @@ exports.protect = async (req, res, next) => {
   }
 
   try {
+    // ✅ FIXED: Validate JWT_SECRET exists
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET is not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error'
+      });
+    }
+    
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 

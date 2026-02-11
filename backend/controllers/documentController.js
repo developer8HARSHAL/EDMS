@@ -8,11 +8,28 @@ const { ObjectId } = mongoose.Types;
 
 // Set up GridFS bucket
 let gfs;
+
+// ✅ FIXED: Initialize GridFS safely with connection check
+const getGridFS = () => {
+  if (!gfs) {
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error('MongoDB connection not ready. Cannot initialize GridFS.');
+    }
+    gfs = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'uploads'
+    });
+    console.log('GridFS initialized successfully');
+  }
+  return gfs;
+};
+
+// Initialize on connection open
 mongoose.connection.once('open', () => {
-  gfs = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-    bucketName: 'uploads'
-  });
-  console.log('GridFS initialized successfully');
+  try {
+    getGridFS();
+  } catch (error) {
+    console.error('Failed to initialize GridFS:', error);
+  }
 });
 
 // @desc    Upload new document
@@ -41,8 +58,11 @@ exports.uploadDocument = async (req, res) => {
     const fileId = new ObjectId();
     const fileName = `document_${req.user.id}_${Date.now()}${path.extname(file.name)}`;
 
+    // ✅ FIXED: Get GridFS instance safely
+    const gridFS = getGridFS();
+    
     // Create writable stream to GridFS
-    const writeStream = gfs.openUploadStreamWithId(fileId, fileName, {
+    const writeStream = gridFS.openUploadStreamWithId(fileId, fileName, {
       contentType: file.mimetype,
       metadata: {
         originalName: file.name,
@@ -563,7 +583,8 @@ exports.updateDocument = async (req, res) => {
       const fileId = new ObjectId();
       const fileName = `document_${userId}_${Date.now()}${path.extname(document.originalName)}`;
 
-      const writeStream = gfs.openUploadStreamWithId(fileId, fileName, {
+      const gridFS = getGridFS();
+      const writeStream = gridFS.openUploadStreamWithId(fileId, fileName, {
         contentType: document.type,
         metadata: { originalName: document.originalName, ownerId: userId }
       });
@@ -577,7 +598,10 @@ exports.updateDocument = async (req, res) => {
       });
 
       try {
-        if (document.path) await gfs.delete(new ObjectId(document.path));
+        if (document.path) {
+          const gridFS = getGridFS();
+          await gridFS.delete(new ObjectId(document.path));
+        }
       } catch (err) {
         console.error('------Error deleting old file:', err);
       }
@@ -671,7 +695,8 @@ exports.deleteDocument = async (req, res) => {
     try {
       if (document.path) {
         const fileId = new ObjectId(document.path);
-        await gfs.delete(fileId);
+        const gridFS = getGridFS();
+        await gridFS.delete(fileId);
         console.log("File deleted from GridFS");
       }
     } catch (fileError) {
@@ -746,8 +771,11 @@ exports.previewDocument = async (req, res) => {
       res.setHeader('Content-Length', files.length);
       res.setHeader('Content-Disposition', `inline; filename="${document.originalName || document.name}"`);
       
+      // ✅ FIXED: Get GridFS instance safely
+      const gridFS = getGridFS();
+      
       // Create download stream
-      const downloadStream = gfs.openDownloadStream(fileId);
+      const downloadStream = gridFS.openDownloadStream(fileId);
       
       // Handle stream errors properly
       downloadStream.on('error', (err) => {
@@ -1068,10 +1096,11 @@ exports.bulkDeleteDocuments = async (req, res) => {
     }
 
     // Delete files from GridFS
+    const gridFS = getGridFS();
     for (const doc of documents) {
       try {
         const fileId = new ObjectId(doc.path);
-        await gfs.delete(fileId);
+        await gridFS.delete(fileId);
       } catch (fileError) {
         console.error(`Error deleting file ${doc.path} from GridFS:`, fileError);
       }

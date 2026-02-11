@@ -232,7 +232,7 @@ DocumentSchema.statics.findByWorkspace = function(workspaceId, options = {}) {
 // Static method to get document statistics for workspace
 DocumentSchema.statics.getWorkspaceStats = function(workspaceId) {
   return this.aggregate([
-    { $match: { workspace: mongoose.Types.ObjectId(workspaceId) } },
+    { $match: { workspace: new mongoose.Types.ObjectId(workspaceId) } },
     {
       $group: {
         _id: null,

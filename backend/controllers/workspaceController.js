@@ -1,7 +1,7 @@
 const Workspace = require('../models/workspaceModel');
 const User = require('../models/userModel');
 const Document = require('../models/documentModel');
-const { getDefaultPermissionsForRole} = require('../utils/permissionMapper');
+const { getDefaultPermissionsForRole, mapFrontendToBackend } = require('../utils/permissionMapper');
 
 
 // @desc    Create new workspace
@@ -451,7 +451,22 @@ console.log("- workspace members:", req.workspace?.members);
 
     if (permissions) {
       // ✅ FIXED: Normalize permissions to backend format
-      workspace.members[memberIndex].permissions = normalizePermissions(permissions);
+      // Check if permissions are in frontend format and convert if needed
+      const frontendKeys = ['read', 'write', 'delete', 'manage', 'invite'];
+      const hasFrontendKeys = Object.keys(permissions).some(key => frontendKeys.includes(key));
+      
+      if (hasFrontendKeys) {
+        workspace.members[memberIndex].permissions = mapFrontendToBackend(permissions);
+      } else {
+        // Already in backend format, validate and use directly
+        workspace.members[memberIndex].permissions = {
+          canView: permissions.canView ?? false,
+          canEdit: permissions.canEdit ?? false,
+          canAdd: permissions.canAdd ?? false,
+          canDelete: permissions.canDelete ?? false,
+          canInvite: permissions.canInvite ?? false
+        };
+      }
     }
 
     await workspace.save();

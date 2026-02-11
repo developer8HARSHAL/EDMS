@@ -1,8 +1,10 @@
+|-- .cursor
 |-- .gitignore
 |-- backend
     |-- .env
     |-- .env.local
     |-- .env.production
+    |-- AUDIT_REPORT.md
     |-- config
         |-- db.js
     |-- controllers
@@ -10,8 +12,11 @@
         |-- invitationController.js
         |-- userController.js
         |-- workspaceController.js
+    |-- FIXES_APPLIED.md
+    |-- HEALTH_REPORT.md
     |-- middleware
         |-- auth.js
+        |-- validateObjectId.js
         |-- workspaceAuth.js
     |-- models
         |-- documentModel.js
@@ -39,16 +44,13 @@
     |-- .gitignore
     |-- hooks
         |-- .gitkeep
+    |-- npm
     |-- package-lock.json
     |-- package.json
     |-- postcss.config.js
     |-- public
-        |-- favicon.ico
         |-- index.html
         |-- logo.png
-        |-- logo1.png
-        |-- logo192.png
-        |-- logo512.png
         |-- manifest.json
         |-- robots.txt
     |-- README.md

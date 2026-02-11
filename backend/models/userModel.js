@@ -73,6 +73,11 @@ UserSchema.pre('save', async function(next) {
 
 // Sign JWT and return
 UserSchema.methods.getSignedJwtToken = function() {
+  // ✅ FIXED: Validate JWT_SECRET exists
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured. Cannot generate token.');
+  }
+  
   return jwt.sign(
     { 
       id: this._id,

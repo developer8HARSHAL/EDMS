@@ -14,7 +14,21 @@ const documentRoutes = require('./routes/documentRoutes');
 const workspaceRoutes = require('./routes/workspaceRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
 
+// ✅ FIXED: Validate required environment variables before starting
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('❌ CRITICAL: Missing required environment variables:');
+  missingVars.forEach(varName => {
+    console.error(`   - ${varName}`);
+  });
+  console.error('\nPlease set these variables in your .env file or environment.');
+  process.exit(1);
+}
+
 // Load environment variables
+console.log("✅ Environment variables validated");
 console.log("EMAIL_USER from env:", process.env.EMAIL_USER);
 console.log("EMAIL_PASS exists?", !!process.env.EMAIL_PASS);
 
