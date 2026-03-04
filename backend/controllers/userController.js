@@ -18,12 +18,12 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user - restrict role to "user" unless explicitly admin
+    // Create user — always force role to 'user' (admin must be assigned by existing admin)
     const user = await User.create({
       name,
       email,
       password,
-      role: role === 'admin' ? 'admin' : 'user'
+      role: 'user'
     });
 
     // Create token
@@ -155,14 +155,14 @@ exports.updateProfile = async (req, res) => {
     if (currentPassword && newPassword) {
       // Verify current password
       const isMatch = await user.matchPassword(currentPassword);
-      
+
       if (!isMatch) {
         return res.status(401).json({
           success: false,
           message: 'Current password is incorrect'
         });
       }
-      
+
       // Set new password
       user.password = newPassword;
     } else if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
@@ -199,7 +199,7 @@ exports.updateProfile = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find().select('-password');
-    
+
     res.status(200).json({
       success: true,
       count: users.length,

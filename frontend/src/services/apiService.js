@@ -5,12 +5,12 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // For development debugging
-const DEBUG = true;
+const DEBUG = process.env.REACT_APP_ENV === 'development';
 
 // ✅ CRITICAL FIX: Create a single axios instance for all API calls
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 20000, // 10 second timeout
+  timeout: 60000, // 60 second timeout to accommodate cold starts on free hosting
 });
 
 
@@ -21,40 +21,40 @@ const api = axios.create({
 const setupAxiosInterceptors = () => {
   // Request interceptor - Add auth headers
   api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    
-    if (DEBUG) {
-      console.log('📤 API Request:', config.method?.toUpperCase(), config.url);
-      console.log('🔑 Token found:', !!token);
-    }
-    
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    (config) => {
+      const token = localStorage.getItem('authToken');
+
       if (DEBUG) {
-        console.log('✅ Authorization header set');
+        console.log('📤 API Request:', config.method?.toUpperCase(), config.url);
+        console.log('🔑 Token found:', !!token);
       }
+
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+        if (DEBUG) {
+          console.log('✅ Authorization header set');
+        }
+      }
+
+      // Ensure Content-Type is set for non-FormData requests
+      if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+        config.headers['Content-Type'] = 'application/json';
+      }
+
+      // ✅ ADD THIS: Disable caching for all requests
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+
+      return config;
+    },
+    (error) => {
+      if (DEBUG) {
+        console.error('❌ Request Error:', error);
+      }
+      return Promise.reject(error);
     }
-    
-    // Ensure Content-Type is set for non-FormData requests
-    if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
-      config.headers['Content-Type'] = 'application/json';
-    }
-    
-    // ✅ ADD THIS: Disable caching for all requests
-    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-    config.headers['Pragma'] = 'no-cache';
-    config.headers['Expires'] = '0';
-    
-    return config;
-  },
-  (error) => {
-    if (DEBUG) {
-      console.error('❌ Request Error:', error);
-    }
-    return Promise.reject(error);
-  }
-);
+  );
 
   // Response interceptor - Handle auth errors
   api.interceptors.response.use(
@@ -78,20 +78,16 @@ const setupAxiosInterceptors = () => {
 
       // Handle 401 errors (unauthorized)
       if (error.response?.status === 401) {
-        console.log('🚨 401 Unauthorized - Clearing token');
         localStorage.removeItem('authToken');
-        
+
         // Dispatch logout action if we have access to store
         if (window.store) {
           window.store.dispatch({ type: 'auth/logout' });
         }
-        
-        // Redirect to login if not already there
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
+        // Let ProtectedRoute handle the redirect naturally
+        // instead of forcing a full page reload with window.location.href
       }
-      
+
       return Promise.reject(error);
     }
   );
@@ -143,54 +139,54 @@ export const workspaceApi = {
   },
 
   // MINIMAL FIX: Add just the getWorkspace method to fix your current error
-// Add this to your existing workspaceApi object in apiService.js
+  // Add this to your existing workspaceApi object in apiService.js
 
-// ✅ ADD THIS MISSING METHOD to fix the current error
-getWorkspace: async (workspaceId) => {
-  try {
-    if (!workspaceId) {
-      throw new Error('Workspace ID is required');
+  // ✅ ADD THIS MISSING METHOD to fix the current error
+  getWorkspace: async (workspaceId) => {
+    try {
+      if (!workspaceId) {
+        throw new Error('Workspace ID is required');
+      }
+
+      const url = `/workspaces/${workspaceId}`;
+
+      if (DEBUG) {
+        console.log('📋 Fetching single workspace from:', url);
+      }
+
+      const response = await api.get(url);
+
+      if (DEBUG) {
+        console.log('✅ Single workspace response:', response.data);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Fetch single workspace error:', error);
+
+      if (!error.response) {
+        throw new Error('Unable to connect to server. Please check your connection.');
+      }
+
+      if (error.response.status === 401) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      if (error.response.status === 403) {
+        throw new Error('Access denied. You do not have permission to view this workspace.');
+      }
+
+      if (error.response.status === 404) {
+        throw new Error('Workspace not found.');
+      }
+
+      if (error.response.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      }
+
+      throw new Error(error.response?.data?.message || 'Failed to fetch workspace');
     }
-
-    const url = `/workspaces/${workspaceId}`;
-
-    if (DEBUG) {
-      console.log('📋 Fetching single workspace from:', url);
-    }
-
-    const response = await api.get(url);
-
-    if (DEBUG) {
-      console.log('✅ Single workspace response:', response.data);
-    }
-
-    return response.data;
-  } catch (error) {
-    console.error('❌ Fetch single workspace error:', error);
-
-    if (!error.response) {
-      throw new Error('Unable to connect to server. Please check your connection.');
-    }
-
-    if (error.response.status === 401) {
-      throw new Error('Authentication required. Please log in again.');
-    }
-
-    if (error.response.status === 403) {
-      throw new Error('Access denied. You do not have permission to view this workspace.');
-    }
-
-    if (error.response.status === 404) {
-      throw new Error('Workspace not found.');
-    }
-
-    if (error.response.status >= 500) {
-      throw new Error('Server error. Please try again later.');
-    }
-
-    throw new Error(error.response?.data?.message || 'Failed to fetch workspace');
-  }
-},
+  },
 
 
   // ... your existing methods (getWorkspaces, getWorkspace, getWorkspaceById) ...
@@ -206,25 +202,25 @@ getWorkspace: async (workspaceId) => {
     }
   },
 
-updateWorkspace: async (workspaceId, updates) => {
-  try {
-    const response = await api.put(`/workspaces/${workspaceId}`, updates);
+  updateWorkspace: async (workspaceId, updates) => {
+    try {
+      const response = await api.put(`/workspaces/${workspaceId}`, updates);
 
-    // ✅ Handle 204 No Content or missing JSON body gracefully
-    if (response.status === 204 || !response.data) {
-      return { success: true };
+      // ✅ Handle 204 No Content or missing JSON body gracefully
+      if (response.status === 204 || !response.data) {
+        return { success: true };
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Update workspace error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error;
     }
-
-    return response.data;
-  } catch (error) {
-    console.error('Update workspace error:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    });
-    throw error;
-  }
-},
+  },
 
 
   deleteWorkspace: async (workspaceId) => {
@@ -258,7 +254,7 @@ updateWorkspace: async (workspaceId, updates) => {
   },
 
   updateMemberRole: async (workspaceId, memberId, roleData) => {
-    
+
     try {
       const response = await api.put(`/workspaces/${workspaceId}/members/${memberId}`, roleData);
       return response.data;
@@ -287,7 +283,7 @@ updateWorkspace: async (workspaceId, updates) => {
       throw error;
     }
   },
-  
+
   // ✅ New - fetch single workspace by ID
   getWorkspaceById: async (id) => {
     try {
@@ -375,7 +371,7 @@ export const documentApi = {
     }
   },
 
-   getDashboardData: async () => {
+  getDashboardData: async () => {
     try {
       const response = await api.get('/documents/dashboard-data');
       return response.data;
@@ -390,7 +386,7 @@ export const documentApi = {
       if (!workspaceId || workspaceId === 'undefined') {
         throw new Error('Invalid workspace ID');
       }
-      
+
       const queryString = new URLSearchParams(params).toString();
       const url = `/documents/workspace/${workspaceId}${queryString ? `?${queryString}` : ''}`;
       const response = await api.get(url);
@@ -407,7 +403,7 @@ export const documentApi = {
         console.error('Invalid document ID passed to getDocument:', documentId);
         throw new Error('Invalid document ID provided');
       }
-      
+
       console.log('Fetching document with ID:', documentId);
       const response = await api.get(`/documents/${documentId}`);
       return response.data;
@@ -417,15 +413,15 @@ export const documentApi = {
     }
   },
 
-updateDocument: async (documentId, updates) => {
-  try {
-    const response = await api.put(`/documents/${documentId}`, updates);
-    return response.data;
-  } catch (error) {
-    console.error(`❌ Update document ${documentId} error:`, error);
-    throw error;
-  }
-},
+  updateDocument: async (documentId, updates) => {
+    try {
+      const response = await api.put(`/documents/${documentId}`, updates);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Update document ${documentId} error:`, error);
+      throw error;
+    }
+  },
   deleteDocument: async (documentId) => {
     try {
       const response = await api.delete(`/documents/${documentId}`);
@@ -436,17 +432,17 @@ updateDocument: async (documentId, updates) => {
     }
   },
 
-previewDocument: async (documentId) => {
-  try {
-    const response = await api.get(`/documents/${documentId}/preview`, {
-      responseType: 'blob'
-    });
-    return response.data; // ✅ Return just the blob data
-  } catch (error) {
-    console.error(`❌ Preview document ${documentId} error:`, error);
-    throw error;
-  }
-},
+  previewDocument: async (documentId) => {
+    try {
+      const response = await api.get(`/documents/${documentId}/preview`, {
+        responseType: 'blob'
+      });
+      return response.data; // ✅ Return just the blob data
+    } catch (error) {
+      console.error(`❌ Preview document ${documentId} error:`, error);
+      throw error;
+    }
+  },
 
   shareDocument: async (documentId, shareData) => {
     try {
@@ -463,7 +459,7 @@ previewDocument: async (documentId) => {
       if (!workspaceId || workspaceId === 'undefined') {
         throw new Error('Invalid workspace ID');
       }
-      
+
       const response = await api.get(`/documents/workspace/${workspaceId}/stats`);
       return response.data;
     } catch (error) {
@@ -511,7 +507,7 @@ previewDocument: async (documentId) => {
   uploadDocumentToWorkspace: async (workspaceId, formData) => {
     try {
       formData.append('workspaceId', workspaceId);
-      
+
       const response = await api.post('/documents', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -556,13 +552,13 @@ export const userApi = {
       if (DEBUG) {
         console.log('👤 Fetching user profile...');
       }
-      
+
       const response = await api.get('/users/profile');
-      
+
       if (DEBUG) {
         console.log('✅ Profile fetched:', response.data);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Get profile error:', error);
@@ -575,12 +571,12 @@ export const userApi = {
       const updateData = {
         name: userData.name
       };
-      
+
       if (userData.currentPassword && userData.newPassword) {
         updateData.currentPassword = userData.currentPassword;
         updateData.newPassword = userData.newPassword;
       }
-      
+
       if (DEBUG) {
         console.log('Updating profile with data:', {
           ...updateData,
@@ -588,37 +584,37 @@ export const userApi = {
           newPassword: updateData.newPassword ? '[REDACTED]' : undefined
         });
       }
-      
+
       const response = await api.put('/users/profile', updateData);
-      
+
       if (!response || !response.data) {
         throw new Error('No response data received from server');
       }
-      
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Profile update failed');
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Update profile error:', error);
-      
+
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check your internet connection.');
       }
-      
+
       if (error.response.status === 400) {
         throw new Error(error.response.data.message || 'Invalid input. Please check your data.');
       }
-      
+
       if (error.response.status === 401) {
         throw new Error('Current password is incorrect.');
       }
-      
+
       if (error.response && error.response.data && error.response.data.message) {
         throw new Error(error.response.data.message);
       }
-      
+
       throw error;
     }
   },
@@ -628,12 +624,12 @@ export const userApi = {
       if (DEBUG) {
         console.log('🔐 Attempting login for:', email);
       }
-      
+
       const response = await api.post('/users/login', { email, password });
-      
+
       if (response.data && response.data.token) {
         localStorage.setItem('authToken', response.data.token);
-        
+
         if (DEBUG) {
           console.log('✅ Token stored, login successful');
         }
@@ -641,35 +637,35 @@ export const userApi = {
         console.error('❌ No token received in login response');
         throw new Error('Authentication failed - no token received');
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Login error:', error);
-      
+
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check if the server is running.');
       }
-      
+
       throw error;
     }
   },
 
   register: async (name, email, password) => {
     try {
-      const response = await api.post('/users/register', { 
-        name, 
-        email, 
-        password 
+      const response = await api.post('/users/register', {
+        name,
+        email,
+        password
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Registration error:', error);
-      
+
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check if the server is running.');
       }
-      
+
       throw error;
     }
   },
@@ -682,56 +678,56 @@ export const userApi = {
 
 // ✅ FIXED: Invitation API with consistent usage of api instance
 export const invitationApi = {
-sendInvitation: async (invitationData) => {
-  try {
-    console.log('🔍 RAW INVITATION DATA RECEIVED:', JSON.stringify(invitationData, null, 2));
-    console.log('📤 Original invitation data:', invitationData);
-    
-    // ✅ FIX: Properly map the data fields to match backend expectations
-    const requestData = {
-      workspaceId: invitationData.workspaceId,
-      inviteeEmail: invitationData.inviteeEmail || invitationData.email,
-      role: invitationData.role,
-      message: invitationData.message || invitationData.customMessage
-    };
-    
-    console.log('🔧 Mapped request data being sent to API:', JSON.stringify(requestData, null, 2));
-    console.log('🚀 About to POST to /invitations/send with:', requestData);
-    
-    // Validate required fields before sending
-    if (!requestData.workspaceId) {
-      console.error('❌ CRITICAL: workspaceId is missing from request data!');
-      throw new Error('workspaceId is required');
+  sendInvitation: async (invitationData) => {
+    try {
+      console.log('🔍 RAW INVITATION DATA RECEIVED:', JSON.stringify(invitationData, null, 2));
+      console.log('📤 Original invitation data:', invitationData);
+
+      // ✅ FIX: Properly map the data fields to match backend expectations
+      const requestData = {
+        workspaceId: invitationData.workspaceId,
+        inviteeEmail: invitationData.inviteeEmail || invitationData.email,
+        role: invitationData.role,
+        message: invitationData.message || invitationData.customMessage
+      };
+
+      console.log('🔧 Mapped request data being sent to API:', JSON.stringify(requestData, null, 2));
+      console.log('🚀 About to POST to /invitations/send with:', requestData);
+
+      // Validate required fields before sending
+      if (!requestData.workspaceId) {
+        console.error('❌ CRITICAL: workspaceId is missing from request data!');
+        throw new Error('workspaceId is required');
+      }
+      if (!requestData.inviteeEmail) {
+        console.error('❌ CRITICAL: inviteeEmail is missing from request data!');
+        throw new Error('inviteeEmail is required');
+      }
+      if (!requestData.role) {
+        console.error('❌ CRITICAL: role is missing from request data!');
+        throw new Error('role is required');
+      }
+
+      const response = await api.post('/invitations/send', requestData);
+
+      console.log('✅ Invitation sent successfully:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Send invitation error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+
+      if (error.response) {
+        console.log('📊 Full error response:', JSON.stringify(error.response.data, null, 2));
+      }
+
+      throw error;
     }
-    if (!requestData.inviteeEmail) {
-      console.error('❌ CRITICAL: inviteeEmail is missing from request data!');
-      throw new Error('inviteeEmail is required');
-    }
-    if (!requestData.role) {
-      console.error('❌ CRITICAL: role is missing from request data!');
-      throw new Error('role is required');
-    }
-    
-    const response = await api.post('/invitations/send', requestData);
-    
-    console.log('✅ Invitation sent successfully:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Send invitation error:', error);
-    console.error('❌ Error details:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
-    });
-    
-    if (error.response) {
-      console.log('📊 Full error response:', JSON.stringify(error.response.data, null, 2));
-    }
-    
-    throw error;
-  }
-},
+  },
 
   getInvitationDetails: async (token) => {
     try {
@@ -771,7 +767,7 @@ sendInvitation: async (invitationData) => {
       return response.data;
     } catch (error) {
       console.error('❌ Get pending invitations error:', error);
-      
+
       if (error.response) {
         console.error('Response status:', error.response.status);
         console.error('Response data:', error.response.data);
@@ -779,7 +775,7 @@ sendInvitation: async (invitationData) => {
       } else if (error.request) {
         console.error('No response received:', error.request);
       }
-      
+
       throw error;
     }
   },
@@ -843,11 +839,11 @@ export const getWorkspaceInvitations = invitationApi.getWorkspaceInvitations;
 export const getPendingInvitations = invitationApi.getPendingInvitations;
 
 // Export all APIs as a combined object
-const apiService = { 
-  documentApi, 
-  userApi, 
-  workspaceApi, 
-  invitationApi 
+const apiService = {
+  documentApi,
+  userApi,
+  workspaceApi,
+  invitationApi
 };
 
 export default apiService;

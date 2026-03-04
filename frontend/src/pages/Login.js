@@ -11,34 +11,29 @@ const Login = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated, loading, error: authError, clearError } = useAuth();
 
-  // Form state
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
 
-  // UI state
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
-  // Clear errors when auth error changes
   useEffect(() => {
     if (authError) {
       setSubmitError(authError);
     }
   }, [authError]);
 
-  // Auto-dismiss error messages after 5 seconds
   useEffect(() => {
     if (submitError) {
       const timer = setTimeout(() => {
@@ -106,15 +101,12 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Clear previous messages
     setSubmitError('');
     setSuccessMessage('');
 
-    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -122,13 +114,10 @@ const Login = () => {
     setIsSubmitting(true);
 
     try {
-      // Call login function from useAuth hook
       await login(formData.email, formData.password);
 
-      // Show success message
       setSuccessMessage('Login successful! Redirecting to dashboard...');
 
-      // Redirect to dashboard after short delay
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
       }, 1000);
@@ -136,7 +125,6 @@ const Login = () => {
     } catch (error) {
       console.error('Login error:', error);
 
-      // Handle specific error messages
       if (error.message) {
         setSubmitError(error.message);
       } else if (error.response?.data?.message) {
@@ -158,30 +146,25 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1a1f2e] px-4">
       <div className="w-full max-w-md">
-        {/* Card Container - Reduced padding */}
         <div className="bg-[#2a3441] rounded-lg p-6 shadow-xl">
-          {/* Header - Reduced spacing */}
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-white">
               Log in to your account
             </h2>
           </div>
 
-          {/* Success Message */}
           {successMessage && (
             <Alert variant="success" className="mb-3">
               {successMessage}
             </Alert>
           )}
 
-          {/* Error Message */}
           {submitError && (
             <Alert variant="error" className="mb-3">
               {submitError}
             </Alert>
           )}
 
-          {/* Login Form - Reduced spacing */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             {/* Email Input */}
             <div>
@@ -237,17 +220,7 @@ const Login = () => {
               )}
             </div>
 
-            {/* Forgot Password Link */}
-            {/* <div className="text-right">
-              <button
-                type="button"
-                className="text-sm text-blue-400 hover:text-blue-300 focus:outline-none"
-              >
-                Forgot Password?
-              </button>
-            </div> */}
 
-            {/* Submit Button */}
             <Button
               type="submit"
               variant="primary"

@@ -62,7 +62,7 @@ const Dashboard = () => {
     getUserRole,
     getUserPermissions
   } = useWorkspaces();
-  console.log("ðŸ” Dashboard Hook Check:", workspaces.length, workspaces);
+
 
   const {
     pendingInvitations,
@@ -87,33 +87,33 @@ const Dashboard = () => {
   const [workspaceSearch, setWorkspaceSearch] = useState('');
 
   // Initialize tab from URL
-const getInitialTab = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const tabParam = urlParams.get('tab');
-  if (tabParam && ['overview', 'workspaces', 'activity'].includes(tabParam)) {
-    return tabParam;
-  }
-  return 'overview';
-};
+  const getInitialTab = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['overview', 'workspaces', 'activity'].includes(tabParam)) {
+      return tabParam;
+    }
+    return 'overview';
+  };
 
-const [activeTab, setActiveTab] = useState(getInitialTab);
-const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-// Update tab when URL changes
-useEffect(() => {
-  const tabParam = searchParams.get('tab');
-  if (tabParam && ['overview', 'workspaces', 'activity'].includes(tabParam)) {
-    setActiveTab(tabParam);
-  }
-}, [searchParams]);
+  // Update tab when URL changes
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['overview', 'workspaces', 'activity'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
-// Handler to change tabs
-const handleTabChange = (tabId) => {
-  setActiveTab(tabId);
-  setSearchParams({ tab: tabId }, { replace: true });
-};
+  // Handler to change tabs
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId }, { replace: true });
+  };
 
-// overview, workspaces, activity
+  // overview, workspaces, activity
   const [recentActivity, setRecentActivity] = useState([]);
 
   // âœ… FIX: Create stable reference for fetchData function
@@ -149,68 +149,7 @@ const handleTabChange = (tabId) => {
 
 
 
-  useEffect(() => {
-    console.log('=== DASHBOARD AUTH DEBUG ===');
 
-    // Check localStorage token
-    const token = localStorage.getItem('authToken');
-    console.log('1. Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NULL');
-
-    // Check axios headers
-    console.log('2. Axios auth header:', axios.defaults.headers.common['Authorization']);
-
-    // Check Redux auth state
-    console.log('3. Redux auth state:', {
-      isAuthenticated,
-      user: user ? { id: user.id, email: user.email } : null,
-      tokenValidated
-    });
-
-    // Test token decode
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        console.log('4. Token decoded:', {
-          id: decoded.id,
-          email: decoded.email,
-          exp: decoded.exp,
-          expired: decoded.exp * 1000 < Date.now(),
-          expiryTime: new Date(decoded.exp * 1000)
-        });
-      } catch (e) {
-        console.error('4. Token decode error:', e);
-      }
-    }
-
-    // Test API call
-    const testAPICall = async () => {
-      try {
-        console.log('5. Testing API call...');
-        const response = await fetch('http://localhost:5000/api/users/profile', {
-          headers: {
-            'Authorization': axios.defaults.headers.common['Authorization']
-          }
-        });
-        console.log('5. API test response:', response.status, response.statusText);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log('5. API test data:', data);
-        } else {
-          const errorData = await response.text();
-          console.log('5. API test error:', errorData);
-        }
-      } catch (error) {
-        console.error('5. API test failed:', error);
-      }
-    };
-
-    if (isAuthenticated && token) {
-      testAPICall();
-    }
-
-    console.log('=== END AUTH DEBUG ===');
-  }, [isAuthenticated, user, tokenValidated]);
 
   // âœ… FIX: Use the stable fetchData function with proper dependencies
   useEffect(() => {
@@ -233,9 +172,7 @@ const handleTabChange = (tabId) => {
 
 
 
-  console.log('apiService:', apiService);
-  console.log('apiService.default:', apiService.default);
-  console.log('Available methods:', Object.keys(apiService));
+
 
   // Filter workspaces based on search
   const filteredWorkspaces = useMemo(() => {
@@ -343,8 +280,8 @@ const handleTabChange = (tabId) => {
     <button
       onClick={() => handleTabChange(id)}
       className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${active
-          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-          : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
         }`}
     >
       <Icon className="h-5 w-5" />
@@ -590,7 +527,7 @@ const handleTabChange = (tabId) => {
                                     </div>
                                   </td>
                                   <td className="py-4 px-4">
-                                    
+
                                     <Badge variant="outline" size="lg">
                                       {workspace?.name || 'Personal'} {/* ✅ This will now work correctly */}
                                     </Badge>

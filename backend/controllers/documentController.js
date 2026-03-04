@@ -45,7 +45,7 @@ exports.uploadDocument = async (req, res) => {
     }
 
     const file = req.files.file;
-    
+
     // Check file size (limit to 50MB)
     if (file.size > 50 * 1024 * 1024) {
       return res.status(400).json({
@@ -60,7 +60,7 @@ exports.uploadDocument = async (req, res) => {
 
     // ✅ FIXED: Get GridFS instance safely
     const gridFS = getGridFS();
-    
+
     // Create writable stream to GridFS
     const writeStream = gridFS.openUploadStreamWithId(fileId, fileName, {
       contentType: file.mimetype,
@@ -81,7 +81,7 @@ exports.uploadDocument = async (req, res) => {
     });
 
     // Create document record in database
-  const document = await Document.create({
+    const document = await Document.create({
       name: req.body.name || file.name,
       originalName: file.name,
       path: fileId.toString(),
@@ -149,12 +149,12 @@ exports.getDocuments = async (req, res) => {
           { 'permissions.user': req.user.id }
         ]
       })
-      .populate('owner', 'name email')
-      .populate('workspace', 'name')
-      .select('-__v -permissions') // ✅ Exclude heavy fields
-      .lean() // ✅ Return plain objects for faster processing
-      .sort({ uploadDate: -1 }) // ✅ Use indexed field
-      .limit(50) // ✅ Limit results for dashboard
+        .populate('owner', 'name email')
+        .populate('workspace', 'name')
+        .select('-__v -permissions') // ✅ Exclude heavy fields
+        .lean() // ✅ Return plain objects for faster processing
+        .sort({ uploadDate: -1 }) // ✅ Use indexed field
+        .limit(50) // ✅ Limit results for dashboard
     ]);
 
     const workspaceIds = userWorkspaces.map(ws => ws._id);
@@ -164,17 +164,17 @@ exports.getDocuments = async (req, res) => {
       workspace: { $in: workspaceIds },
       owner: { $ne: req.user.id } // Exclude own documents (already fetched)
     })
-    .populate('owner', 'name email')
-    .populate('workspace', 'name')
-    .select('-__v -permissions')
-    .lean()
-    .sort({ uploadDate: -1 })
-    .limit(50);
+      .populate('owner', 'name email')
+      .populate('workspace', 'name')
+      .select('-__v -permissions')
+      .lean()
+      .sort({ uploadDate: -1 })
+      .limit(50);
 
     // ✅ Combine and deduplicate results
     const allDocuments = [
       ...documents,
-      ...workspaceDocuments.filter(doc => 
+      ...workspaceDocuments.filter(doc =>
         !documents.some(existingDoc => existingDoc._id.toString() === doc._id.toString())
       )
     ];
@@ -274,9 +274,6 @@ console.log("✅ documentController.js loaded");
 
 exports.getDashboardData = async (req, res) => {
   try {
-    console.log("✅ getDashboardData called");
-    console.log("🔍 DEBUG: User ID:", req.user?.id);
-
     // Get user workspaces
     const userWorkspaces = await Workspace.find({
       $or: [
@@ -285,41 +282,9 @@ exports.getDashboardData = async (req, res) => {
       ]
     }).select("_id name").lean();
 
-    console.log("--------DEBUG: User workspaces:", userWorkspaces);
-
     const workspaceIds = userWorkspaces.map(ws => ws._id);
-    console.log("🔍 DEBUG: Workspace IDs:", workspaceIds);
 
-    // Step 1: Owned documents
-    const ownedDocs = await Document.find({ owner: req.user.id })
-      .select("name workspace")
-      .lean();
-    console.log("🔍 DEBUG: Owned documents:", ownedDocs);
-
-    // Step 2: Shared documents
-    const sharedDocs = await Document.find({ "permissions.user": req.user.id })
-      .select("name workspace")
-      .lean();
-    console.log("🔍 DEBUG: Shared documents:", sharedDocs);
-
-    // Step 3: Workspace documents
-    const workspaceDocs = await Document.find({ workspace: { $in: workspaceIds } })
-      .select("name workspace owner")
-      .lean();
-    console.log("🔍 DEBUG: All workspace documents:", workspaceDocs);
-
-    // Step 4: All accessible documents
-    const allAccessibleDocs = await Document.find({
-      $or: [
-        { owner: req.user.id },
-        { "permissions.user": req.user.id },
-        { workspace: { $in: workspaceIds } }
-      ]
-    }).select("name workspace owner").lean();
-
-    console.log("🔍 DEBUG: All accessible documents:", allAccessibleDocs);
-
-    // Step 5: Recent docs + stats
+    // Single combined query: recent docs + stats (2 DB calls instead of 6)
     const [recentDocs, stats] = await Promise.all([
       Document.find({
         $or: [
@@ -338,7 +303,7 @@ exports.getDashboardData = async (req, res) => {
         {
           $match: {
             $or: [
-              { owner: new mongoose.Types.ObjectId(req.user.id) }, // ✅ FIXED with "new"
+              { owner: new mongoose.Types.ObjectId(req.user.id) },
               { "permissions.user": new mongoose.Types.ObjectId(req.user.id) },
               { workspace: { $in: workspaceIds } }
             ]
@@ -362,24 +327,15 @@ exports.getDashboardData = async (req, res) => {
       ])
     ]);
 
-    console.log("🔍 DEBUG: Aggregation result:", stats);
-    console.log("🔍 DEBUG: Recent docs count:", recentDocs.length);
-
-    // ✅ Final response (prevents hanging request)
-    console.log("✅ Sending dashboard data response");
     res.status(200).json({
       success: true,
       data: {
-        ownedDocuments: ownedDocs,
-        sharedDocuments: sharedDocs,
-        workspaceDocuments: workspaceDocs,
-        allAccessibleDocuments: allAccessibleDocs,
         recentDocuments: recentDocs,
         stats: stats[0] || { totalDocs: 0, totalSize: 0, thisMonth: 0 }
       }
     });
   } catch (error) {
-    console.error("❌ Dashboard data error:", error);
+    console.error("Dashboard data error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -393,7 +349,7 @@ exports.getDashboardData = async (req, res) => {
 exports.getDocumentStats = async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    
+
     // Aggregate document statistics
     const stats = await Document.aggregate([
       {
@@ -562,10 +518,10 @@ exports.updateDocument = async (req, res) => {
     }
 
     // ---- Check role-based permission ----
- if (!member.permissions?.canEdit) {
-    console.log("------User cannot edit based on permissions:", req.user._id);
-    return res.status(403).json({ success: false, message: 'No permission to edit document' });
-}
+    if (!member.permissions?.canEdit) {
+      console.log("------User cannot edit based on permissions:", req.user._id);
+      return res.status(403).json({ success: false, message: 'No permission to edit document' });
+    }
 
 
 
@@ -653,7 +609,7 @@ exports.deleteDocument = async (req, res) => {
     if (document.workspace) {
       // Check if user is workspace owner
       const isWorkspaceOwner = document.workspace.owner.toString() === req.user.id;
-      
+
       console.log("Is workspace owner?", isWorkspaceOwner);
 
       // Find member in workspace
@@ -755,10 +711,10 @@ exports.previewDocument = async (req, res) => {
     // Get the file from GridFS
     try {
       const fileId = new ObjectId(document.path);
-      
+
       // Check if file exists in GridFS
       const files = await mongoose.connection.db.collection('uploads.files').findOne({ _id: fileId });
-      
+
       if (!files) {
         return res.status(404).json({
           success: false,
@@ -770,13 +726,13 @@ exports.previewDocument = async (req, res) => {
       res.setHeader('Content-Type', document.type || 'application/octet-stream');
       res.setHeader('Content-Length', files.length);
       res.setHeader('Content-Disposition', `inline; filename="${document.originalName || document.name}"`);
-      
+
       // ✅ FIXED: Get GridFS instance safely
       const gridFS = getGridFS();
-      
+
       // Create download stream
       const downloadStream = gridFS.openDownloadStream(fileId);
-      
+
       // Handle stream errors properly
       downloadStream.on('error', (err) => {
         console.error('GridFS stream error:', err);
@@ -795,7 +751,7 @@ exports.previewDocument = async (req, res) => {
 
       // Pipe the stream to response
       downloadStream.pipe(res);
-      
+
     } catch (error) {
       console.error('Error accessing file in GridFS:', error);
       res.status(500).json({
@@ -916,7 +872,7 @@ exports.shareDocument = async (req, res) => {
 exports.moveDocument = async (req, res) => {
   try {
     const { workspaceId } = req.body;
-    
+
     if (!workspaceId) {
       return res.status(400).json({
         success: false,
@@ -1073,7 +1029,7 @@ exports.bulkDeleteDocuments = async (req, res) => {
   try {
     const { documentIds } = req.body;
     const { workspaceId } = req.params;
-    
+
     if (!documentIds || !Array.isArray(documentIds)) {
       return res.status(400).json({
         success: false,
@@ -1144,8 +1100,8 @@ exports.exportDocuments = async (req, res) => {
         { 'permissions.user': req.user.id }
       ]
     })
-    .populate('owner', 'name email')
-    .select('-__v');
+      .populate('owner', 'name email')
+      .select('-__v');
 
     if (format === 'csv') {
       // Export as CSV
@@ -1158,22 +1114,22 @@ exports.exportDocuments = async (req, res) => {
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt
       }));
-      
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="workspace-${workspaceId}-documents.csv"`);
-      
+
       // Simple CSV conversion (in production, use a proper CSV library)
       const csvString = [
         Object.keys(csv[0] || {}).join(','),
         ...csv.map(row => Object.values(row).join(','))
       ].join('\n');
-      
+
       res.send(csvString);
     } else {
       // Export as JSON
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="workspace-${workspaceId}-documents.json"`);
-      
+
       res.status(200).json({
         success: true,
         workspace: workspaceId,

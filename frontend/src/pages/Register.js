@@ -48,7 +48,7 @@ const Register = () => {
         setSubmitError('');
         clearError();
       }, 5000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [submitError, clearError]);
@@ -59,7 +59,7 @@ const Register = () => {
       const timer = setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [successMessage]);
@@ -132,7 +132,7 @@ const Register = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Clear previous messages
     setSubmitError('');
     setSuccessMessage('');
@@ -147,34 +147,18 @@ const Register = () => {
     try {
       // Call register function from useAuth hook
       await register(formData.name, formData.email, formData.password);
-      
-      // Show success message
-      setSuccessMessage('Registration successful! Logging you in...');
-      
-      // Automatically log in the user after registration
-      try {
-        await login(formData.email, formData.password);
-        
-        // Redirect to dashboard after short delay
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 1000);
-      } catch (loginError) {
-        // If auto-login fails, redirect to login page
-        setSuccessMessage('Registration successful! Please log in.');
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 2000);
-      }
-      
+
+      // Registration now auto-stores token (auto-login).
+      // The isAuthenticated useEffect will redirect to /dashboard.
+      setSuccessMessage('Registration successful! Redirecting...');
+
     } catch (error) {
       console.error('Registration error:', error);
-      
+
       // Handle specific error messages
       if (error.message) {
         setSubmitError(error.message);
       } else if (error.response?.data?.message) {
-        // Backend sends "User already exists" message
         setSubmitError(error.response.data.message);
       } else if (error.response?.status === 400) {
         setSubmitError('User already exists with this email address');

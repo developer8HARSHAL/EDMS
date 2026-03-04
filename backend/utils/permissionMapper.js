@@ -6,7 +6,6 @@
  * Backend uses: canView, canEdit, canAdd, canDelete, canInvite
  */
 
-// ✅ Map frontend permissions to backend permissions
 const mapFrontendToBackend = (frontendPermissions) => {
   if (!frontendPermissions || typeof frontendPermissions !== 'object') {
     return null;
@@ -16,13 +15,12 @@ const mapFrontendToBackend = (frontendPermissions) => {
     read: 'canView',
     write: 'canEdit',
     delete: 'canDelete',
-    manage: 'canAdd', // 'manage' typically includes adding new items
+    manage: 'canAdd', 
     invite: 'canInvite'
   };
 
   const backendPermissions = {};
 
-  // Map each frontend permission to backend equivalent
   Object.keys(frontendPermissions).forEach(frontendKey => {
     const backendKey = permissionMap[frontendKey];
     if (backendKey) {
@@ -30,7 +28,6 @@ const mapFrontendToBackend = (frontendPermissions) => {
     }
   });
 
-  // Ensure all backend permissions are present with defaults
   const allBackendPermissions = {
     canView: backendPermissions.canView || false,
     canEdit: backendPermissions.canEdit || false,
@@ -42,7 +39,6 @@ const mapFrontendToBackend = (frontendPermissions) => {
   return allBackendPermissions;
 };
 
-// ✅ Map backend permissions to frontend permissions
 const mapBackendToFrontend = (backendPermissions) => {
   if (!backendPermissions || typeof backendPermissions !== 'object') {
     return null;
@@ -56,7 +52,6 @@ const permissionMap = {
 };
   const frontendPermissions = {};
 
-  // Map each backend permission to frontend equivalent
   Object.keys(backendPermissions).forEach(backendKey => {
     const frontendKey = permissionMap[backendKey];
     if (frontendKey) {
@@ -66,9 +61,7 @@ const permissionMap = {
 
   return frontendPermissions;
 };
-// const getRolePermissions = getDefaultPermissionsForRole;
 
-// ✅ Get default permissions for a role (backend format)
 const getDefaultPermissionsForRole = (role) => {
   
   const rolePermissions = {
@@ -105,13 +98,11 @@ const getDefaultPermissionsForRole = (role) => {
   return rolePermissions[role] || rolePermissions.viewer;
 };
 
-// ✅ Get default permissions for a role (frontend format)
 const getDefaultFrontendPermissionsForRole = (role) => {
   const backendPermissions = getDefaultPermissionsForRole(role);
   return mapBackendToFrontend(backendPermissions);
 };
 
-// ✅ Validate permission object (backend format)
 const validateBackendPermissions = (permissions) => {
   if (!permissions || typeof permissions !== 'object') {
     return { isValid: false, errors: ['Permissions must be an object'] };
@@ -120,7 +111,6 @@ const validateBackendPermissions = (permissions) => {
   const validPermissions = ['canView', 'canEdit', 'canAdd', 'canDelete', 'canInvite'];
   const errors = [];
 
-  // Check for invalid permission keys
   const providedKeys = Object.keys(permissions);
   const invalidKeys = providedKeys.filter(key => !validPermissions.includes(key));
   
@@ -128,14 +118,12 @@ const validateBackendPermissions = (permissions) => {
     errors.push(`Invalid permission keys: ${invalidKeys.join(', ')}`);
   }
 
-  // Check for invalid permission values
   providedKeys.forEach(key => {
     if (typeof permissions[key] !== 'boolean') {
       errors.push(`Permission '${key}' must be a boolean value`);
     }
   });
 
-  // Business logic validation
   if (permissions.canEdit && !permissions.canView) {
     errors.push('Cannot have edit permission without view permission');
   }
@@ -154,7 +142,6 @@ const validateBackendPermissions = (permissions) => {
   };
 };
 
-// ✅ Validate permission object (frontend format)
 const validateFrontendPermissions = (permissions) => {
   if (!permissions || typeof permissions !== 'object') {
     return { isValid: false, errors: ['Permissions must be an object'] };
@@ -163,7 +150,6 @@ const validateFrontendPermissions = (permissions) => {
   const validPermissions = ['read', 'write', 'delete', 'manage', 'invite'];
   const errors = [];
 
-  // Check for invalid permission keys
   const providedKeys = Object.keys(permissions);
   const invalidKeys = providedKeys.filter(key => !validPermissions.includes(key));
   
@@ -171,14 +157,12 @@ const validateFrontendPermissions = (permissions) => {
     errors.push(`Invalid permission keys: ${invalidKeys.join(', ')}`);
   }
 
-  // Check for invalid permission values
   providedKeys.forEach(key => {
     if (typeof permissions[key] !== 'boolean') {
       errors.push(`Permission '${key}' must be a boolean value`);
     }
   });
 
-  // Business logic validation
   if (permissions.write && !permissions.read) {
     errors.push('Cannot have write permission without read permission');
   }
@@ -197,7 +181,6 @@ const validateFrontendPermissions = (permissions) => {
   };
 };
 
-// ✅ Middleware to transform frontend permissions to backend format
 const transformPermissionsMiddleware = (req, res, next) => {
   if (req.body.permissions) {
     // Check if permissions are in frontend format
@@ -207,7 +190,6 @@ const transformPermissionsMiddleware = (req, res, next) => {
     );
 
     if (hasFrontendKeys) {
-      // Transform to backend format
       req.body.permissions = mapFrontendToBackend(req.body.permissions);
     }
   }
@@ -215,7 +197,6 @@ const transformPermissionsMiddleware = (req, res, next) => {
   next();
 };
 
-// ✅ Response transformer to convert backend permissions to frontend format
 const transformResponsePermissions = (data) => {
   if (!data) return data;
 
@@ -227,7 +208,6 @@ const transformResponsePermissions = (data) => {
     };
   }
 
-  // Handle array of workspaces
   if (Array.isArray(data.workspaces)) {
     data.workspaces = data.workspaces.map(workspace => {
       if (workspace.userPermissions) {
@@ -240,7 +220,6 @@ const transformResponsePermissions = (data) => {
     });
   }
 
-  // Handle members array
   if (data.members && Array.isArray(data.members)) {
     data.members = data.members.map(member => {
       if (member.permissions) {
@@ -256,7 +235,6 @@ const transformResponsePermissions = (data) => {
   return data;
 };
 
-// ✅ Utility to check if user has specific permission
 const hasPermission = (userPermissions, requiredPermission, format = 'backend') => {
   if (!userPermissions) return false;
 
@@ -268,7 +246,6 @@ const hasPermission = (userPermissions, requiredPermission, format = 'backend') 
   return userPermissions[requiredPermission] === true;
 };
 
-// ✅ Express middleware to add permission helpers to response
 const addPermissionHelpers = (req, res, next) => {
   // Add helper methods to response
   res.transformPermissions = (data) => transformResponsePermissions(data);

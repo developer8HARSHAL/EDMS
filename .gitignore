@@ -35,6 +35,9 @@ backend/features.txt
 backend/flow.txt
 backend/flow_done.txt
 backend/workspace_feature.txt
+backend/AUDIT_REPORT.md
+backend/FIXES_APPLIED.md
+backend/HEALTH_REPORT.md
 
 # ============================
 # Frontend
@@ -52,6 +55,10 @@ frontend/dist/
 frontend/build/
 frontend/.next/
 frontend/.vercel/
+frontend/.gitignore/
+frontend/README.md/
+frontend/yarn/
+
 
 # Test files
 frontend/src/App.test.js

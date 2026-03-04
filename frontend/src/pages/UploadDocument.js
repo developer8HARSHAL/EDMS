@@ -172,17 +172,14 @@ const UploadDocument = () => {
         category: prev.category || detectCategory(selectedFile)
       }));
       
-      // ✅ FIX: Proper selection message
       showAlert(`File "${selectedFile.name}" selected. Please fill in details and click Upload.`, 'info');
     }
   }, [state.mounted, showAlert, detectCategory]);
 
-  // Form input handlers
   const handleInputChange = useCallback((field, value) => {
     setState(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  // Remove file handler
   const removeFile = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -200,7 +197,6 @@ const UploadDocument = () => {
     showAlert('File removed', 'info');
   }, [showAlert]);
 
-  // ✅ FIX: Form submission with backend API format
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     

@@ -8,13 +8,11 @@ const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const morgan = require('morgan');
 
-// Import routes
 const userRoutes = require('./routes/userRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const workspaceRoutes = require('./routes/workspaceRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
 
-// ✅ FIXED: Validate required environment variables before starting
 const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
@@ -27,14 +25,10 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// Load environment variables
 console.log("✅ Environment variables validated");
-console.log("EMAIL_USER from env:", process.env.EMAIL_USER);
-console.log("EMAIL_PASS exists?", !!process.env.EMAIL_PASS);
 
-// Initialize express app
 const app = express();
-app.use(morgan('dev'));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // ✅ FIXED: CORS configuration for Vercel deployments
 app.use(cors({
@@ -46,17 +40,20 @@ app.use(cors({
     if (process.env.NODE_ENV === 'production') {
       // Allow specific FRONTEND_URL if set
       if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
-        console.log('✅ CORS allowed (FRONTEND_URL):', origin);
         return callback(null, true);
       }
       
       // Allow all Vercel preview URLs (*.vercel.app)
       if (origin.match(/https:\/\/.*\.vercel\.app$/)) {
-        console.log('✅ CORS allowed (Vercel):', origin);
         return callback(null, true);
       }
       
-      console.log('🚫 CORS blocked origin:', origin);
+      // Allow all Netlify URLs (*.netlify.app)
+      if (origin.match(/https:\/\/.*\.netlify\.app$/)) {
+        return callback(null, true);
+      }
+      
+      console.log('CORS blocked origin:', origin);
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
@@ -80,13 +77,6 @@ app.use(fileUpload({
 
 // Static directory for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Connect to MongoDB
-connectDB()
-  .then(() => console.log('MongoDB Connected Successfully'))
-  .catch(err => {
-    console.error('Failed to connect to MongoDB:', err);
-  });
 
 // Routes
 app.use('/api/users', userRoutes);
@@ -118,6 +108,33 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
+// Graceful error handling — prevent silent crashes in production
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Give the server a chance to finish in-flight requests before exiting
+  setTimeout(() => process.exit(1), 1000);
+});
+
+// Start server — await DB connection first
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`));
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    console.log('✅ MongoDB Connected Successfully');
+    
+    app.listen(PORT, () => {
+      console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to connect to MongoDB:', err.message);
+    console.error('Server will retry in 5 seconds...');
+    setTimeout(startServer, 5000);
+  }
+};
+
+startServer();

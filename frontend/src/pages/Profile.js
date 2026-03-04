@@ -43,9 +43,7 @@ const Profile = () => {
       errors.name = 'Name is required';
     }
     
-    // Validate password change if attempted
     if (formData.newPassword || formData.currentPassword) {
-      // If one password field is filled, both must be filled
       if (!formData.currentPassword) {
         errors.currentPassword = 'Current password is required to set a new password';
       }
@@ -68,10 +66,8 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Clear previous success message
     setSuccessMessage('');
     
-    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -79,12 +75,10 @@ const Profile = () => {
     setIsSubmitting(true);
     
     try {
-      // Prepare data for API - only send what's needed
       const profileData = {
         name: formData.name
       };
       
-      // Only include password fields if both are provided
       if (formData.currentPassword && formData.newPassword) {
         profileData.currentPassword = formData.currentPassword;
         profileData.newPassword = formData.newPassword;
@@ -95,7 +89,6 @@ const Profile = () => {
       
       setSuccessMessage('Your profile has been successfully updated');
       
-      // Reset password fields
       setFormData(prev => ({
         ...prev,
         currentPassword: '',
@@ -103,14 +96,12 @@ const Profile = () => {
         confirmPassword: ''
       }));
     } catch (error) {
-      // Error is already handled by context
       console.error('Profile update failed in component:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Generate initials for avatar
   const getInitials = (name) => {
     if (!name) return 'U';
     return name
@@ -125,7 +116,6 @@ const Profile = () => {
     <div className="container mx-auto max-w-4xl py-8 px-4">
       <Card className="p-6">
         <div className="space-y-6">
-          {/* Header Section */}
           <div className="flex items-start space-x-6">
             <div className="flex-shrink-0">
               <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-semibold">
@@ -153,14 +143,12 @@ const Profile = () => {
           {/* Divider */}
           <hr className="border-gray-200 dark:border-gray-700" />
           
-          {/* Error Alert */}
           {error && (
             <Alert variant="error">
               {error}
             </Alert>
           )}
           
-          {/* Success Alert */}
           {successMessage && (
             <Alert variant="success">
               {successMessage}
@@ -169,7 +157,6 @@ const Profile = () => {
           
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name Field */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Full Name
@@ -189,7 +176,6 @@ const Profile = () => {
               )}
             </div>
             
-            {/* Email Field (Read-only) */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email Address
@@ -206,13 +192,11 @@ const Profile = () => {
               </p>
             </div>
             
-            {/* Password Section */}
             <div className="pt-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Change Password
               </h2>
               
-              {/* Current Password */}
               <div className="mb-4">
                 <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Current Password
@@ -233,7 +217,6 @@ const Profile = () => {
                 )}
               </div>
               
-              {/* New Password */}
               <div className="mb-4">
                 <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   New Password
@@ -254,7 +237,6 @@ const Profile = () => {
                 )}
               </div>
               
-              {/* Confirm Password */}
               <div className="mb-4">
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Confirm New Password
@@ -276,7 +258,6 @@ const Profile = () => {
               </div>
             </div>
             
-            {/* Submit Button */}
             <div className="pt-6">
               <Button
                 type="submit"
