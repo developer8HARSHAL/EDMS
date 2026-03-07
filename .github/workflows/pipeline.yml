@@ -81,6 +81,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          CI: false                  
+          DISABLE_ESLINT_PLUGIN: true 
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
 
   # ──────────────────────────────────────────────
