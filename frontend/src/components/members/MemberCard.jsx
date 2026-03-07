@@ -5,7 +5,6 @@ import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import RoleSelector from './RoleSelector';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
-const [showConfirm, setShowConfirm] = useState(false);
 
 const MemberCard = ({
   member,
@@ -23,6 +22,8 @@ const MemberCard = ({
 
   const { removeMember, updateMemberRole } = useWorkspaces();
   const { user: currentUser } = useSelector(state => state.auth);
+  const [showConfirm, setShowConfirm] = useState(false);
+
 
   // Permission checks
   const canEditRole = currentUserRole === 'admin' && !isCurrentUser && member.role !== 'owner';
