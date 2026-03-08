@@ -6,7 +6,8 @@
   "scripts": {
     "test:backend": "jest --testPathPatterns=test",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint . --ext .js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.3",
+    "eslint": "^9.0.0",
     "jest": "^30.2.0",
     "nodemon": "^2.0.22",
     "supertest": "^7.1.4"

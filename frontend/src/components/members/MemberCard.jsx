@@ -6,22 +6,24 @@ import Badge from '../ui/Badge';
 import RoleSelector from './RoleSelector';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
 
-const MemberCard = ({ 
-  member, 
-  workspaceId, 
+const MemberCard = ({
+  member,
+  workspaceId,
   currentUserRole,
   onRemove,
   onRoleUpdate,
   isCurrentUser = false,
   compact = false,
-  showActions = true 
+  showActions = true
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { removeMember, updateMemberRole } = useWorkspaces();
   const { user: currentUser } = useSelector(state => state.auth);
+  const [showConfirm, setShowConfirm] = useState(false);
+
 
   // Permission checks
   const canEditRole = currentUserRole === 'admin' && !isCurrentUser && member.role !== 'owner';
@@ -47,8 +49,11 @@ const MemberCard = ({
   };
 
   const handleRemoveMember = async () => {
-    if (!confirm(`Remove ${member.name} from this workspace?`)) return;
-    
+    if (!showConfirm) {
+      setShowConfirm(true);
+      return;
+    }
+    setShowConfirm(false);
     setIsLoading(true);
     try {
       await removeMember(workspaceId, member.userId);
@@ -92,9 +97,9 @@ const MemberCard = ({
     return (
       <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
         <div className="flex items-center space-x-3">
-          <Avatar 
-            src={member.avatar} 
-            name={member.name} 
+          <Avatar
+            src={member.avatar}
+            name={member.name}
             size="sm"
             className="flex-shrink-0"
           />
@@ -120,9 +125,9 @@ const MemberCard = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-4">
-          <Avatar 
-            src={member.avatar} 
-            name={member.name} 
+          <Avatar
+            src={member.avatar}
+            name={member.name}
             size="lg"
             className="flex-shrink-0"
           />
@@ -177,14 +182,11 @@ const MemberCard = ({
                 )}
                 {canRemove && (
                   <button
-                    onClick={() => {
-                      handleRemoveMember();
-                      setShowDropdown(false);
-                    }}
+                    onClick={() => { handleRemoveMember(); setShowDropdown(false); }}
                     className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Remove Member</span>
+                    <span>{showConfirm ? 'Click again to confirm' : 'Remove Member'}</span>
                   </button>
                 )}
               </div>
@@ -232,14 +234,13 @@ const MemberCard = ({
           <Calendar className="w-4 h-4 text-gray-400" />
           <span>Joined {formatJoinDate(member.joinedAt)}</span>
         </div>
-        
+
         {member.lastActive && (
           <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${
-              new Date() - new Date(member.lastActive) < 5 * 60 * 1000 
-                ? 'bg-green-500' 
+            <div className={`w-2 h-2 rounded-full ${new Date() - new Date(member.lastActive) < 5 * 60 * 1000
+                ? 'bg-green-500'
                 : 'bg-gray-400'
-            }`} />
+              }`} />
             <span>
               Last active {new Date(member.lastActive).toLocaleDateString()}
             </span>
