@@ -68,6 +68,29 @@ const DocumentSchema = new mongoose.Schema({
     type: Number,
     default: 1
   },
+  // Document lifecycle status
+  status: {
+    type: String,
+    enum: ['draft', 'in-review', 'approved'],
+    default: 'draft'
+  },
+  // Users assigned to review this document. Per-document assignment,
+  // separate from workspace role (an editor isn't automatically a reviewer
+  // for every document — they have to be explicitly assigned).
+  reviewers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  ],
+  // Set when status moves to 'approved'; used to lock further edits.
+  approvedAt: {
+    type: Date
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   isPublic: {
     type: Boolean,
     default: false
@@ -105,6 +128,9 @@ DocumentSchema.index({ owner: 1 });
 DocumentSchema.index({ workspace: 1 });
 DocumentSchema.index({ 'permissions.user': 1 });
 DocumentSchema.index({ favoritedBy: 1 });
+DocumentSchema.index({ reviewers: 1 });
+DocumentSchema.index({ status: 1 });
+DocumentSchema.index({ workspace: 1, status: 1 });
 DocumentSchema.index({ uploadDate: -1 });
 DocumentSchema.index({ lastModified: -1 });
 DocumentSchema.index({ type: 1 });
