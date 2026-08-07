@@ -33,6 +33,13 @@ const DocumentSchema = new mongoose.Schema({
     ref: 'Workspace',
     required: [true, 'Document must belong to a workspace']
   },
+  // Users who have favorited this document (per-user, not a global flag)
+  favoritedBy: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  ],
   // Keep individual permissions for backward compatibility and additional granular control
   permissions: [
     {
@@ -97,6 +104,7 @@ DocumentSchema.index({ name: 'text', description: 'text', tags: 'text' });
 DocumentSchema.index({ owner: 1 });
 DocumentSchema.index({ workspace: 1 });
 DocumentSchema.index({ 'permissions.user': 1 });
+DocumentSchema.index({ favoritedBy: 1 });
 DocumentSchema.index({ uploadDate: -1 });
 DocumentSchema.index({ lastModified: -1 });
 DocumentSchema.index({ type: 1 });

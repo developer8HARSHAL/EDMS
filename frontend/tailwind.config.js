@@ -7,7 +7,19 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
       colors: {
+        // Semantic tokens — driven by CSS variables in index.css (:root / .dark).
+        // Components should reach for these (bg-surface, border-border, text-ink)
+        // instead of hardcoding gray/slate + dark: pairs.
+        bg: 'rgb(var(--color-bg) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        'surface-2': 'rgb(var(--color-surface-2) / <alpha-value>)',
+        border: 'rgb(var(--color-border) / <alpha-value>)',
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        'ink-muted': 'rgb(var(--color-ink-muted) / <alpha-value>)',
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -20,6 +32,15 @@ module.exports = {
           800: '#1e40af',
           900: '#1e3a8a',
           950: '#172554',
+        },
+        // Deep navy accent used for tinted nested rows/panels (dark mode "inner card" look)
+        navy: {
+          400: '#3457D5',
+          500: '#1E3A8A',
+          600: '#152B63',
+          700: '#101F49',
+          800: '#0B1739',
+          900: '#080F26',
         },
         gray: {
           50: '#f9fafb',
@@ -35,10 +56,15 @@ module.exports = {
           950: '#030712',
         }
       },
+      borderRadius: {
+        '4xl': '2rem',
+      },
       boxShadow: {
+        'xs': '0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06)',
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.08), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         'large': '0 10px 40px -10px rgba(0, 0, 0, 0.15)',
+        'panel': '0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(15, 23, 42, 0.12)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-in-out',

@@ -74,7 +74,7 @@ const getWorkspaces = async (req, res) => {
     const userId = req.user.id;
     const { page = 1, limit = 10, search, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
 
-    let query = {
+    const membershipFilter = {
       $or: [
         { owner: userId },
         { 'members.user': userId }
@@ -82,16 +82,19 @@ const getWorkspaces = async (req, res) => {
     };
 
     // Add search functionality
+    let query = membershipFilter;
     if (search) {
-      query.$and = [
-        query,
-        {
-          $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
-          ]
-        }
-      ];
+      query = {
+        $and: [
+          membershipFilter,
+          {
+            $or: [
+              { name: { $regex: search, $options: 'i' } },
+              { description: { $regex: search, $options: 'i' } }
+            ]
+          }
+        ]
+      };
     }
 
     const sortObj = {};
@@ -274,10 +277,17 @@ const updatedWorkspace = await Workspace.findByIdAndUpdate(
       return res.status(404).json({ success: false, message: 'Workspace not found after update' });
     }
 
+    const updatedWorkspaceObj = updatedWorkspace.toObject();
+    // documentCount virtual is a static placeholder (see workspaceModel.js) since
+    // it can't run an async count — must be set explicitly here, same as
+    // getWorkspace/getWorkspaces, or the frontend's cached workspace (which
+    // gets fully replaced by this response) will show 0 documents post-edit.
+    updatedWorkspaceObj.documentCount = await Document.countDocuments({ workspace: updatedWorkspace._id });
+
     res.status(200).json({
       success: true,
       message: 'Workspace updated successfully',
-      data: { workspace: updatedWorkspace }
+      data: { workspace: updatedWorkspaceObj }
     });
 
   } catch (error) {
@@ -472,11 +482,15 @@ console.log("- workspace members:", req.workspace?.members);
     await workspace.save();
     await workspace.populate('members.user', 'name email');
 
+    const workspaceObj = workspace.toObject();
+    // See updateWorkspace for why this must be set explicitly.
+    workspaceObj.documentCount = await Document.countDocuments({ workspace: workspace._id });
+
    res.status(200).json({
   success: true,
   message: 'Member role updated successfully',
   data: {
-    workspace: workspace
+    workspace: workspaceObj
   }
 });
 

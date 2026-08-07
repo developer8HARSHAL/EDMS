@@ -9,7 +9,7 @@ import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading, error: authError, clearError } = useAuth();
+  const { login, guestLogin, isAuthenticated, loading, error: authError, clearError } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -143,6 +143,22 @@ const Login = () => {
     }
   };
 
+  const handleGuestLogin = async () => {
+    setSubmitError('');
+    setSuccessMessage('');
+    setIsSubmitting(true);
+
+    try {
+      await guestLogin();
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      console.error('Guest login error:', error);
+      setSubmitError(error.message || 'Could not start guest session. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1a1f2e] px-4">
       <div className="w-full max-w-md">
@@ -230,6 +246,31 @@ const Login = () => {
             >
               {isSubmitting || loading ? 'Signing in...' : 'Sign in'}
             </Button>
+
+            {/* Divider */}
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-600"></div>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-[#2a3441] px-2 text-gray-400">or</span>
+              </div>
+            </div>
+
+            {/* Guest Access */}
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="w-full"
+              disabled={isSubmitting || loading}
+              onClick={handleGuestLogin}
+            >
+              Continue as Guest
+            </Button>
+            <p className="text-center text-xs text-gray-500">
+              Explore a shared demo workspace — no account needed. Guest data is public and reset periodically.
+            </p>
 
             {/* Sign Up Link */}
             <div className="text-center mt-4">

@@ -182,10 +182,18 @@ exports.getDocuments = async (req, res) => {
     // ✅ Sort final results
     allDocuments.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
 
+    // Attach current user's favorite status (favoritedBy excluded above via projection is not the case here,
+    // it's still on the lean object since it wasn't excluded)
+    const allDocumentsWithFavorite = allDocuments.map(doc => ({
+      ...doc,
+      isFavorite: Array.isArray(doc.favoritedBy) &&
+        doc.favoritedBy.some(favUserId => favUserId.toString() === req.user.id)
+    }));
+
     res.status(200).json({
       success: true,
-      count: allDocuments.length,
-      data: allDocuments
+      count: allDocumentsWithFavorite.length,
+      data: allDocumentsWithFavorite
     });
   } catch (error) {
     console.error('Error getting documents:', error);
@@ -249,9 +257,14 @@ exports.getWorkspaceDocuments = async (req, res) => {
         if (perm) userPermission.access = perm.access; // 'read' or 'write'
       }
 
+      const isFavorite = doc.favoritedBy.some(
+        favUserId => favUserId.toString() === req.user.id
+      );
+
       return {
         ...doc.toObject(),
         userPermission,
+        isFavorite,
       };
     });
 
@@ -452,6 +465,26 @@ exports.getDocumentStats = async (req, res) => {
 // @access  Private
 exports.getDocument = async (req, res) => {
   try {
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    res.status(200).json({
+      success: true,
+      data: req.document
+    });
+  } catch (error) {
+    console.error('Error getting document:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve document',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Toggle favorite status of a document for the current user
+// @route   PUT /api/documents/:id/favorite
+// @access  Private
+exports.toggleFavorite = async (req, res) => {
+  try {
     const document = await Document.findById(req.params.id);
 
     if (!document) {
@@ -462,27 +495,83 @@ exports.getDocument = async (req, res) => {
     }
 
     // Check if user is authorized to access this document
+    // (owner, explicit permission entry, or workspace member)
     const isOwner = document.owner.toString() === req.user.id;
     const hasPermission = document.permissions.some(
       permission => permission.user.toString() === req.user.id
     );
-
+    let isWorkspaceMember = false;
     if (!isOwner && !hasPermission) {
+      const workspace = await Workspace.findById(document.workspace);
+      isWorkspaceMember = !!workspace && (
+        workspace.owner.toString() === req.user.id ||
+        workspace.members.some(member => member.user.toString() === req.user.id)
+      );
+    }
+
+    if (!isOwner && !hasPermission && !isWorkspaceMember) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this document'
       });
     }
 
+    const userId = req.user.id;
+    const alreadyFavorited = document.favoritedBy.some(
+      favUserId => favUserId.toString() === userId
+    );
+
+    if (alreadyFavorited) {
+      document.favoritedBy = document.favoritedBy.filter(
+        favUserId => favUserId.toString() !== userId
+      );
+    } else {
+      document.favoritedBy.push(userId);
+    }
+
+    await document.save();
+
     res.status(200).json({
       success: true,
-      data: document
+      data: {
+        _id: document._id,
+        isFavorite: !alreadyFavorited
+      }
     });
   } catch (error) {
-    console.error('Error getting document:', error);
+    console.error('Error toggling favorite:', error);
     res.status(500).json({
       success: false,
-      message: 'Could not retrieve document',
+      message: 'Could not toggle favorite',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get all documents favorited by the current user
+// @route   GET /api/documents/favorites
+// @access  Private
+exports.getFavoriteDocuments = async (req, res) => {
+  try {
+    const documents = await Document.find({ favoritedBy: req.user.id })
+      .sort({ lastModified: -1 });
+
+    const documentsWithFlag = documents.map(doc => {
+      const docObj = doc.toObject();
+      docObj.isFavorite = true;
+      return docObj;
+    });
+
+    res.status(200).json({
+      success: true,
+      count: documentsWithFlag.length,
+      data: documentsWithFlag
+    });
+  } catch (error) {
+    console.error('Error getting favorite documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve favorite documents',
       error: error.message
     });
   }
@@ -681,32 +770,10 @@ exports.deleteDocument = async (req, res) => {
 // @desc    Get document content for preview
 // @route   GET /api/documents/:id/preview
 // @access  Private
-// @desc    Get document content for preview
-// @route   GET /api/documents/:id/preview
-// @access  Private
 exports.previewDocument = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check if user is authorized to access this document
-    const isOwner = document.owner.toString() === req.user.id;
-    const hasPermission = document.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-
-    if (!isOwner && !hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this document'
-      });
-    }
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    const document = req.document;
 
     // Get the file from GridFS
     try {
@@ -781,10 +848,18 @@ exports.getSharedDocuments = async (req, res) => {
       'permissions.user': req.user.id // User has permissions
     }).select('-__v');
 
+    const documentsWithFavorite = documents.map(doc => {
+      const docObj = doc.toObject();
+      docObj.isFavorite = doc.favoritedBy.some(
+        favUserId => favUserId.toString() === req.user.id
+      );
+      return docObj;
+    });
+
     res.status(200).json({
       success: true,
-      count: documents.length,
-      data: documents
+      count: documentsWithFavorite.length,
+      data: documentsWithFavorite
     });
   } catch (error) {
     console.error('Error getting shared documents:', error);
@@ -919,26 +994,8 @@ exports.moveDocument = async (req, res) => {
 // @access  Private
 exports.duplicateDocument = async (req, res) => {
   try {
-    const originalDoc = await Document.findById(req.params.id);
-    if (!originalDoc) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check access permissions
-    const isOwner = originalDoc.owner.toString() === req.user.id;
-    const hasPermission = originalDoc.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-
-    if (!isOwner && !hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to duplicate this document'
-      });
-    }
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    const originalDoc = req.document;
 
     // Create duplicate with new name
     const duplicateDoc = await Document.create({
@@ -976,26 +1033,8 @@ exports.duplicateDocument = async (req, res) => {
 // @access  Private
 exports.getDocumentVersions = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check access permissions
-    const isOwner = document.owner.toString() === req.user.id;
-    const hasPermission = document.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-
-    if (!isOwner && !hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access document versions'
-      });
-    }
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    const document = req.document;
 
     // For now, return the document itself as the only version
     // In a full implementation, you'd track version history

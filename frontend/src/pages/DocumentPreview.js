@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchDocument } from '../store/slices/documentsSlice';
+import { fetchDocument, deleteDocument as deleteDocumentThunk } from '../store/slices/documentsSlice';
 import { fetchWorkspace } from '../store/slices/workspaceSlice';
 import apiService from '../services/apiService';
 import PermissionGuard from '../components/permissions/PermissionGuard';
@@ -333,7 +333,7 @@ const DocumentPreview = () => {
     }
 
     try {
-      await apiService.documentApi.deleteDocument(documentId);
+      await dispatch(deleteDocumentThunk({ documentId, workspaceId })).unwrap();
       alert('Document deleted successfully');
       handleBackNavigation();
     } catch (error) {

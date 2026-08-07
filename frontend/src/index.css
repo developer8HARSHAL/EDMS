@@ -1,34 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Theme tokens
+  ------------
+  Every surface/text color used by components should resolve through these
+  variables (bg / surface / surface-2 / border / ink) rather than hardcoded
+  gray/slate + dark: pairs. Flip .dark on <html> and the whole app repaints.
+
+  Tiering (light):  bg (page, slate-ish off-white) < surface (card, white) < surface-2 (nested row, tinted blue)
+  Tiering (dark):   bg (near-black) < surface (card, near-black, one step up) < surface-2 (navy, tinted rows)
+*/
 @layer base {
+  :root {
+    --color-bg: 247 248 250;          /* page background */
+    --color-surface: 255 255 255;     /* card background */
+    --color-surface-2: 239 246 255;   /* nested/tinted row background (primary-50) */
+    --color-border: 228 231 236;
+    --color-ink: 15 23 42;
+    --color-ink-muted: 100 116 139;
+  }
+
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
-  
+
   body {
-    @apply antialiased;
+    @apply antialiased bg-bg text-ink;
   }
+}
+
+/*
+  NOTE: this block intentionally sits OUTSIDE @layer base.
+  Tailwind's class-based dark mode engine silently strips a literal
+  `.dark { ... }` rule if it's placed inside @layer base (verified against
+  the compiled output) — it collides with the internal `:is(.dark *)`
+  variant machinery. Left unlayered, it compiles correctly and, being
+  unlayered, still wins the cascade over the layered :root defaults.
+*/
+.dark {
+  --color-bg: 8 9 13;                /* near-black page background */
+  --color-surface: 17 18 24;         /* near-black card, one step lighter than bg */
+  --color-surface-2: 11 23 57;       /* navy tinted row (matches reference "Schedule" card) */
+  --color-border: 32 34 42;
+  --color-ink: 241 245 249;
+  --color-ink-muted: 148 163 184;
 }
 
 @layer components {
-  /* Custom component classes will go here */
-  
+  /* Pill buttons — Default/Hover/Active/Disabled per the reference button spec */
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 disabled:bg-primary-200 disabled:text-primary-400
+           text-white font-semibold py-2.5 px-5 rounded-full transition-colors duration-150
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-surface
+           disabled:cursor-not-allowed;
   }
-  
+
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+    @apply bg-primary-100 hover:bg-primary-200 active:bg-primary-300 disabled:bg-primary-50 disabled:text-primary-300
+           text-primary-700 font-semibold py-2.5 px-5 rounded-full transition-colors duration-150
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-surface
+           disabled:cursor-not-allowed dark:bg-primary-950/60 dark:hover:bg-primary-900/60 dark:active:bg-primary-800/60 dark:text-primary-300;
   }
-  
+
+  .btn-tertiary {
+    @apply bg-transparent border border-primary-300 hover:bg-primary-50 active:bg-primary-100 disabled:opacity-40
+           text-primary-700 font-semibold py-2.5 px-5 rounded-full transition-colors duration-150
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-surface
+           disabled:cursor-not-allowed dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-950/40;
+  }
+
+  /* Cards resolve entirely through tokens — no dark: needed for the base look */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-soft border border-gray-200 dark:border-gray-700;
+    @apply bg-surface border border-border rounded-2xl shadow-xs;
   }
-  
+
+  .card-nested {
+    @apply bg-surface-2 rounded-xl;
+  }
+
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white;
+    @apply w-full px-3.5 py-2.5 bg-surface border border-border text-ink rounded-xl shadow-xs
+           placeholder:text-ink-muted
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+  }
+
+  /* Status/label pill — deliberately monochrome. The reference never switches hue
+     for status (Open/Processing/Closed all read as blue); only shade/weight changes. */
+  .badge-pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+           bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300;
+  }
+
+  /* Tonal icon badges — cycle 1→4 for rhythm across a row of icons/categories,
+     staying inside the primary blue family (light → mid → dark) instead of
+     assigning a different hue per item. */
+  .icon-badge {
+    @apply flex items-center justify-center rounded-full shrink-0;
+  }
+  .icon-badge-1 {
+    @apply bg-primary-200 text-primary-700 dark:bg-primary-900/60 dark:text-primary-300;
+  }
+  .icon-badge-2 {
+    @apply bg-primary-500 text-white dark:bg-primary-600 dark:text-white;
+  }
+  .icon-badge-3 {
+    @apply bg-primary-100 text-primary-600 dark:bg-primary-950/70 dark:text-primary-400;
+  }
+  .icon-badge-4 {
+    @apply bg-primary-700 text-white dark:bg-primary-700 dark:text-white;
+  }
+
+  /* Thin rounded progress track/fill matching the reference's budget & course bars */
+  .progress-track {
+    @apply h-2 w-full rounded-full bg-surface-2 overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full rounded-full bg-primary-600 transition-all duration-500 ease-out;
   }
 }
 
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .timeline-rail {
+    position: relative;
+  }
+  .timeline-rail::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    @apply bg-border;
+  }
+}

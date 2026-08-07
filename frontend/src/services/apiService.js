@@ -432,6 +432,26 @@ export const documentApi = {
     }
   },
 
+  toggleFavorite: async (documentId) => {
+    try {
+      const response = await api.put(`/documents/${documentId}/favorite`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Toggle favorite ${documentId} error:`, error);
+      throw error;
+    }
+  },
+
+  getFavoriteDocuments: async () => {
+    try {
+      const response = await api.get('/documents/favorites');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Get favorite documents error:', error);
+      throw error;
+    }
+  },
+
   previewDocument: async (documentId) => {
     try {
       const response = await api.get(`/documents/${documentId}/preview`, {
@@ -536,11 +556,11 @@ export const documentApi = {
 
   getSharedDocuments: async () => {
     try {
-      const response = await api.get('/documents?shared=true');
+      const response = await api.get('/documents/shared');
       return response.data;
     } catch (error) {
       console.error('❌ Get shared documents error:', error);
-      return { success: true, data: [] };
+      throw error;
     }
   }
 };
@@ -661,6 +681,37 @@ export const userApi = {
       return response.data;
     } catch (error) {
       console.error('❌ Registration error:', error);
+
+      if (!error.response) {
+        throw new Error('Cannot connect to server. Please check if the server is running.');
+      }
+
+      throw error;
+    }
+  },
+
+  guestLogin: async () => {
+    try {
+      if (DEBUG) {
+        console.log('🔐 Starting guest session...');
+      }
+
+      const response = await api.post('/users/guest-login');
+
+      if (response.data && response.data.token) {
+        localStorage.setItem('authToken', response.data.token);
+
+        if (DEBUG) {
+          console.log('✅ Guest token stored, session started');
+        }
+      } else {
+        console.error('❌ No token received in guest-login response');
+        throw new Error('Guest login failed - no token received');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Guest login error:', error);
 
       if (!error.response) {
         throw new Error('Cannot connect to server. Please check if the server is running.');
