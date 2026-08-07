@@ -577,6 +577,166 @@ exports.getFavoriteDocuments = async (req, res) => {
   }
 };
 
+// Valid status transitions and who's allowed to make them.
+// 'draft' -> 'in-review': anyone who can edit the document (submitting for review)
+// 'in-review' -> 'approved': only an assigned reviewer, or a workspace admin
+// 'in-review' -> 'draft': only an assigned reviewer, or a workspace admin (rejection/send-back)
+// 'approved' -> 'draft' or 'in-review': only a workspace admin (reopening a locked doc)
+const STATUS_VALUES = ['draft', 'in-review', 'approved'];
+
+// @desc    Update a document's lifecycle status
+// @route   PATCH /api/documents/:id/status
+// @access  Private
+exports.updateDocumentStatus = async (req, res) => {
+  try {
+    const { status: newStatus } = req.body;
+
+    if (!STATUS_VALUES.includes(newStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Status must be one of: ${STATUS_VALUES.join(', ')}`
+      });
+    }
+
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    const workspace = await Workspace.findById(document.workspace);
+    if (!workspace) {
+      return res.status(404).json({ success: false, message: 'Workspace not found' });
+    }
+
+    const userId = req.user._id.toString();
+    const member = workspace.members.find(m => m.user.equals(req.user._id));
+    const isOwner = workspace.owner.toString() === userId;
+    const isAdmin = isOwner || member?.role === 'admin';
+    const isAssignedReviewer = document.reviewers.some(r => r.toString() === userId);
+
+    if (!member && !isOwner) {
+      return res.status(403).json({ success: false, message: 'Not a member of this workspace' });
+    }
+
+    const currentStatus = document.status;
+
+    let allowed = false;
+    if (currentStatus === 'draft' && newStatus === 'in-review') {
+      allowed = !!member?.permissions?.canEdit || isAdmin;
+    } else if (currentStatus === 'in-review' && (newStatus === 'approved' || newStatus === 'draft')) {
+      allowed = isAssignedReviewer || isAdmin;
+    } else if (currentStatus === 'approved' && (newStatus === 'draft' || newStatus === 'in-review')) {
+      allowed = isAdmin;
+    } else if (currentStatus === newStatus) {
+      allowed = true; // no-op, harmless
+    }
+
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        message: `Not authorized to move this document from '${currentStatus}' to '${newStatus}'`
+      });
+    }
+
+    document.status = newStatus;
+
+    if (newStatus === 'approved') {
+      document.approvedAt = new Date();
+      document.approvedBy = req.user._id;
+    } else {
+      // Leaving 'approved' clears the approval record — it's no longer approved.
+      document.approvedAt = undefined;
+      document.approvedBy = undefined;
+    }
+
+    document.lastModifiedBy = req.user._id;
+    await document.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: document._id,
+        status: document.status,
+        approvedAt: document.approvedAt,
+        approvedBy: document.approvedBy
+      }
+    });
+  } catch (error) {
+    console.error('Error updating document status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not update document status',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Assign or replace the reviewer list for a document
+// @route   PATCH /api/documents/:id/reviewers
+// @access  Private (workspace admin or document owner only)
+exports.assignReviewers = async (req, res) => {
+  try {
+    const { reviewerIds } = req.body;
+
+    if (!Array.isArray(reviewerIds)) {
+      return res.status(400).json({ success: false, message: 'reviewerIds must be an array of user IDs' });
+    }
+
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    const workspace = await Workspace.findById(document.workspace);
+    if (!workspace) {
+      return res.status(404).json({ success: false, message: 'Workspace not found' });
+    }
+
+    const userId = req.user._id.toString();
+    const isOwner = workspace.owner.toString() === userId;
+    const member = workspace.members.find(m => m.user.equals(req.user._id));
+    const isAdmin = isOwner || member?.role === 'admin';
+    const isDocOwner = document.owner.toString() === userId;
+
+    if (!isAdmin && !isDocOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only a workspace admin or the document owner can assign reviewers'
+      });
+    }
+
+    // Reviewers must actually be members of the workspace.
+    const workspaceMemberIds = new Set(workspace.members.map(m => m.user.toString()));
+    const invalidIds = reviewerIds.filter(id => !workspaceMemberIds.has(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'All reviewers must be members of this workspace',
+        invalidIds
+      });
+    }
+
+    document.reviewers = reviewerIds;
+    document.lastModifiedBy = req.user._id;
+    await document.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: document._id,
+        reviewers: document.reviewers
+      }
+    });
+  } catch (error) {
+    console.error('Error assigning reviewers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not assign reviewers',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Update document
 // @route   PUT /api/documents/:id
 // @access  Private
@@ -612,7 +772,14 @@ exports.updateDocument = async (req, res) => {
       return res.status(403).json({ success: false, message: 'No permission to edit document' });
     }
 
-
+    // ---- Approved documents are locked from edits ----
+    // Must go through PATCH /:id/status to move it back to draft/in-review first.
+    if (document.status === 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: 'This document is approved and locked. Change its status before editing.'
+      });
+    }
 
     console.log("------User authorized based on workspace role:", member.role);
 

@@ -20,7 +20,9 @@ const {
   exportDocuments,
   toggleFavorite,
   getFavoriteDocuments,
-  getSharedDocuments
+  getSharedDocuments,
+  updateDocumentStatus,
+  assignReviewers
 } = require('../controllers/documentController');
 
 // Base route: /api/documents
@@ -51,6 +53,10 @@ router.delete('/:id', protect, deleteDocument);
 router.get('/:id/preview', protect, checkDocumentAccess(['canView']), previewDocument);
 router.post('/:id/share', protect, shareDocument);
 router.put('/:id/favorite', protect, toggleFavorite);
+
+// Lifecycle status and reviewer assignment
+router.patch('/:id/status', protect, updateDocumentStatus);
+router.patch('/:id/reviewers', protect, assignReviewers);
 
 // Advanced document operations
 router.post('/:id/move', protect, moveDocument);
