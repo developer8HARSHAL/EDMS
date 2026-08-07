@@ -235,8 +235,20 @@ exports.getWorkspaceDocuments = async (req, res) => {
       });
     }
 
-    // Get ALL documents in the workspace
-    const documents = await Document.find({ workspace: workspaceId })
+    // Get documents in the workspace, optionally filtered by due-date range
+    // (for the calendar view — e.g. ?dueDateFrom=2026-08-01&dueDateTo=2026-08-31).
+    // Built as a fresh object per request, never mutated in place, to avoid
+    // repeating the self-referencing $and bug fixed earlier in workspaceController.
+    const { dueDateFrom, dueDateTo } = req.query;
+    const documentQuery = { workspace: workspaceId };
+
+    if (dueDateFrom || dueDateTo) {
+      documentQuery.dueDate = {};
+      if (dueDateFrom) documentQuery.dueDate.$gte = new Date(dueDateFrom);
+      if (dueDateTo) documentQuery.dueDate.$lte = new Date(dueDateTo);
+    }
+
+    const documents = await Document.find(documentQuery)
       .populate('owner', 'name email')
       .populate('uploadedBy', 'name email')
       .select('-__v')
@@ -789,6 +801,12 @@ exports.updateDocument = async (req, res) => {
     if (req.body.name) document.name = req.body.name;
     if (req.body.description !== undefined) document.description = req.body.description;
     if (req.body.tags) document.tags = req.body.tags;
+    if (req.body.dueDate !== undefined) {
+      document.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : undefined;
+    }
+    if (req.body.expiryDate !== undefined) {
+      document.expiryDate = req.body.expiryDate ? new Date(req.body.expiryDate) : undefined;
+    }
 
     // ---- Update content if provided ----
     if (req.body.content && req.body.updateContent === true) {

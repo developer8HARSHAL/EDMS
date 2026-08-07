@@ -91,6 +91,14 @@ const DocumentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  // Optional deadlines for the calendar view. No default — most documents
+  // won't have one, and defaulting to a date would be actively misleading.
+  dueDate: {
+    type: Date
+  },
+  expiryDate: {
+    type: Date
+  },
   isPublic: {
     type: Boolean,
     default: false
@@ -131,6 +139,9 @@ DocumentSchema.index({ favoritedBy: 1 });
 DocumentSchema.index({ reviewers: 1 });
 DocumentSchema.index({ status: 1 });
 DocumentSchema.index({ workspace: 1, status: 1 });
+DocumentSchema.index({ dueDate: 1 });
+DocumentSchema.index({ expiryDate: 1 });
+DocumentSchema.index({ workspace: 1, dueDate: 1 });
 DocumentSchema.index({ uploadDate: -1 });
 DocumentSchema.index({ lastModified: -1 });
 DocumentSchema.index({ type: 1 });
