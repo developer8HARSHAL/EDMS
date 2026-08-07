@@ -10,11 +10,16 @@ import workspaceReducer from './slices/workspaceSlice';  // ✅ Added
 import invitationReducer from './slices/invitationSlice';  // ✅ Added
 
 // Auth persist configuration
+// NOTE: 'token' is intentionally NOT persisted here. The actual token used by
+// the axios interceptor (apiService.js) and re-derived by validateToken() on
+// every app boot is the raw 'authToken' localStorage key, not this Redux state.
+// Persisting it here as well created a second, easily-desynced copy of the
+// same value. user/isAuthenticated are still persisted for optimistic UI.
 const authPersistConfig = {
   key: 'auth',
   storage,
-  whitelist: ['user', 'token', 'isAuthenticated'],
-  blacklist: ['loading', 'error']
+  whitelist: ['user', 'isAuthenticated'],
+  blacklist: ['loading', 'error', 'token', 'tokenValidated']
 };
 
 // Root reducer with all slices
@@ -26,20 +31,16 @@ const rootReducer = combineReducers({
   invitations: invitationReducer  // ✅ Added
 });
 
-// Main persist configuration
-const persistConfig = {
-  key: 'root',
-  storage,
-  whitelist: ['auth'],
-  blacklist: ['documents', 'ui', 'workspaces', 'invitations']  // You can persist more if needed
-};
-
-// Create persisted reducer
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+// NOTE: Only the 'auth' slice is persisted, and it's already wrapped in its
+// own persistReducer above (authPersistConfig). Do NOT wrap rootReducer in a
+// second, outer persistReducer here — that's a "nested persist", a known
+// redux-persist anti-pattern that double-writes storage and can cause stale
+// rehydration. persistStore(store) below picks up the nested auth
+// persistReducer just fine without an outer wrap.
 
 // Configure store
 export const store = configureStore({
-  reducer: persistedReducer,
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {

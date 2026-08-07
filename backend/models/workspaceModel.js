@@ -185,8 +185,15 @@ WorkspaceSchema.virtual('memberCount').get(function() {
 
 
 
+// documentCount is intentionally NOT a real virtual computation — Mongoose
+// virtual getters are synchronous and can't await Document.countDocuments().
+// Every controller response that includes a workspace MUST explicitly set
+// documentCount on the plain object before sending it (see getWorkspaces,
+// getWorkspace, updateWorkspace, updateMemberRole in workspaceController.js).
+// This placeholder only prevents `undefined` from leaking through if a future
+// response forgets to do that — it is not a substitute for the real count.
 WorkspaceSchema.virtual('documentCount').get(function() {
-  return 0; // safe placeholder
+  return 0; // placeholder — see comment above; do not rely on this value
 });
 
 WorkspaceSchema.methods.getDocumentCount = async function() {

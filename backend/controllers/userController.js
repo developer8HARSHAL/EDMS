@@ -1,5 +1,6 @@
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
+const { ensureGuestData } = require('../utils/guestSeed');
 
 // @desc    Register user
 // @route   POST /api/users/register
@@ -99,6 +100,36 @@ exports.login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+// @desc    Log in as the shared guest/demo account (no password required)
+// @route   POST /api/users/guest-login
+// @access  Public
+exports.guestLogin = async (req, res) => {
+  try {
+    const guestUser = await ensureGuestData();
+
+    const token = guestUser.getSignedJwtToken();
+
+    res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: guestUser._id,
+        name: guestUser.name,
+        email: guestUser.email,
+        role: guestUser.role,
+        isGuest: true
+      }
+    });
+  } catch (error) {
+    console.error('Error during guest login:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not start guest session',
+      error: error.message
     });
   }
 };

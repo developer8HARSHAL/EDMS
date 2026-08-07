@@ -50,27 +50,30 @@ export const fetchWorkspaces = createAsyncThunk(
   async (params = {}, { rejectWithValue }) => {
     try {
       console.log('🔄 Redux: Fetching workspaces with params:', params);
-      
+
       const response = await workspaceService.getWorkspaces(params);
       console.log('📋 Redux: Raw API response:', response);
 
-     const workspacesData = response?.data;  // ✅ go one level higher
+      // workspaceService.getWorkspaces() already normalizes the backend
+      // response into a flat { workspaces, pagination } shape — no
+      // response.success / response.data wrapper exists at this point.
+      // (Previously this code looked for response.data.workspaces, which
+      // never existed, so this thunk rejected on every single call even
+      // when the fetch succeeded.)
+      if (response?.workspaces) {
+        console.log('📦 Thunk parsed workspaces:', response.workspaces.length);
 
-if (response?.success && workspacesData?.workspaces) {
-  console.log("📦 Thunk parsed workspaces:", workspacesData?.workspaces?.length);
-
-  return {
-    workspaces: workspacesData.workspaces,
-    pagination: {
-      totalDocs: workspacesData.totalDocs || 0,
-      totalPages: workspacesData.totalPages || 1,
-      currentPage: workspacesData.currentPage || params?.page || 1,
-      hasNextPage: workspacesData.hasNextPage || false,
-      hasPrevPage: workspacesData.hasPrevPage || false
-    }
-  };
-}
-
+        return {
+          workspaces: response.workspaces,
+          pagination: response.pagination || {
+            totalDocs: response.workspaces.length,
+            totalPages: 1,
+            currentPage: params?.page || 1,
+            hasNextPage: false,
+            hasPrevPage: false
+          }
+        };
+      }
 
       if (Array.isArray(response)) {
         return {

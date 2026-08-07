@@ -247,18 +247,7 @@ const DocumentList = () => {
 
   const handleToggleFavorite = async (documentId) => {
     try {
-      if (typeof toggleFavorite === 'function') {
-        await toggleFavorite(documentId);
-      } else {
-        // Fallback to direct API call
-        await apiService.documentApi.toggleFavorite(documentId);
-        // Manually refresh the list
-        if (workspaceId) {
-          fetchWorkspaceDocuments(workspaceId);
-        } else {
-          fetchDocuments();
-        }
-      }
+      await toggleFavorite(documentId);
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }

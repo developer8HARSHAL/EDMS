@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   validateToken,
   loginUser,
+  guestLoginUser,
   registerUser,
   updateUserProfile,
   logout,
@@ -18,7 +19,6 @@ import {
 
 const useAuth = () => {
   const dispatch = useDispatch();
-  const initializationRef = useRef(false);
   const validationInProgressRef = useRef(false);
 
   // Select auth state
@@ -58,14 +58,10 @@ const useAuth = () => {
     }
   }, [dispatch, tokenValidated]);
 
-  // ✅ FIXED: Initialize auth state on mount
-  useEffect(() => {
-    if (!initializationRef.current) {
-      console.log('🚀 Initializing auth state...');
-      initializationRef.current = true;
-      validateTokenIfNeeded();
-    }
-  }, [validateTokenIfNeeded]);
+  // NOTE: Auth initialization on app boot is handled once, in App.js.
+  // validateTokenIfNeeded is still exposed below (as `validateToken`) for
+  // manual re-validation elsewhere, but this hook no longer self-triggers
+  // it on mount — that was a second, redundant init path alongside App.js.
 
   // ✅ FIXED: Stable login function
   const login = useCallback(async (email, password) => {
@@ -76,6 +72,19 @@ const useAuth = () => {
       return result;
     } catch (error) {
       console.error('❌ Login failed:', error);
+      throw error;
+    }
+  }, [dispatch]);
+
+  // Continue as guest — starts a session on the shared demo account
+  const guestLogin = useCallback(async () => {
+    try {
+      console.log('👋 Starting guest session...');
+      const result = await dispatch(guestLoginUser()).unwrap();
+      console.log('✅ Guest session started');
+      return result;
+    } catch (error) {
+      console.error('❌ Guest login failed:', error);
       throw error;
     }
   }, [dispatch]);
@@ -156,6 +165,7 @@ const useAuth = () => {
     
     // Actions
     login,
+    guestLogin,
     register,
     logout: logoutUser,
     updateProfile,

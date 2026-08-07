@@ -47,6 +47,11 @@ workspaces: [{
     enum: ['user', 'admin'],
     default: 'user'
   },
+  // Marks the single shared demo/guest account used by "Continue as Guest"
+  isGuest: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
