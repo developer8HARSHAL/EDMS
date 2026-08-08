@@ -308,32 +308,35 @@ exports.getDashboardData = async (req, res) => {
     }).select("_id name").lean();
 
     const workspaceIds = userWorkspaces.map(ws => ws._id);
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
-    // Single combined query: recent docs + stats (2 DB calls instead of 6)
-    const [recentDocs, stats] = await Promise.all([
-      Document.find({
-        $or: [
-          { owner: req.user.id },
-          { "permissions.user": req.user.id },
-          { workspace: { $in: workspaceIds } }
-        ]
-      })
-        .select("name type uploadDate size workspace")
+    const accessFilter = {
+      $or: [
+        { owner: userObjectId },
+        { "permissions.user": userObjectId },
+        { workspace: { $in: workspaceIds } }
+      ]
+    };
+
+    // Upcoming deadlines window: today through 7 days out.
+    const now = new Date();
+    const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // Combined query: recent docs + stats + pending-review + upcoming deadlines
+    // (4 DB calls in parallel, not sequential — same pattern as before, just
+    // extended rather than adding separate round-trips).
+    const [recentDocs, stats, pendingReview, upcomingDeadlines] = await Promise.all([
+      Document.find(accessFilter)
+        // status/dueDate added so the "needs my attention" UI can show them
+        // on the recent-documents list, not just in the two new sections below.
+        .select("name type uploadDate size workspace status dueDate")
         .populate("workspace", "name")
         .sort({ uploadDate: -1 })
         .limit(10)
         .lean(),
 
       Document.aggregate([
-        {
-          $match: {
-            $or: [
-              { owner: new mongoose.Types.ObjectId(req.user.id) },
-              { "permissions.user": new mongoose.Types.ObjectId(req.user.id) },
-              { workspace: { $in: workspaceIds } }
-            ]
-          }
-        },
+        { $match: accessFilter },
         {
           $group: {
             _id: null,
@@ -346,17 +349,50 @@ exports.getDashboardData = async (req, res) => {
                   1, 0
                 ]
               }
-            }
+            },
+            draftCount: { $sum: { $cond: [{ $eq: ["$status", "draft"] }, 1, 0] } },
+            inReviewCount: { $sum: { $cond: [{ $eq: ["$status", "in-review"] }, 1, 0] } },
+            approvedCount: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } }
           }
         }
-      ])
+      ]),
+
+      // Documents in-review where the current user is an assigned reviewer —
+      // the actual "needs my attention" queue.
+      Document.find({
+        status: 'in-review',
+        reviewers: userObjectId
+      })
+        .select("name workspace status dueDate uploadedBy")
+        .populate("workspace", "name")
+        .populate("uploadedBy", "name email")
+        .sort({ lastModified: -1 })
+        .limit(10)
+        .lean(),
+
+      // Documents with a dueDate in the next 7 days, across everything the
+      // user can access — feeds the calendar/deadlines widget.
+      Document.find({
+        ...accessFilter,
+        dueDate: { $gte: now, $lte: sevenDaysOut }
+      })
+        .select("name workspace status dueDate")
+        .populate("workspace", "name")
+        .sort({ dueDate: 1 })
+        .limit(10)
+        .lean()
     ]);
 
     res.status(200).json({
       success: true,
       data: {
         recentDocuments: recentDocs,
-        stats: stats[0] || { totalDocs: 0, totalSize: 0, thisMonth: 0 }
+        stats: stats[0] || {
+          totalDocs: 0, totalSize: 0, thisMonth: 0,
+          draftCount: 0, inReviewCount: 0, approvedCount: 0
+        },
+        pendingReview,
+        upcomingDeadlines
       }
     });
   } catch (error) {

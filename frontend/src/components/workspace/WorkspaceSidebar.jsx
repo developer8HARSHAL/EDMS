@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Home, FileText, Users, Settings, Plus, Search, Filter,
-  ChevronDown, ChevronRight, Folder, Star, Clock, Archive,
-  BarChart3, Bell, Shield, Edit3, Eye, Menu, X, Pin, Hash
+  Home, FileText, Users, Settings, Plus, Search,
+  ChevronRight, Star, Clock, Archive,
+  BarChart3, Bell, Menu, X, Hash
 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
@@ -23,7 +23,6 @@ const WorkspaceSidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useDispatch();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [expandedSections, setExpandedSections] = useState(['documents', 'categories']);
   const [searchQuery, setSearchQuery] = useState('');
