@@ -1,0 +1,29 @@
+node_modules/
+
+.env
+.env.local
+.env.development
+.env.production
+.env.backup
+.env.*.local
+
+# Build output
+build/
+dist/
+
+# Session/troubleshooting leftovers — not project files
+filestructure.txt
+session_changes.patch
+session_full_diff.patch
+*.patch
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vercel/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
