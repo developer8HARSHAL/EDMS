@@ -182,10 +182,18 @@ exports.getDocuments = async (req, res) => {
     // ✅ Sort final results
     allDocuments.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
 
+    // Attach current user's favorite status (favoritedBy excluded above via projection is not the case here,
+    // it's still on the lean object since it wasn't excluded)
+    const allDocumentsWithFavorite = allDocuments.map(doc => ({
+      ...doc,
+      isFavorite: Array.isArray(doc.favoritedBy) &&
+        doc.favoritedBy.some(favUserId => favUserId.toString() === req.user.id)
+    }));
+
     res.status(200).json({
       success: true,
-      count: allDocuments.length,
-      data: allDocuments
+      count: allDocumentsWithFavorite.length,
+      data: allDocumentsWithFavorite
     });
   } catch (error) {
     console.error('Error getting documents:', error);
@@ -227,8 +235,20 @@ exports.getWorkspaceDocuments = async (req, res) => {
       });
     }
 
-    // Get ALL documents in the workspace
-    const documents = await Document.find({ workspace: workspaceId })
+    // Get documents in the workspace, optionally filtered by due-date range
+    // (for the calendar view — e.g. ?dueDateFrom=2026-08-01&dueDateTo=2026-08-31).
+    // Built as a fresh object per request, never mutated in place, to avoid
+    // repeating the self-referencing $and bug fixed earlier in workspaceController.
+    const { dueDateFrom, dueDateTo } = req.query;
+    const documentQuery = { workspace: workspaceId };
+
+    if (dueDateFrom || dueDateTo) {
+      documentQuery.dueDate = {};
+      if (dueDateFrom) documentQuery.dueDate.$gte = new Date(dueDateFrom);
+      if (dueDateTo) documentQuery.dueDate.$lte = new Date(dueDateTo);
+    }
+
+    const documents = await Document.find(documentQuery)
       .populate('owner', 'name email')
       .populate('uploadedBy', 'name email')
       .select('-__v')
@@ -249,9 +269,14 @@ exports.getWorkspaceDocuments = async (req, res) => {
         if (perm) userPermission.access = perm.access; // 'read' or 'write'
       }
 
+      const isFavorite = doc.favoritedBy.some(
+        favUserId => favUserId.toString() === req.user.id
+      );
+
       return {
         ...doc.toObject(),
         userPermission,
+        isFavorite,
       };
     });
 
@@ -283,32 +308,35 @@ exports.getDashboardData = async (req, res) => {
     }).select("_id name").lean();
 
     const workspaceIds = userWorkspaces.map(ws => ws._id);
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
-    // Single combined query: recent docs + stats (2 DB calls instead of 6)
-    const [recentDocs, stats] = await Promise.all([
-      Document.find({
-        $or: [
-          { owner: req.user.id },
-          { "permissions.user": req.user.id },
-          { workspace: { $in: workspaceIds } }
-        ]
-      })
-        .select("name type uploadDate size workspace")
+    const accessFilter = {
+      $or: [
+        { owner: userObjectId },
+        { "permissions.user": userObjectId },
+        { workspace: { $in: workspaceIds } }
+      ]
+    };
+
+    // Upcoming deadlines window: today through 7 days out.
+    const now = new Date();
+    const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // Combined query: recent docs + stats + pending-review + upcoming deadlines
+    // (4 DB calls in parallel, not sequential — same pattern as before, just
+    // extended rather than adding separate round-trips).
+    const [recentDocs, stats, pendingReview, upcomingDeadlines] = await Promise.all([
+      Document.find(accessFilter)
+        // status/dueDate added so the "needs my attention" UI can show them
+        // on the recent-documents list, not just in the two new sections below.
+        .select("name type uploadDate size workspace status dueDate")
         .populate("workspace", "name")
         .sort({ uploadDate: -1 })
         .limit(10)
         .lean(),
 
       Document.aggregate([
-        {
-          $match: {
-            $or: [
-              { owner: new mongoose.Types.ObjectId(req.user.id) },
-              { "permissions.user": new mongoose.Types.ObjectId(req.user.id) },
-              { workspace: { $in: workspaceIds } }
-            ]
-          }
-        },
+        { $match: accessFilter },
         {
           $group: {
             _id: null,
@@ -321,17 +349,50 @@ exports.getDashboardData = async (req, res) => {
                   1, 0
                 ]
               }
-            }
+            },
+            draftCount: { $sum: { $cond: [{ $eq: ["$status", "draft"] }, 1, 0] } },
+            inReviewCount: { $sum: { $cond: [{ $eq: ["$status", "in-review"] }, 1, 0] } },
+            approvedCount: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } }
           }
         }
-      ])
+      ]),
+
+      // Documents in-review where the current user is an assigned reviewer —
+      // the actual "needs my attention" queue.
+      Document.find({
+        status: 'in-review',
+        reviewers: userObjectId
+      })
+        .select("name workspace status dueDate uploadedBy")
+        .populate("workspace", "name")
+        .populate("uploadedBy", "name email")
+        .sort({ lastModified: -1 })
+        .limit(10)
+        .lean(),
+
+      // Documents with a dueDate in the next 7 days, across everything the
+      // user can access — feeds the calendar/deadlines widget.
+      Document.find({
+        ...accessFilter,
+        dueDate: { $gte: now, $lte: sevenDaysOut }
+      })
+        .select("name workspace status dueDate")
+        .populate("workspace", "name")
+        .sort({ dueDate: 1 })
+        .limit(10)
+        .lean()
     ]);
 
     res.status(200).json({
       success: true,
       data: {
         recentDocuments: recentDocs,
-        stats: stats[0] || { totalDocs: 0, totalSize: 0, thisMonth: 0 }
+        stats: stats[0] || {
+          totalDocs: 0, totalSize: 0, thisMonth: 0,
+          draftCount: 0, inReviewCount: 0, approvedCount: 0
+        },
+        pendingReview,
+        upcomingDeadlines
       }
     });
   } catch (error) {
@@ -452,6 +513,26 @@ exports.getDocumentStats = async (req, res) => {
 // @access  Private
 exports.getDocument = async (req, res) => {
   try {
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    res.status(200).json({
+      success: true,
+      data: req.document
+    });
+  } catch (error) {
+    console.error('Error getting document:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve document',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Toggle favorite status of a document for the current user
+// @route   PUT /api/documents/:id/favorite
+// @access  Private
+exports.toggleFavorite = async (req, res) => {
+  try {
     const document = await Document.findById(req.params.id);
 
     if (!document) {
@@ -462,27 +543,243 @@ exports.getDocument = async (req, res) => {
     }
 
     // Check if user is authorized to access this document
+    // (owner, explicit permission entry, or workspace member)
     const isOwner = document.owner.toString() === req.user.id;
     const hasPermission = document.permissions.some(
       permission => permission.user.toString() === req.user.id
     );
-
+    let isWorkspaceMember = false;
     if (!isOwner && !hasPermission) {
+      const workspace = await Workspace.findById(document.workspace);
+      isWorkspaceMember = !!workspace && (
+        workspace.owner.toString() === req.user.id ||
+        workspace.members.some(member => member.user.toString() === req.user.id)
+      );
+    }
+
+    if (!isOwner && !hasPermission && !isWorkspaceMember) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this document'
       });
     }
 
+    const userId = req.user.id;
+    const alreadyFavorited = document.favoritedBy.some(
+      favUserId => favUserId.toString() === userId
+    );
+
+    if (alreadyFavorited) {
+      document.favoritedBy = document.favoritedBy.filter(
+        favUserId => favUserId.toString() !== userId
+      );
+    } else {
+      document.favoritedBy.push(userId);
+    }
+
+    await document.save();
+
     res.status(200).json({
       success: true,
-      data: document
+      data: {
+        _id: document._id,
+        isFavorite: !alreadyFavorited
+      }
     });
   } catch (error) {
-    console.error('Error getting document:', error);
+    console.error('Error toggling favorite:', error);
     res.status(500).json({
       success: false,
-      message: 'Could not retrieve document',
+      message: 'Could not toggle favorite',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get all documents favorited by the current user
+// @route   GET /api/documents/favorites
+// @access  Private
+exports.getFavoriteDocuments = async (req, res) => {
+  try {
+    const documents = await Document.find({ favoritedBy: req.user.id })
+      .sort({ lastModified: -1 });
+
+    const documentsWithFlag = documents.map(doc => {
+      const docObj = doc.toObject();
+      docObj.isFavorite = true;
+      return docObj;
+    });
+
+    res.status(200).json({
+      success: true,
+      count: documentsWithFlag.length,
+      data: documentsWithFlag
+    });
+  } catch (error) {
+    console.error('Error getting favorite documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not retrieve favorite documents',
+      error: error.message
+    });
+  }
+};
+
+// Valid status transitions and who's allowed to make them.
+// 'draft' -> 'in-review': anyone who can edit the document (submitting for review)
+// 'in-review' -> 'approved': only an assigned reviewer, or a workspace admin
+// 'in-review' -> 'draft': only an assigned reviewer, or a workspace admin (rejection/send-back)
+// 'approved' -> 'draft' or 'in-review': only a workspace admin (reopening a locked doc)
+const STATUS_VALUES = ['draft', 'in-review', 'approved'];
+
+// @desc    Update a document's lifecycle status
+// @route   PATCH /api/documents/:id/status
+// @access  Private
+exports.updateDocumentStatus = async (req, res) => {
+  try {
+    const { status: newStatus } = req.body;
+
+    if (!STATUS_VALUES.includes(newStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Status must be one of: ${STATUS_VALUES.join(', ')}`
+      });
+    }
+
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    const workspace = await Workspace.findById(document.workspace);
+    if (!workspace) {
+      return res.status(404).json({ success: false, message: 'Workspace not found' });
+    }
+
+    const userId = req.user._id.toString();
+    const member = workspace.members.find(m => m.user.equals(req.user._id));
+    const isOwner = workspace.owner.toString() === userId;
+    const isAdmin = isOwner || member?.role === 'admin';
+    const isAssignedReviewer = document.reviewers.some(r => r.toString() === userId);
+
+    if (!member && !isOwner) {
+      return res.status(403).json({ success: false, message: 'Not a member of this workspace' });
+    }
+
+    const currentStatus = document.status;
+
+    let allowed = false;
+    if (currentStatus === 'draft' && newStatus === 'in-review') {
+      allowed = !!member?.permissions?.canEdit || isAdmin;
+    } else if (currentStatus === 'in-review' && (newStatus === 'approved' || newStatus === 'draft')) {
+      allowed = isAssignedReviewer || isAdmin;
+    } else if (currentStatus === 'approved' && (newStatus === 'draft' || newStatus === 'in-review')) {
+      allowed = isAdmin;
+    } else if (currentStatus === newStatus) {
+      allowed = true; // no-op, harmless
+    }
+
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        message: `Not authorized to move this document from '${currentStatus}' to '${newStatus}'`
+      });
+    }
+
+    document.status = newStatus;
+
+    if (newStatus === 'approved') {
+      document.approvedAt = new Date();
+      document.approvedBy = req.user._id;
+    } else {
+      // Leaving 'approved' clears the approval record — it's no longer approved.
+      document.approvedAt = undefined;
+      document.approvedBy = undefined;
+    }
+
+    document.lastModifiedBy = req.user._id;
+    await document.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: document._id,
+        status: document.status,
+        approvedAt: document.approvedAt,
+        approvedBy: document.approvedBy
+      }
+    });
+  } catch (error) {
+    console.error('Error updating document status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not update document status',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Assign or replace the reviewer list for a document
+// @route   PATCH /api/documents/:id/reviewers
+// @access  Private (workspace admin or document owner only)
+exports.assignReviewers = async (req, res) => {
+  try {
+    const { reviewerIds } = req.body;
+
+    if (!Array.isArray(reviewerIds)) {
+      return res.status(400).json({ success: false, message: 'reviewerIds must be an array of user IDs' });
+    }
+
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    const workspace = await Workspace.findById(document.workspace);
+    if (!workspace) {
+      return res.status(404).json({ success: false, message: 'Workspace not found' });
+    }
+
+    const userId = req.user._id.toString();
+    const isOwner = workspace.owner.toString() === userId;
+    const member = workspace.members.find(m => m.user.equals(req.user._id));
+    const isAdmin = isOwner || member?.role === 'admin';
+    const isDocOwner = document.owner.toString() === userId;
+
+    if (!isAdmin && !isDocOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only a workspace admin or the document owner can assign reviewers'
+      });
+    }
+
+    // Reviewers must actually be members of the workspace.
+    const workspaceMemberIds = new Set(workspace.members.map(m => m.user.toString()));
+    const invalidIds = reviewerIds.filter(id => !workspaceMemberIds.has(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'All reviewers must be members of this workspace',
+        invalidIds
+      });
+    }
+
+    document.reviewers = reviewerIds;
+    document.lastModifiedBy = req.user._id;
+    await document.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: document._id,
+        reviewers: document.reviewers
+      }
+    });
+  } catch (error) {
+    console.error('Error assigning reviewers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Could not assign reviewers',
       error: error.message
     });
   }
@@ -523,7 +820,14 @@ exports.updateDocument = async (req, res) => {
       return res.status(403).json({ success: false, message: 'No permission to edit document' });
     }
 
-
+    // ---- Approved documents are locked from edits ----
+    // Must go through PATCH /:id/status to move it back to draft/in-review first.
+    if (document.status === 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: 'This document is approved and locked. Change its status before editing.'
+      });
+    }
 
     console.log("------User authorized based on workspace role:", member.role);
 
@@ -533,6 +837,12 @@ exports.updateDocument = async (req, res) => {
     if (req.body.name) document.name = req.body.name;
     if (req.body.description !== undefined) document.description = req.body.description;
     if (req.body.tags) document.tags = req.body.tags;
+    if (req.body.dueDate !== undefined) {
+      document.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : undefined;
+    }
+    if (req.body.expiryDate !== undefined) {
+      document.expiryDate = req.body.expiryDate ? new Date(req.body.expiryDate) : undefined;
+    }
 
     // ---- Update content if provided ----
     if (req.body.content && req.body.updateContent === true) {
@@ -681,32 +991,10 @@ exports.deleteDocument = async (req, res) => {
 // @desc    Get document content for preview
 // @route   GET /api/documents/:id/preview
 // @access  Private
-// @desc    Get document content for preview
-// @route   GET /api/documents/:id/preview
-// @access  Private
 exports.previewDocument = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check if user is authorized to access this document
-    const isOwner = document.owner.toString() === req.user.id;
-    const hasPermission = document.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-
-    if (!isOwner && !hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this document'
-      });
-    }
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    const document = req.document;
 
     // Get the file from GridFS
     try {
@@ -781,10 +1069,18 @@ exports.getSharedDocuments = async (req, res) => {
       'permissions.user': req.user.id // User has permissions
     }).select('-__v');
 
+    const documentsWithFavorite = documents.map(doc => {
+      const docObj = doc.toObject();
+      docObj.isFavorite = doc.favoritedBy.some(
+        favUserId => favUserId.toString() === req.user.id
+      );
+      return docObj;
+    });
+
     res.status(200).json({
       success: true,
-      count: documents.length,
-      data: documents
+      count: documentsWithFavorite.length,
+      data: documentsWithFavorite
     });
   } catch (error) {
     console.error('Error getting shared documents:', error);
@@ -919,26 +1215,8 @@ exports.moveDocument = async (req, res) => {
 // @access  Private
 exports.duplicateDocument = async (req, res) => {
   try {
-    const originalDoc = await Document.findById(req.params.id);
-    if (!originalDoc) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check access permissions
-    const isOwner = originalDoc.owner.toString() === req.user.id;
-    const hasPermission = originalDoc.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-
-    if (!isOwner && !hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to duplicate this document'
-      });
-    }
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    const originalDoc = req.document;
 
     // Create duplicate with new name
     const duplicateDoc = await Document.create({
@@ -976,26 +1254,8 @@ exports.duplicateDocument = async (req, res) => {
 // @access  Private
 exports.getDocumentVersions = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check access permissions
-    const isOwner = document.owner.toString() === req.user.id;
-    const hasPermission = document.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-
-    if (!isOwner && !hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access document versions'
-      });
-    }
+    // Access already verified and document fetched by checkDocumentAccess middleware
+    const document = req.document;
 
     // For now, return the document itself as the only version
     // In a full implementation, you'd track version history

@@ -33,6 +33,13 @@ const DocumentSchema = new mongoose.Schema({
     ref: 'Workspace',
     required: [true, 'Document must belong to a workspace']
   },
+  // Users who have favorited this document (per-user, not a global flag)
+  favoritedBy: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  ],
   // Keep individual permissions for backward compatibility and additional granular control
   permissions: [
     {
@@ -60,6 +67,37 @@ const DocumentSchema = new mongoose.Schema({
   version: {
     type: Number,
     default: 1
+  },
+  // Document lifecycle status
+  status: {
+    type: String,
+    enum: ['draft', 'in-review', 'approved'],
+    default: 'draft'
+  },
+  // Users assigned to review this document. Per-document assignment,
+  // separate from workspace role (an editor isn't automatically a reviewer
+  // for every document — they have to be explicitly assigned).
+  reviewers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  ],
+  // Set when status moves to 'approved'; used to lock further edits.
+  approvedAt: {
+    type: Date
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  // Optional deadlines for the calendar view. No default — most documents
+  // won't have one, and defaulting to a date would be actively misleading.
+  dueDate: {
+    type: Date
+  },
+  expiryDate: {
+    type: Date
   },
   isPublic: {
     type: Boolean,
@@ -97,6 +135,13 @@ DocumentSchema.index({ name: 'text', description: 'text', tags: 'text' });
 DocumentSchema.index({ owner: 1 });
 DocumentSchema.index({ workspace: 1 });
 DocumentSchema.index({ 'permissions.user': 1 });
+DocumentSchema.index({ favoritedBy: 1 });
+DocumentSchema.index({ reviewers: 1 });
+DocumentSchema.index({ status: 1 });
+DocumentSchema.index({ workspace: 1, status: 1 });
+DocumentSchema.index({ dueDate: 1 });
+DocumentSchema.index({ expiryDate: 1 });
+DocumentSchema.index({ workspace: 1, dueDate: 1 });
 DocumentSchema.index({ uploadDate: -1 });
 DocumentSchema.index({ lastModified: -1 });
 DocumentSchema.index({ type: 1 });

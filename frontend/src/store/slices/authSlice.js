@@ -114,6 +114,45 @@ export const loginUser = createAsyncThunk(
   }
 );
 
+// Guest login — starts a session on the shared demo account, no credentials needed
+export const guestLoginUser = createAsyncThunk(
+  'auth/guestLoginUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await userApi.guestLogin();
+
+      if (!data || !data.token) {
+        return rejectWithValue('No authentication token received');
+      }
+
+      localStorage.setItem('authToken', data.token);
+
+      let decoded;
+      try {
+        decoded = jwtDecode(data.token);
+      } catch (decodeError) {
+        return rejectWithValue('Invalid token received from server');
+      }
+
+      const userData = {
+        id: decoded.id || data.user?.id,
+        name: decoded.name || data.user?.name,
+        email: decoded.email || data.user?.email,
+        role: decoded.role || data.user?.role,
+        isGuest: true
+      };
+
+      return {
+        user: userData,
+        token: data.token
+      };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Guest login failed';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Register user — now stores token for auto-login
 export const registerUser = createAsyncThunk(
   'auth/registerUser',
@@ -250,6 +289,27 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(guestLoginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(guestLoginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.tokenValidated = true;
+        state.error = null;
+      })
+      .addCase(guestLoginUser.rejected, (state, action) => {
         state.loading = false;
         state.user = null;
         state.token = null;

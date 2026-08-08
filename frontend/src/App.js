@@ -12,8 +12,8 @@ import { store } from './store';
 // Premium loading component with modern design
 // Simple loading spinner
 const GlobalLoader = () => (
-  <div className="fixed inset-0 bg-slate-50 flex justify-center items-center z-50">
-    <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-200 border-t-blue-600"></div>
+  <div className="fixed inset-0 bg-bg flex justify-center items-center z-50">
+    <div className="animate-spin rounded-full h-16 w-16 border-4 border-border border-t-primary-600"></div>
   </div>
 );
 
@@ -43,7 +43,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-bg">
         <Navbar />
         <main className="pb-8">
           <ApplicationRoutes />

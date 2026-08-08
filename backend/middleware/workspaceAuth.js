@@ -238,20 +238,52 @@ const checkDocumentWorkspaceAccess = async (userId, documentId, requiredPermissi
       member => member.user.toString() === userId
     );
 
+    if (membership) {
+      // Check permissions
+      const hasPermission = requiredPermissions.some(permission => {
+        return membership.permissions[permission] === true;
+      });
+
+      if (hasPermission) {
+        return { document, workspace, membership };
+      }
+    }
+
+    // Not a workspace member (or lacks the required workspace permission) —
+    // fall back to legacy per-document sharing (Document.permissions[]).
+    // This is how a document owner can share with someone outside the workspace.
+    const legacyPermission = document.permissions.find(
+      perm => perm.user.toString() === userId
+    );
+
+    if (legacyPermission) {
+      const legacyMembership = {
+        role: 'shared',
+        permissions: {
+          canView: true,
+          canEdit: legacyPermission.access === 'write',
+          canAdd: false,
+          canDelete: false,
+          canInvite: false
+        }
+      };
+
+      const hasPermission = requiredPermissions.some(permission => {
+        return legacyMembership.permissions[permission] === true;
+      });
+
+      if (hasPermission) {
+        return { document, workspace, membership: legacyMembership };
+      }
+
+      throw new Error(`Insufficient permissions: ${requiredPermissions.join(' or ')} required`);
+    }
+
     if (!membership) {
       throw new Error('Access denied: Not a workspace member');
     }
 
-    // Check permissions
-    const hasPermission = requiredPermissions.some(permission => {
-      return membership.permissions[permission] === true;
-    });
-
-    if (!hasPermission) {
-      throw new Error(`Insufficient permissions: ${requiredPermissions.join(' or ')} required`);
-    }
-
-    return { document, workspace, membership };
+    throw new Error(`Insufficient permissions: ${requiredPermissions.join(' or ')} required`);
   } catch (error) {
     throw error;
   }
