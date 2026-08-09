@@ -11,8 +11,7 @@ import {
   Mail,
   Calendar,
   Search,
-  Filter,
-  Settings
+  Filter
 } from 'lucide-react';
 
 const MemberList = ({ 

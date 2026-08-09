@@ -85,9 +85,9 @@ const MemberCard = ({
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'owner': return 'yellow';
-      case 'admin': return 'red';
-      case 'editor': return 'blue';
+      case 'owner': return 'warning';
+      case 'admin': return 'danger';
+      case 'editor': return 'primary';
       case 'viewer': return 'gray';
       default: return 'gray';
     }

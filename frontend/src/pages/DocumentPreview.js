@@ -513,7 +513,7 @@ const DocumentPreview = () => {
                     <div className="flex items-center flex-wrap gap-2">
                       <i className="fas fa-tags text-gray-400 mr-2"></i>
                       {document.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" size="sm">
+                        <Badge key={index} variant="gray" outline size="sm">
                           {tag}
                         </Badge>
                       ))}

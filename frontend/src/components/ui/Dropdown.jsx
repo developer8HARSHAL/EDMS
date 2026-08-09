@@ -74,7 +74,7 @@ export const Dropdown = ({ trigger, children, className }) => {
       {isOpen && (
         <div
           className={clsx(
-            "absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50",
+            "absolute right-0 mt-2 w-56 origin-top-right divide-y divide-border rounded-xl border border-border bg-surface shadow-panel focus:outline-none z-50",
             "animate-in fade-in-0 zoom-in-95 duration-100",
             className
           )}
@@ -96,8 +96,8 @@ export const DropdownItem = ({ children, onClick, className, ...props }) => {
   return (
     <button
       className={clsx(
-        'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
-        'group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150',
+        'text-ink hover:bg-surface-2',
+        'group flex w-full items-center rounded-lg px-2 py-2 text-sm transition-colors duration-150',
         className
       )}
       onClick={handleClick}

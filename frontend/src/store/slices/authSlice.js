@@ -53,7 +53,12 @@ export const validateToken = createAsyncThunk(
           id: decoded.id,
           name: decoded.name || profileResponse.name,
           email: decoded.email || profileResponse.email,
-          role: decoded.role || profileResponse.role
+          role: decoded.role || profileResponse.role,
+          // Without this, isGuest silently disappears on every refresh —
+          // it's set correctly right after guest-login, but validateToken
+          // (which runs on every page load) rebuilds the user object from
+          // scratch and was never copying this field across.
+          isGuest: profileResponse.isGuest || false
         };
 
         return {

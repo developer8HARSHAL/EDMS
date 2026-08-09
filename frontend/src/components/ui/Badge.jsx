@@ -29,20 +29,25 @@ const Badge = ({
   title
 }) => {
   // Variant color classes
+  // Deliberate design choice, not an oversight: success/warning/danger/info/
+  // purple/pink/indigo stay on explicit Tailwind hues because they carry
+  // semantic meaning a neutral/brand token can't express. primary/secondary/
+  // gray/default route through tokens since they're neutral/brand, not semantic.
+  // Alert.jsx follows this same policy.
   const getVariantClasses = () => {
     const baseClasses = outline 
       ? 'border-2 bg-transparent' 
       : 'border border-transparent';
     
-    switch (variant) {
+    switch (finalVariant) {
       case 'primary':
         return outline
-          ? `${baseClasses} border-blue-500 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-400 dark:hover:bg-blue-900/20`
-          : `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300`;
+          ? `${baseClasses} border-primary-500 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:border-primary-400 dark:hover:bg-primary-900/20`
+          : `${baseClasses} bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300`;
       case 'secondary':
         return outline
-          ? `${baseClasses} border-gray-500 text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-400 dark:hover:bg-gray-800`
-          : `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300`;
+          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
+          : `${baseClasses} bg-surface-2 text-ink-muted`;
       case 'success':
         return outline
           ? `${baseClasses} border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-900/20`
@@ -73,8 +78,8 @@ const Badge = ({
           : `${baseClasses} bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300`;
       case 'gray':
         return outline
-          ? `${baseClasses} border-gray-400 text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-500 dark:hover:bg-gray-800`
-          : `${baseClasses} bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300`;
+          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
+          : `${baseClasses} bg-surface-2 text-ink-muted`;
       case 'black':
         return outline
           ? `${baseClasses} border-black text-black hover:bg-gray-50 dark:border-white dark:text-white dark:hover:bg-gray-800`
@@ -85,8 +90,8 @@ const Badge = ({
           : `${baseClasses} bg-white text-gray-900 dark:bg-gray-900 dark:text-white`;
       default:
         return outline
-          ? `${baseClasses} border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800`
-          : `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300`;
+          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
+          : `${baseClasses} bg-surface-2 text-ink-muted`;
     }
   };
 

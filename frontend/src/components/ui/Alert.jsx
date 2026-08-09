@@ -2,6 +2,11 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
+// Deliberate design choice, not an oversight: success/error/warning stay on
+// explicit Tailwind hues (red/green/yellow) because they carry semantic meaning
+// that a neutral/brand token can't express. Only 'info' routes through primary-*
+// tokens below, since it's literally the brand blue with no separate meaning.
+// See Badge.jsx for the same policy applied consistently.
 const alertVariants = {
   success: {
     container: 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800',
@@ -25,10 +30,10 @@ const alertVariants = {
     iconComponent: ExclamationTriangleIcon
   },
   info: {
-    container: 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
-    icon: 'text-blue-400',
-    title: 'text-blue-800 dark:text-blue-200',
-    description: 'text-blue-700 dark:text-blue-300',
+    container: 'bg-primary-50 border-primary-200 dark:bg-primary-900/20 dark:border-primary-800',
+    icon: 'text-primary-400',
+    title: 'text-primary-800 dark:text-primary-200',
+    description: 'text-primary-700 dark:text-primary-300',
     iconComponent: InformationCircleIcon
   }
 };
@@ -47,7 +52,7 @@ export const Alert = ({
   return (
     <div
       className={clsx(
-        'border rounded-md p-4',
+        'border rounded-xl p-4',
         variantStyles.container,
         className
       )}

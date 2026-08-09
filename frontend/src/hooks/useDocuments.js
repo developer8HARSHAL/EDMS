@@ -33,8 +33,6 @@ import {
   updatePagination,
   selectDocuments,
   selectCurrentWorkspaceId,
-  selectWorkspaceDocuments,
-  selectCurrentWorkspaceDocuments,
   selectSharedDocuments,
   selectCurrentDocument,
   selectFavoriteDocuments,
@@ -48,8 +46,6 @@ import {
   selectPagination,
   selectBulkOperationLoading,
   selectWorkspaceStats,
-  selectDocumentsByCategory,
-  selectDocumentsByTag,
   selectFilteredDocuments,
   selectDocumentStatistics,
   selectAvailableTags,
@@ -335,7 +331,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Delete document error:', error);
       return false;
     }
-  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+  }, [dispatch, workspaceId, currentWorkspaceId]);
 
   // NEW: Toggle favorite document
   const handleToggleFavorite = useCallback(async (documentId, documentName) => {
@@ -358,7 +354,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Toggle favorite error:', error);
       return false;
     }
-  }, [dispatch, toast]);
+  }, [dispatch]);
 
   // NEW: Move document to different workspace
   const handleMoveDocument = useCallback(async (documentId, fromWorkspaceId, toWorkspaceId, documentName) => {
@@ -380,7 +376,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Move document error:', error);
       return false;
     }
-  }, [dispatch, toast]);
+  }, [dispatch]);
 
   // NEW: Duplicate document
   const handleDuplicateDocument = useCallback(async (documentId, targetWorkspaceId, documentName) => {
@@ -404,7 +400,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Duplicate document error:', error);
       return false;
     }
-  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+  }, [dispatch, workspaceId, currentWorkspaceId]);
 
   // NEW: Bulk delete documents
   const handleBulkDeleteDocuments = useCallback(async (documentIds, targetWorkspaceId) => {
@@ -428,7 +424,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Bulk delete documents error:', error);
       return false;
     }
-  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+  }, [dispatch, workspaceId, currentWorkspaceId]);
 
   // NEW: Archive document
   const handleArchiveDocument = useCallback(async (documentId, targetWorkspaceId, documentName) => {
@@ -452,7 +448,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Archive document error:', error);
       return false;
     }
-  }, [dispatch, toast, workspaceId, currentWorkspaceId]);
+  }, [dispatch, workspaceId, currentWorkspaceId]);
 
   // NEW: Search documents
   const handleSearchDocuments = useCallback(async (query, searchFilters = {}, targetWorkspaceId) => {
@@ -502,7 +498,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       console.error('Download document error:', error);
       return false;
     }
-  }, [dispatch, toast]);
+  }, [dispatch]);
 
   // ===== STATE MANAGEMENT =====
 

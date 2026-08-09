@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Camera, Upload } from 'lucide-react';
+import { User, Camera } from 'lucide-react';
 
 const Avatar = ({
   src,
@@ -81,7 +81,7 @@ const Avatar = ({
     if (!border) return '';
     
     const borderColors = {
-      gray: 'border-gray-300 dark:border-gray-600',
+      gray: 'border-border',
       blue: 'border-blue-500',
       green: 'border-green-500',
       red: 'border-red-500',
@@ -162,7 +162,7 @@ const Avatar = ({
         <div className={`
           ${statusSizes[statusSize] || statusSizes.default}
           ${isOnline ? 'bg-green-500' : 'bg-gray-400'}
-          rounded-full border-2 border-white dark:border-gray-800
+          rounded-full border-2 border-surface
         `} />
       </div>
     );
@@ -183,7 +183,7 @@ const Avatar = ({
               name={member.name}
               size={size}
               variant={variant}
-              className="ring-2 ring-white dark:ring-gray-800"
+              className="ring-2 ring-surface"
               showOnlineStatus={false}
             />
           ))}
@@ -192,8 +192,8 @@ const Avatar = ({
               flex items-center justify-center
               ${getSizeClasses()}
               ${getVariantClasses()}
-              bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300
-              ring-2 ring-white dark:ring-gray-800 font-medium
+              bg-surface-2 text-ink-muted
+              ring-2 ring-surface font-medium
             `}>
               +{remainingCount}
             </div>
@@ -205,8 +205,8 @@ const Avatar = ({
 
   // Loading spinner
   const LoadingSpinner = () => (
-    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full">
-      <div className="animate-spin rounded-full h-1/2 w-1/2 border-b-2 border-gray-500"></div>
+    <div className="absolute inset-0 flex items-center justify-center bg-surface-2 rounded-full">
+      <div className="animate-spin rounded-full h-1/2 w-1/2 border-b-2 border-primary-600"></div>
     </div>
   );
 
@@ -287,7 +287,7 @@ const Avatar = ({
         </span>
       ) : (
         <div className={`
-          bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400
+          bg-surface-2 text-ink-muted
           w-full h-full flex items-center justify-center
           ${getVariantClasses()}
         `}>
@@ -370,7 +370,7 @@ export const AvatarStack = ({
           src={avatar.src || avatar.avatar}
           name={avatar.name}
           size={size}
-          className="ring-2 ring-white dark:ring-gray-800"
+          className="ring-2 ring-surface"
           {...avatar}
         />
       ))}
@@ -383,8 +383,8 @@ export const AvatarStack = ({
             size === 'xl' ? 'w-16 h-16 text-xl' :
             'w-10 h-10 text-base'
           }
-          bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300
-          rounded-full ring-2 ring-white dark:ring-gray-800 font-medium
+          bg-surface-2 text-ink-muted
+          rounded-full ring-2 ring-surface font-medium
         `}>
           +{remainingCount}
         </div>
