@@ -1,29 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 
-export const Dropdown = ({ trigger, children, className }) => {
+export const Dropdown = ({ trigger, children, className, fullWidth = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const closeTimeout = useRef(null);
-
-  const delayClose = () => {
-    closeTimeout.current = setTimeout(() => {
-      setIsOpen(false);
-    }, 3000); // 3 second delay
-  };
-
-  const cancelClose = () => {
-    if (closeTimeout.current) {
-      clearTimeout(closeTimeout.current);
-      closeTimeout.current = null;
-    }
-  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        delayClose(); // Delay the close
+        setIsOpen(false);
       }
     };
 
@@ -37,7 +23,7 @@ export const Dropdown = ({ trigger, children, className }) => {
   useEffect(() => {
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
-        delayClose(); // Delay the close
+        setIsOpen(false);
       }
     };
 
@@ -50,32 +36,30 @@ export const Dropdown = ({ trigger, children, className }) => {
   }, [isOpen]);
 
   const toggleDropdown = () => {
-    cancelClose(); // Cancel any pending close
     setIsOpen((prev) => !prev);
   };
 
   const handleItemClick = () => {
-    cancelClose();
-    setIsOpen(false); // Immediate close on item click
+    setIsOpen(false);
   };
 
   return (
     <div
-      className="relative inline-block text-left"
+      className={clsx('relative text-left', fullWidth ? 'block w-full' : 'inline-block')}
       ref={dropdownRef}
-      onMouseEnter={cancelClose} // Optional: prevent closing when hovering back in
     >
-      {/* Trigger Button */}
+      {/* Trigger */}
       <div onClick={toggleDropdown}>
         {trigger}
       </div>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu — fullWidth spans the trigger; otherwise fixed-width, right-aligned menu */}
       {isOpen && (
         <div
           className={clsx(
-            "absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50",
-            "animate-in fade-in-0 zoom-in-95 duration-100",
+            'absolute mt-2 divide-y divide-border rounded-xl border border-border bg-surface shadow-panel',
+            'focus:outline-none z-50 max-h-64 overflow-y-auto animate-fade-in',
+            fullWidth ? 'left-0 right-0 origin-top' : 'right-0 w-56 origin-top-right',
             className
           )}
         >
@@ -96,8 +80,8 @@ export const DropdownItem = ({ children, onClick, className, ...props }) => {
   return (
     <button
       className={clsx(
-        'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
-        'group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150',
+        'text-ink hover:bg-surface-2',
+        'group flex w-full items-center rounded-lg px-2 py-2 text-sm transition-colors duration-150',
         className
       )}
       onClick={handleClick}

@@ -1,7 +1,8 @@
-import React from 'react';
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
+import { fetchWorkspaces } from '../../store/slices/workspaceSlice';
 
 const PermissionGuard = ({
   children,
@@ -22,6 +23,11 @@ const PermissionGuard = ({
   const { user: currentUser } = useSelector(state => state.auth);
   const { getUserRole, getUserPermissions, canPerformAction } = useWorkspaces();
   const routeParams = useParams();
+  const dispatch = useDispatch();
+  const workspacesLoading = useSelector(state => state.workspaces.loading.fetchWorkspaces);
+  // Tracks whether we've resolved (found, or confirmed-absent-after-fetch) the workspace
+  // this guard needs — starts false so we don't fail-closed before data has loaded.
+  const [workspaceResolved, setWorkspaceResolved] = useState(false);
 
   // ✅ FIXED: Properly extract workspaceId from params
   const actualWorkspaceId = workspaceId || (workspaceIdParam ? routeParams[workspaceIdParam] : null);
@@ -39,7 +45,17 @@ const PermissionGuard = ({
   const workspace = useSelector(state => 
     state.workspaces.workspaces.find(w => w._id === actualWorkspaceId)
   );
-  
+
+  useEffect(() => {
+    if (!actualWorkspaceId || workspace) {
+      setWorkspaceResolved(true);
+      return;
+    }
+    if (!workspacesLoading) {
+      dispatch(fetchWorkspaces()).finally(() => setWorkspaceResolved(true));
+    }
+  }, [actualWorkspaceId, workspace, workspacesLoading, dispatch]);
+
   const targetUserId = userId || currentUser?.id;
   const userRole = getUserRole(actualWorkspaceId, targetUserId);
   const userPermissions = getUserPermissions(actualWorkspaceId, targetUserId);
@@ -214,12 +230,23 @@ const hasPermission = () => {
     isViewer: ['viewer', 'editor', 'admin', 'owner'].includes(userRole)
   };
 
+  // Wait for the workspace fetch to resolve before judging permission or handing off
+  // to either render mode — otherwise every workspace-scoped route fails-closed on
+  // first render whenever the workspaces list isn't already warm in Redux.
+  if (actualWorkspaceId && !workspace && !workspaceResolved) {
+    if (renderProps) return children({ ...permissionContext, hasPermission: false, isLoading: true });
+    return (
+      <div className={`flex items-center justify-center py-8 ${className}`}>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
+      </div>
+    );
+  }
+
   // Render props pattern
   if (renderProps) {
     return children(permissionContext);
   }
 
-  // Standard conditional rendering
   const permitted = hasPermission();
 
   if (!permitted) {

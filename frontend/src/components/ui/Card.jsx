@@ -5,7 +5,7 @@ export const Card = ({ children, className, padding = true, ...props }) => {
   return (
     <div
       className={clsx(
-        'bg-white dark:bg-gray-800 rounded-lg shadow-soft border border-gray-200 dark:border-gray-700',
+        'bg-surface rounded-2xl shadow-xs border border-border',
         padding && 'p-6',
         className
       )}
@@ -18,7 +18,7 @@ export const Card = ({ children, className, padding = true, ...props }) => {
 
 export const CardHeader = ({ children, className, ...props }) => {
   return (
-    <div className={clsx('border-b border-gray-200 dark:border-gray-700 pb-4 mb-4', className)} {...props}>
+    <div className={clsx('border-b border-border pb-4 mb-4', className)} {...props}>
       {children}
     </div>
   );

@@ -10,12 +10,14 @@ const Register = lazy(() => import('../pages/Register'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const DocumentList = lazy(() => import('../pages/DocumentList'));
 const UploadDocument = lazy(() => import('../pages/UploadDocument'));
-const DocumentPreview = lazy(() => import('../pages/DocumentPreview'));
+const DocumentDetail = lazy(() => import('../pages/DocumentDetail'));
 const Profile = lazy(() => import('../pages/Profile'));
+const Workspaces = lazy(() => import('../pages/Workspaces'));
 const WorkspacePage = lazy(() => import('../pages/WorkspacePage'));
 const WorkspaceSettings = lazy(() => import('../pages/WorkspaceSettings'));
 const InvitationPage = lazy(() => import('../pages/InvitationPage'));
 const LandingPage = lazy(() => import('../pages/LandingPage'));
+const Calendar = lazy(() => import('../pages/Calendar'));
 
 
 
@@ -36,20 +38,6 @@ function WorkspaceRedirect() {
 function WorkspaceDocumentsRedirect() {
   const { workspaceId } = useParams();
   return <Navigate to={`/workspaces/${workspaceId}/documents`} replace />;
-}
-
-function DocumentPreviewWithPermission() {
-  const { workspaceId } = useParams();
-
-  return (
-    <PermissionGuard
-      workspaceId={workspaceId}
-      allowedRoles={['viewer', 'editor', 'admin', 'owner']}
-      fallback={<Navigate to="/dashboard" replace />}
-    >
-      <DocumentPreview />
-    </PermissionGuard>
-  );
 }
 
 function PublicRouteWrapper({ children }) {
@@ -159,7 +147,25 @@ const ApplicationRoutes = () => {
           path="/documents/preview/:documentId"
           element={
             <ProtectedRoute>
-              <DocumentPreview />
+              <DocumentDetail />
+            </ProtectedRoute>
+          }
+        />
+
+          <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Calendar />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/workspaces"
+          element={
+            <ProtectedRoute>
+              <Workspaces />
             </ProtectedRoute>
           }
         />
@@ -192,7 +198,7 @@ const ApplicationRoutes = () => {
           path="/workspaces/:workspaceId/documents/:documentId"
           element={
             <ProtectedRoute>
-              <DocumentPreviewWithPermission />
+              <DocumentDetail />
             </ProtectedRoute>
           }
         />

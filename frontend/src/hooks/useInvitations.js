@@ -19,7 +19,6 @@ import {
   selectInvitationsError,
   selectInvitationStats,
   selectExpiredInvitations,
-  selectWorkspaceInvitationsByStatus,
   selectHasPendingInvitations,
   selectSendingInvitation,
   selectProcessingInvitation

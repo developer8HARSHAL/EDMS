@@ -6,7 +6,6 @@
     |-- .env
     |-- .env.local
     |-- .env.production
-    |-- AUDIT_REPORT.md
     |-- config
         |-- db.js
     |-- controllers
@@ -15,8 +14,6 @@
         |-- userController.js
         |-- workspaceController.js
     |-- eslint.config.js
-    |-- FIXES_APPLIED.md
-    |-- HEALTH_REPORT.md
     |-- middleware
         |-- auth.js
         |-- validateObjectId.js
@@ -35,6 +32,8 @@
         |-- workspaceRoutes.js
     |-- scripts
         |-- resetGuestWorkspace.js
+        |-- seedCalendarTestData.js
+        |-- seedTestMembers.js
     |-- server.js
     |-- test
         |-- model-test.js
@@ -71,8 +70,25 @@
         |-- components
             |-- ApplicationRoutes.js
             |-- AuthStatus.js
+            |-- dashboard
+                |-- AttentionListItem.jsx
+                |-- MetricTile.jsx
+            |-- documents
+                |-- Breadcrumb.jsx
+                |-- BulkActionBar.jsx
+                |-- DocumentRow.jsx
+                |-- DueDateChip.jsx
+                |-- FavoriteToggle.jsx
+                |-- ReviewerAvatarGroup.jsx
+                |-- ReviewerPicker.jsx
+                |-- ShareRow.jsx
+                |-- StatusPill.jsx
+                |-- StatusTransitionMenu.jsx
             |-- EditDocumentModal.js
             |-- ErrorBoundary.jsx
+            |-- layout
+                |-- GuestBanner.jsx
+                |-- Sidebar.jsx
             |-- members
                 |-- InviteMemberModal.jsx
                 |-- MemberCard.jsx
@@ -91,6 +107,7 @@
                 |-- Button.jsx
                 |-- Card.jsx
                 |-- Dropdown.jsx
+                |-- EmptyState.jsx
                 |-- Input.jsx
                 |-- Modal.jsx
                 |-- ThemeToggle.jsx
@@ -111,9 +128,10 @@
         |-- index.css
         |-- index.js
         |-- pages
+            |-- Calendar.js
             |-- Dashboard.js
+            |-- DocumentDetail.js
             |-- DocumentList.js
-            |-- DocumentPreview.js
             |-- InvitationPage.js
             |-- LandingPage.js
             |-- Login.js
@@ -122,6 +140,7 @@
             |-- StatCard.js
             |-- UploadDocument.js
             |-- WorkspacePage.js
+            |-- Workspaces.js
             |-- WorkspaceSettings.js
         |-- reportWebVitals.js
         |-- services
@@ -139,4 +158,6 @@
         |-- utils
             |-- .gitkeep
             |-- AuthUtils.js
+            |-- fileTypeStyles.js
     |-- tailwind.config.js
+|-- README.md

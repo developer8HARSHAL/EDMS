@@ -160,11 +160,11 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1a1f2e] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-bg px-4">
       <div className="w-full max-w-md">
-        <div className="bg-[#2a3441] rounded-lg p-6 shadow-xl">
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-panel">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-ink">
               Log in to your account
             </h2>
           </div>
@@ -183,45 +183,34 @@ const Login = () => {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             {/* Email Input */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                disabled={isSubmitting}
-                className="w-full px-3 py-2.5 bg-[#374151] border border-transparent rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              />
-              {errors.email && (
-                <p className="mt-1 text-xs text-red-400">{errors.email}</p>
-              )}
-            </div>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              label="Email address"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Enter your email"
+              disabled={isSubmitting}
+              error={errors.email}
+            />
 
             {/* Password Input */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Enter your password"
-                  disabled={isSubmitting}
-                  className="w-full px-3 py-2.5 bg-[#374151] border border-transparent rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed pr-10 text-sm"
-                />
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              label="Password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password"
+              disabled={isSubmitting}
+              error={errors.password}
+              rightIcon={
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 focus:outline-none"
+                  className="text-ink-muted hover:text-ink focus:outline-none"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -230,11 +219,8 @@ const Login = () => {
                     <EyeIcon className="h-4 w-4" />
                   )}
                 </button>
-              </div>
-              {errors.password && (
-                <p className="mt-1 text-xs text-red-400">{errors.password}</p>
-              )}
-            </div>
+              }
+            />
 
 
             <Button
@@ -250,10 +236,10 @@ const Login = () => {
             {/* Divider */}
             <div className="relative py-1">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-600"></div>
+                <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-[#2a3441] px-2 text-gray-400">or</span>
+                <span className="bg-surface px-2 text-ink-muted">or</span>
               </div>
             </div>
 
@@ -268,17 +254,17 @@ const Login = () => {
             >
               Continue as Guest
             </Button>
-            <p className="text-center text-xs text-gray-500">
+            <p className="text-center text-xs text-ink-muted">
               Explore a shared demo workspace — no account needed. Guest data is public and reset periodically.
             </p>
 
             {/* Sign Up Link */}
             <div className="text-center mt-4">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-ink-muted">
                 Don't have an account?{' '}
                 <Link
                   to="/register"
-                  className="text-blue-400 hover:text-blue-300 font-medium"
+                  className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
                 >
                   Register
                 </Link>

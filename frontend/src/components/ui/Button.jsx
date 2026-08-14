@@ -2,11 +2,11 @@ import React from 'react';
 import { clsx } from 'clsx';
 
 const buttonVariants = {
-  primary: 'bg-blue-500 hover:bg-blue-600 text-white focus:ring-blue-500',
-  secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white focus:ring-gray-500',
-  outline: 'border border-gray-300 hover:bg-gray-50 text-gray-700 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300 focus:ring-gray-500',
-  ghost: 'hover:bg-gray-100 text-gray-700 dark:hover:bg-gray-800 dark:text-gray-300 focus:ring-gray-500',
-  link: 'text-blue-500 hover:text-blue-600 underline-offset-4 hover:underline focus:ring-blue-500'
+  primary: 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 disabled:bg-primary-200 disabled:text-primary-400 text-white focus:ring-primary-500',
+  secondary: 'bg-primary-100 hover:bg-primary-200 active:bg-primary-300 disabled:bg-primary-50 disabled:text-primary-300 text-primary-700 dark:bg-primary-950/60 dark:hover:bg-primary-900/60 dark:active:bg-primary-800/60 dark:text-primary-300 focus:ring-primary-500',
+  outline: 'bg-transparent border border-primary-300 hover:bg-primary-50 active:bg-primary-100 disabled:opacity-40 text-primary-700 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-950/40 focus:ring-primary-500',
+  ghost: 'hover:bg-surface-2 text-ink-muted hover:text-ink focus:ring-primary-500',
+  link: 'text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline focus:ring-primary-500'
 };
 
 const buttonSizes = {
@@ -28,7 +28,7 @@ export const Button = ({
   ...props 
 }) => {
   const baseClasses = clsx(
-    'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+    'inline-flex items-center justify-center font-medium rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-50 disabled:cursor-not-allowed',
     buttonVariants[variant],
     buttonSizes[size],
     className

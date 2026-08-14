@@ -130,9 +130,9 @@ const Modal = ({
       case 'success':
         return 'border-green-200 dark:border-green-800';
       case 'info':
-        return 'border-blue-200 dark:border-blue-800';
+        return 'border-primary-200 dark:border-primary-800';
       default:
-        return 'border-gray-200 dark:border-gray-700';
+        return 'border-border';
     }
   };
 
@@ -166,9 +166,9 @@ const Modal = ({
         case 'green':
           return 'text-green-600 bg-green-100 dark:bg-green-900/20';
         case 'blue':
-          return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
+          return 'text-primary-600 bg-primary-100 dark:bg-primary-900/20';
         default:
-          return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
+          return 'text-ink-muted bg-surface-2';
       }
     };
 
@@ -186,7 +186,7 @@ const Modal = ({
     }
 
     return (
-      <div className={`flex items-center justify-end space-x-3 px-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-b-lg ${footerClassName}`}>
+      <div className={`flex items-center justify-end space-x-3 px-6 py-4 bg-surface-2 rounded-b-2xl ${footerClassName}`}>
         {cancelAction && (
           <Button
             variant="outline"
@@ -246,7 +246,7 @@ const Modal = ({
         <div
           ref={modalRef}
           className={`
-            relative w-full bg-white dark:bg-gray-900 rounded-lg shadow-xl
+            relative w-full bg-surface rounded-2xl shadow-panel
             transform transition-all duration-${animationDuration}
             ${getSizeClasses()}
             ${getVariantClasses()}
@@ -265,7 +265,7 @@ const Modal = ({
                 {title && (
                   <h3 
                     id="modal-title"
-                    className="text-lg font-semibold text-gray-900 dark:text-white leading-6"
+                    className="text-lg font-semibold text-ink leading-6"
                   >
                     {title}
                   </h3>
@@ -278,10 +278,10 @@ const Modal = ({
                   onClick={handleClose}
                   disabled={preventClose || isLoading}
                   className={`
-                    ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                    focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-1
+                    ml-4 text-ink-muted hover:text-ink
+                    focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg p-1
                     transition-colors duration-150
-                    ${(preventClose || isLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}
+                    ${(preventClose || isLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-2'}
                   `}
                   aria-label="Close modal"
                 >
@@ -301,10 +301,10 @@ const Modal = ({
 
           {/* Loading Overlay */}
           {isLoading && (
-            <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center rounded-lg">
+            <div className="absolute inset-0 bg-surface/50 flex items-center justify-center rounded-2xl">
               <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-300">{loadingText}</span>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                <span className="text-sm text-ink-muted">{loadingText}</span>
               </div>
             </div>
           )}
@@ -363,7 +363,7 @@ export const ConfirmModal = ({
     {...props}
   >
     {message && (
-      <p className="text-gray-600 dark:text-gray-300">
+      <p className="text-ink-muted">
         {message}
       </p>
     )}
@@ -395,7 +395,7 @@ export const AlertModal = ({
     {...props}
   >
     {message && (
-      <p className="text-gray-600 dark:text-gray-300">
+      <p className="text-ink-muted">
         {message}
       </p>
     )}
@@ -431,7 +431,7 @@ export const FormModal = ({
     >
       <form onSubmit={handleSubmit}>
         {children}
-        <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-border">
           <Button
             type="button"
             variant="outline"

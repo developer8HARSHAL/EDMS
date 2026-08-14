@@ -214,9 +214,9 @@ const WorkspaceSidebar = ({
   // Enhanced Badge component that handles role prop
   const RoleBadge = ({ role, size = "xs", ...props }) => {
     const roleConfig = {
-      owner: { variant: 'yellow', text: 'Owner' },
-      admin: { variant: 'blue', text: 'Admin' },
-      editor: { variant: 'green', text: 'Editor' },
+      owner: { variant: 'warning', text: 'Owner' },
+      admin: { variant: 'danger', text: 'Admin' },
+      editor: { variant: 'primary', text: 'Editor' },
       viewer: { variant: 'gray', text: 'Viewer' }
     };
 
@@ -257,8 +257,8 @@ const WorkspaceSidebar = ({
             w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg
             transition-colors duration-150
             ${isActive 
-              ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' 
+              : 'text-ink hover:bg-surface-2'
             }
             ${isChild ? 'ml-4 pl-8' : ''}
             ${isCollapsed ? 'justify-center px-2' : ''}
@@ -275,7 +275,7 @@ const WorkspaceSidebar = ({
                   </Badge>
                 )}
                 {item.count !== undefined && (
-                  <span className="text-xs text-gray-500">({item.count})</span>
+                  <span className="text-xs text-ink-muted">({item.count})</span>
                 )}
               </>
             )}
@@ -309,8 +309,8 @@ const WorkspaceSidebar = ({
           w-full flex items-center space-x-3 px-3 py-2 text-sm font-medium rounded-lg
           transition-colors duration-150
           ${action.primary 
-            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            ? 'bg-primary-600 text-white hover:bg-primary-700' 
+            : 'bg-surface-2 text-ink hover:bg-primary-50 dark:hover:bg-primary-900/20'
           }
           ${isCollapsed ? 'justify-center px-2' : ''}
         `}
@@ -326,26 +326,26 @@ const WorkspaceSidebar = ({
     <button
       key={category.id}
       onClick={() => navigate(`/workspaces/${workspaceId}/documents?category=${category.id}`)}
-      className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+      className="w-full flex items-center justify-between px-3 py-2 text-sm text-ink hover:bg-surface-2 rounded-lg transition-colors"
     >
       <div className="flex items-center space-x-3">
-        <Hash className="w-4 h-4 text-gray-400" />
+        <Hash className="w-4 h-4 text-ink-muted" />
         {!isCollapsed && <span className="truncate">{category.name}</span>}
       </div>
       {!isCollapsed && (
-        <span className="text-xs text-gray-500">{category.count}</span>
+        <span className="text-xs text-ink-muted">{category.count}</span>
       )}
     </button>
   );
 
   if (isLoading || !currentWorkspace) {
     return (
-      <div className={`bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 ${className}`}>
+      <div className={`bg-surface border-r border-border ${className}`}>
         <div className="p-4">
           <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-300 rounded"></div>
-            <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+            <div className="h-4 bg-surface-2 rounded"></div>
+            <div className="h-4 bg-surface-2 rounded w-3/4"></div>
+            <div className="h-4 bg-surface-2 rounded w-1/2"></div>
           </div>
         </div>
       </div>
@@ -354,7 +354,7 @@ const WorkspaceSidebar = ({
 
   return (
     <div className={`
-      bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 
+      bg-surface border-r border-border 
       flex flex-col h-full
       ${isCollapsed ? 'w-16' : 'w-64'}
       transition-all duration-300
@@ -362,7 +362,7 @@ const WorkspaceSidebar = ({
     `}>
       {/* Header */}
       {showWorkspaceInfo && (
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
             {!isCollapsed ? (
               <div className="flex items-center space-x-3 min-w-0">
@@ -372,12 +372,12 @@ const WorkspaceSidebar = ({
                   variant="square"
                 />
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  <h2 className="text-sm font-semibold text-ink truncate">
                     {currentWorkspace.name}
                   </h2>
                   <div className="flex items-center space-x-2 mt-1">
                     <RoleBadge role={actualUserRole} size="xs" />
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-ink-muted">
                       {currentWorkspace.members?.length || 0} members
                     </span>
                   </div>
@@ -393,7 +393,7 @@ const WorkspaceSidebar = ({
             
             <button
               onClick={onToggleCollapse}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+              className="p-1 text-ink-muted hover:text-ink rounded"
             >
               {isCollapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
             </button>
@@ -403,15 +403,15 @@ const WorkspaceSidebar = ({
 
       {/* Search */}
       {!isCollapsed && (
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-border">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-ink-muted" />
             <input
               type="text"
               placeholder="Search workspace..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-xl bg-surface text-ink placeholder:text-ink-muted focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
         </div>
@@ -419,9 +419,9 @@ const WorkspaceSidebar = ({
 
       {/* Quick Actions */}
       {showQuickActions && (
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-border">
           {!isCollapsed && (
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
               Quick Actions
             </h3>
           )}
@@ -434,7 +434,7 @@ const WorkspaceSidebar = ({
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto p-4">
         {!isCollapsed && (
-          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
             Navigation
           </h3>
         )}
@@ -445,7 +445,7 @@ const WorkspaceSidebar = ({
         {/* Categories */}
         {!isCollapsed && documentCategories.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
               Categories
             </h3>
             <div className="space-y-1">
@@ -457,8 +457,8 @@ const WorkspaceSidebar = ({
 
       {/* Recent Activity */}
       {showRecentActivity && !isCollapsed && recentDocuments?.length > 0 && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <div className="p-4 border-t border-border">
+          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
             Recent Activity
           </h3>
           <div className="space-y-2">
@@ -466,12 +466,12 @@ const WorkspaceSidebar = ({
               <button
                 key={doc._id}
                 onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)}
-                className="w-full flex items-center space-x-2 p-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="w-full flex items-center space-x-2 p-2 text-sm text-ink hover:bg-surface-2 rounded-lg transition-colors"
               >
-                <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <FileText className="w-4 h-4 text-ink-muted flex-shrink-0" />
                 <div className="min-w-0 flex-1 text-left">
                   <p className="truncate font-medium">{doc.name}</p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-ink-muted truncate">
                     {new Date(doc.lastModified || doc.updatedAt || doc.createdAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -482,22 +482,22 @@ const WorkspaceSidebar = ({
       )}
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-t border-border">
         {!isCollapsed ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-ink-muted">
                 {currentWorkspace.members?.filter(m => m.isOnline)?.length || 0} online
               </span>
             </div>
-            <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded">
+            <button className="p-1 text-ink-muted hover:text-ink rounded">
               <Bell className="w-4 h-4" />
             </button>
           </div>
         ) : (
           <div className="flex justify-center">
-            <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded">
+            <button className="p-2 text-ink-muted hover:text-ink rounded">
               <Bell className="w-4 h-4" />
             </button>
           </div>

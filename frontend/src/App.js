@@ -1,11 +1,13 @@
 // App.js - FIXED: Proper Authentication Initialization (Updated for your setup)
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import ApplicationRoutes from './components/ApplicationRoutes';
 import Navbar from './components/Navbar';
+import Sidebar from './components/layout/Sidebar';
+import GuestBanner from './components/layout/GuestBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { validateToken } from './store/slices/authSlice';
-import { selectTokenValidated, selectAuthLoading } from './store/slices/authSlice';
+import { selectTokenValidated, selectAuthLoading, selectIsAuthenticated, selectUser } from './store/slices/authSlice';
 import { store } from './store';
 
 // Enhanced loading component with Tailwind
@@ -21,6 +23,9 @@ function App() {
   const dispatch = useDispatch();
   const tokenValidated = useSelector(selectTokenValidated);
   const authLoading = useSelector(selectAuthLoading);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectUser);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // ✅ CRITICAL FIX: Make store available globally for interceptors
   useEffect(() => {
@@ -44,8 +49,20 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-bg">
-        <Navbar />
-        <main className="pb-8">
+        {isAuthenticated && (
+          <Sidebar
+            mobileOpen={mobileSidebarOpen}
+            onCloseMobile={() => setMobileSidebarOpen(false)}
+          />
+        )}
+        {/* onMenuClick opens the mobile Sidebar drawer via Navbar's hamburger button */}
+        <Navbar onMenuClick={() => setMobileSidebarOpen(true)} />
+        {isAuthenticated && (
+          <div className="md:pl-64">
+            <GuestBanner isGuest={user?.isGuest} />
+          </div>
+        )}
+        <main className={`pb-8 ${isAuthenticated ? 'md:pl-64' : ''}`}>
           <ApplicationRoutes />
         </main>
       </div>
