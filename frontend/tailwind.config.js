@@ -9,6 +9,10 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Added for the Documents page editorial pass only — nothing existing
+        // uses font-serif/font-mono today, so this is purely additive.
+        serif: ['"Libre Caslon Text"', 'Georgia', 'serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       colors: {
         // Semantic tokens — driven by CSS variables in index.css (:root / .dark).

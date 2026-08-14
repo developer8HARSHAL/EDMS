@@ -422,6 +422,28 @@ export const documentApi = {
       throw error;
     }
   },
+  // Dedicated status-transition endpoint — enforces role/reviewer rules the
+  // generic PUT above does not (see backend_briefing_for_frontend.md §4).
+  updateDocumentStatus: async (documentId, status) => {
+    try {
+      const response = await api.patch(`/documents/${documentId}/status`, { status });
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Update document status ${documentId} error:`, error);
+      throw error;
+    }
+  },
+  // Dedicated reviewers endpoint — validates reviewer IDs are actual workspace
+  // members server-side (400 on invalid), which the generic PUT does not do.
+  updateDocumentReviewers: async (documentId, reviewerIds) => {
+    try {
+      const response = await api.patch(`/documents/${documentId}/reviewers`, { reviewerIds });
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Update document reviewers ${documentId} error:`, error);
+      throw error;
+    }
+  },
   deleteDocument: async (documentId) => {
     try {
       const response = await api.delete(`/documents/${documentId}`);

@@ -2,6 +2,7 @@
 import { useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
+import apiService from '../services/apiService';
 import {
   fetchDocuments,
   fetchWorkspaceDocuments,
@@ -313,6 +314,40 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
 }, [dispatch, workspaceId, currentWorkspaceId, handleFetchWorkspaceDocuments]);
 
 
+  // Calls the dedicated PATCH /:id/status endpoint directly (bypasses the generic
+  // updateDocument thunk above, which hits PUT and skips the backend's role/reviewer
+  // transition rules) then refetches to bring Redux state back in sync.
+  const handleUpdateDocumentStatus = useCallback(async (documentId, status, targetWorkspaceId) => {
+    const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
+    try {
+      await apiService.documentApi.updateDocumentStatus(documentId, status);
+      toast.success(`Status changed to ${status}`);
+      await dispatch(fetchDocument(documentId));
+      if (wsId) setTimeout(() => handleFetchWorkspaceDocuments(wsId), 500);
+      return true;
+    } catch (error) {
+      console.error('Update document status error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update status');
+      return false;
+    }
+  }, [dispatch, workspaceId, currentWorkspaceId, handleFetchWorkspaceDocuments]);
+
+  // Same pattern for PATCH /:id/reviewers — server validates reviewer IDs are
+  // actual workspace members, which the generic PUT endpoint does not do.
+  const handleUpdateDocumentReviewers = useCallback(async (documentId, reviewerIds) => {
+    try {
+      await apiService.documentApi.updateDocumentReviewers(documentId, reviewerIds);
+      toast.success('Reviewers updated');
+      await dispatch(fetchDocument(documentId));
+      return true;
+    } catch (error) {
+      console.error('Update document reviewers error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update reviewers');
+      return false;
+    }
+  }, [dispatch]);
+
+
   // Delete document with confirmation
   const handleDeleteDocument = useCallback(async (documentId, documentName, targetWorkspaceId) => {
     const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
@@ -340,13 +375,10 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       
       if (toggleFavorite.fulfilled.match(result)) {
         const isFavorite = result.payload.isFavorite;
-        toast.success({
-          title: isFavorite ? 'Added to Favorites' : 'Removed from Favorites',
-          description: `${documentName || 'Document'} has been ${isFavorite ? 'added to' : 'removed from'} favorites`,
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        });
+        toast.success(
+          `${documentName || 'Document'} has been ${isFavorite ? 'added to' : 'removed from'} favorites`,
+          { duration: 2000 }
+        );
         return true;
       }
       return false;
@@ -362,13 +394,10 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       const result = await dispatch(moveDocument({ documentId, fromWorkspaceId, toWorkspaceId }));
       
       if (moveDocument.fulfilled.match(result)) {
-        toast.success({
-          title: 'Document Moved',
-          description: `${documentName || 'Document'} has been moved successfully`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
+        toast.success(
+          `${documentName || 'Document'} has been moved successfully`,
+          { duration: 3000 }
+        );
         return true;
       }
       return false;
@@ -386,13 +415,10 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       const result = await dispatch(duplicateDocument({ documentId, workspaceId: wsId }));
       
       if (duplicateDocument.fulfilled.match(result)) {
-        toast.success({
-          title: 'Document Duplicated',
-          description: `${documentName || 'Document'} has been duplicated successfully`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
+        toast.success(
+          `${documentName || 'Document'} has been duplicated successfully`,
+          { duration: 3000 }
+        );
         return true;
       }
       return false;
@@ -410,13 +436,10 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       const result = await dispatch(bulkDeleteDocuments({ documentIds, workspaceId: wsId }));
       
       if (bulkDeleteDocuments.fulfilled.match(result)) {
-        toast.success({
-          title: 'Documents Deleted',
-          description: `${documentIds.length} documents have been deleted successfully`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
+        toast.success(
+          `${documentIds.length} documents have been deleted successfully`,
+          { duration: 3000 }
+        );
         return true;
       }
       return false;
@@ -434,13 +457,10 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       const result = await dispatch(archiveDocument({ documentId, workspaceId: wsId }));
       
       if (archiveDocument.fulfilled.match(result)) {
-        toast.success({
-          title: 'Document Archived',
-          description: `${documentName || 'Document'} has been archived successfully`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
+        toast.success(
+          `${documentName || 'Document'} has been archived successfully`,
+          { duration: 3000 }
+        );
         return true;
       }
       return false;
@@ -484,13 +504,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       const result = await dispatch(downloadDocument({ documentId, filename }));
       
       if (downloadDocument.fulfilled.match(result)) {
-        toast.success({
-          title: 'Download Started',
-          description: `Downloading ${filename || 'document'}...`,
-          status: 'info',
-          duration: 2000,
-          isClosable: true,
-        });
+        toast(`Downloading ${filename || 'document'}...`, { duration: 2000 });
         return true;
       }
       return false;
@@ -714,6 +728,8 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
     // Document operations
     uploadDocument: handleUploadDocument,
     updateDocument: handleUpdateDocument, 
+    updateDocumentStatus: handleUpdateDocumentStatus,
+    updateDocumentReviewers: handleUpdateDocumentReviewers,
     deleteDocument: handleDeleteDocument,
     toggleFavorite: handleToggleFavorite,
     moveDocument: handleMoveDocument,

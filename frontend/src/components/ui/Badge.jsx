@@ -24,6 +24,9 @@ const Badge = ({
   count,
   max = 99,
   showZero = false,
+  // Visual — small solid dot before the label, in the variant's text color.
+  // Opt-in only; nothing renders a dot unless a call site explicitly passes it.
+  dot = false,
   // Accessibility
   ariaLabel,
   title
@@ -34,6 +37,11 @@ const Badge = ({
   // semantic meaning a neutral/brand token can't express. primary/secondary/
   // gray/default route through tokens since they're neutral/brand, not semantic.
   // Alert.jsx follows this same policy.
+  //
+  // Dark-mode intensity: every filled semantic variant below uses the same
+  // {color}-950/60 + {color}-300 formula that index.css already established
+  // for primary (.badge-pill, .icon-badge-3) — keeps dark mode consistent
+  // across the whole badge family instead of each hue picking its own opacity.
   const getVariantClasses = () => {
     const baseClasses = outline 
       ? 'border-2 bg-transparent' 
@@ -42,40 +50,40 @@ const Badge = ({
     switch (finalVariant) {
       case 'primary':
         return outline
-          ? `${baseClasses} border-primary-500 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:border-primary-400 dark:hover:bg-primary-900/20`
-          : `${baseClasses} bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300`;
+          ? `${baseClasses} border-primary-500 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:border-primary-400 dark:hover:bg-primary-950/40`
+          : `${baseClasses} bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300`;
       case 'secondary':
         return outline
           ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
           : `${baseClasses} bg-surface-2 text-ink-muted`;
       case 'success':
         return outline
-          ? `${baseClasses} border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-900/20`
-          : `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300`;
+          ? `${baseClasses} border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/40`
+          : `${baseClasses} bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300`;
       case 'warning':
         return outline
-          ? `${baseClasses} border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-400 dark:hover:bg-yellow-900/20`
-          : `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300`;
+          ? `${baseClasses} border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-400 dark:hover:bg-yellow-950/40`
+          : `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300`;
       case 'danger':
         return outline
-          ? `${baseClasses} border-red-500 text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-900/20`
-          : `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300`;
+          ? `${baseClasses} border-red-500 text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-950/40`
+          : `${baseClasses} bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300`;
       case 'info':
         return outline
-          ? `${baseClasses} border-cyan-500 text-cyan-600 hover:bg-cyan-50 dark:text-cyan-400 dark:border-cyan-400 dark:hover:bg-cyan-900/20`
-          : `${baseClasses} bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300`;
+          ? `${baseClasses} border-cyan-500 text-cyan-600 hover:bg-cyan-50 dark:text-cyan-400 dark:border-cyan-400 dark:hover:bg-cyan-950/40`
+          : `${baseClasses} bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300`;
       case 'purple':
         return outline
-          ? `${baseClasses} border-purple-500 text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-400 dark:hover:bg-purple-900/20`
-          : `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300`;
+          ? `${baseClasses} border-purple-500 text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-400 dark:hover:bg-purple-950/40`
+          : `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300`;
       case 'pink':
         return outline
-          ? `${baseClasses} border-pink-500 text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:border-pink-400 dark:hover:bg-pink-900/20`
-          : `${baseClasses} bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-300`;
+          ? `${baseClasses} border-pink-500 text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:border-pink-400 dark:hover:bg-pink-950/40`
+          : `${baseClasses} bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300`;
       case 'indigo':
         return outline
-          ? `${baseClasses} border-indigo-500 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-400 dark:hover:bg-indigo-900/20`
-          : `${baseClasses} bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300`;
+          ? `${baseClasses} border-indigo-500 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-400 dark:hover:bg-indigo-950/40`
+          : `${baseClasses} bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300`;
       case 'gray':
         return outline
           ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
@@ -95,7 +103,8 @@ const Badge = ({
     }
   };
 
-  // Size classes
+  // Size classes — default/lg get slightly roomier vertical padding (py-1.5
+  // instead of py-1) so the pill doesn't feel cramped; xs/sm/xl unchanged.
   const getSizeClasses = () => {
     switch (size) {
       case 'xs':
@@ -103,11 +112,11 @@ const Badge = ({
       case 'sm':
         return 'px-2 py-0.5 text-xs';
       case 'lg':
-        return 'px-3 py-1 text-sm';
+        return 'px-3 py-1.5 text-sm';
       case 'xl':
         return 'px-4 py-1.5 text-base';
       default:
-        return 'px-2.5 py-1 text-sm';
+        return 'px-2.5 py-1.5 text-sm';
     }
   };
 
@@ -178,6 +187,22 @@ const Badge = ({
     );
   };
 
+  // Dot indicator — solid circle, currentColor so it always matches this
+  // badge's own text color regardless of variant. Rendered before the icon
+  // (if any) and the label.
+  const renderDot = () => {
+    if (!dot) return null;
+
+    return (
+      <span
+        className={iconPosition === 'right' ? 'ml-1.5' : 'mr-1.5'}
+        aria-hidden="true"
+      >
+        <span className="block h-1.5 w-1.5 rounded-full bg-current" />
+      </span>
+    );
+  };
+
   // Icon rendering
   const renderIcon = () => {
     let iconElement = null;
@@ -225,15 +250,18 @@ const Badge = ({
                      status === 'info' ? 'info' : variant :
                      role && !variant ? getRoleVariant(role) : variant;
 
-  // Common classes
+  // Common classes — tracking-tight added for the tighter, more confident
+  // type treatment confirmed on the alert mockup (Tailwind's built-in scale,
+  // no arbitrary values). hover:shadow-xs uses the project's real shadow
+  // token instead of Tailwind's generic default.
   const baseClasses = `
-    inline-flex items-center font-medium leading-none
+    inline-flex items-center font-medium leading-none tracking-tight
     ${rounded ? 'rounded-full' : 'rounded-md'}
     ${getSizeClasses()}
     ${getVariantClasses()}
     ${animated ? 'transition-all duration-200' : ''}
     ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-    ${onClick || href ? 'cursor-pointer hover:shadow-sm' : ''}
+    ${onClick || href ? 'cursor-pointer hover:shadow-xs' : ''}
     ${uppercase ? 'uppercase' : ''}
     ${className}
   `;
@@ -241,12 +269,14 @@ const Badge = ({
   // Content
   const content = (
     <>
+      {iconPosition === 'left' && renderDot()}
       {iconPosition === 'left' && renderIcon()}
       <span className="truncate">
         {children}
         {renderCount()}
       </span>
       {iconPosition === 'right' && renderIcon()}
+      {iconPosition === 'right' && renderDot()}
       {renderRemoveButton()}
     </>
   );

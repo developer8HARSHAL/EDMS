@@ -71,3 +71,18 @@ frontend/src/setupTests.js
 frontend/.vscode/
 frontend/.idea/
 
+
+
+
+curl -X PATCH "http://localhost:5000/api/documents/6a797b1afcadf2b1a57cbacd/reviewers" ^
+  -H "Content-Type: application/json" ^
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1ZTVhNmZhM2ViMWZiODIyOTJjOSIsIm5hbWUiOiJIYXJzaGFsMTIiLCJlbWFpbCI6ImhhcnNoYWxwaW5nZTEyQGdtYWlsLmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzg2MzQ2MTk4LCJleHAiOjE3ODg5MzgxOTh9.cQg8RzF7oVEol85Djvil-C3HNUxaFJ5C05EFO6egA9A" ^
+  -d "{\"reviewerIds\":[\""6a797b1afcadf2b1a57cbace\"]}"
+
+  curl -X PATCH "http://localhost:5000/api/documents/6a797b56fcadf2b1a57cbb67/reviewers" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1ZTVhNmZhM2ViMWZiODIyOTJjOSIsIm5hbWUiOiJIYXJzaGFsMTIiLCJlbWFpbCI6ImhhcnNoYWxwaW5nZTEyQGdtYWlsLmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzg2MzQ2MTk4LCJleHAiOjE3ODg5MzgxOTh9.cQg8RzF7oVEol85Djvil-C3HNUxaFJ5C05EFO6egA9A" \
+  -d '{"reviewerIds":["697c5e5a6fa3eb1fb82292c9"]}'
+
+  curl "http://localhost:5000/api/documents/6a797b56fcadf2b1a57cbb67" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5N2M1ZTVhNmZhM2ViMWZiODIyOTJjOSIsIm5hbWUiOiJIYXJzaGFsMTIiLCJlbWFpbCI6ImhhcnNoYWxwaW5nZTEyQGdtYWlsLmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzg2MzQ2MTk4LCJleHAiOjE3ODg5MzgxOTh9.cQg8RzF7oVEol85Djvil-C3HNUxaFJ5C05EFO6egA9A"

@@ -1,188 +1,675 @@
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { Bars3Icon, BellIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Bars3Icon,
+  MagnifyingGlassIcon,
+  BellIcon,
+  SunIcon,
+  MoonIcon,
+  ChevronDownIcon,
+  DocumentTextIcon,
+  UserCircleIcon,
+  CheckCircleIcon,
+  ClockIcon,
+} from '@heroicons/react/24/outline';
+
 import { useAuth } from '../hooks/useAuth';
-import { useInvitations } from '../hooks/useInvitations';
+import { useTheme } from '../context/ThemeContext';
 import { useWorkspaces } from '../hooks/useWorkspaces';
-import { Button } from '../components/ui/Button';
-import { Dropdown } from '../components/ui/Dropdown';
-import Badge from '../components/ui/Badge';
-import ThemeToggle from '../components/ui/ThemeToggle';
 
-const getInitials = (name) => {
-  if (!name) return 'U';
-  return name.split(' ').map((w) => w.charAt(0)).join('').toUpperCase().slice(0, 2);
-};
-
-// Thin top bar. Sidebar (components/layout/Sidebar.jsx) owns primary nav —
-// this only carries what doesn't fit there: mobile menu trigger, invitations
-// bell, profile menu, theme toggle. Public (unauthenticated) pages get the
-// logo + sign in/up instead, since Sidebar isn't rendered for them.
+// onMenuClick opens the Sidebar's mobile drawer (components/layout/Sidebar.jsx) —
+// required on small screens since Sidebar's own rail is desktop-only (md:flex).
 const Navbar = ({ onMenuClick }) => {
-  const authHook = useAuth();
-  const invitationsHook = useInvitations();
-  const { searchWorkspaces } = useWorkspaces();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const { searchWorkspaces } = useWorkspaces();
 
-  const isAuthenticated = authHook?.isAuthenticated || false;
-  const user = authHook?.user || null;
-  const authReady = authHook?.isAuthReady || false;
-  const pendingInvitations = invitationsHook?.pendingInvitations || [];
-
-  const [searchTerm, setSearchTerm] = useState('');
+  const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
   const searchRef = useRef(null);
+  const notificationRef = useRef(null);
+  const profileRef = useRef(null);
 
-  // searchWorkspaces() is a synchronous client-side filter over already-loaded
-  // workspaces (name/description) — no dedicated document-search endpoint exists yet.
-  const searchResults = useMemo(
-    () => (searchTerm.trim() ? searchWorkspaces(searchTerm).slice(0, 6) : []),
-    [searchTerm, searchWorkspaces]
-  );
+  const isDark = theme === 'dark';
 
+  const displayName = user?.name || 'Guest';
+  const email = user?.email || 'guest@edmsdemo.com';
+
+  const initials =
+    displayName
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'G';
+
+  /*
+   * ----------------------------------------------------
+   * Close dropdowns when clicking outside
+   * ----------------------------------------------------
+   */
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setSearchOpen(false);
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target)
+      ) {
+        setNotificationsOpen(false);
+      }
+
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target)
+      ) {
+        setProfileOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
-  const handleSelectWorkspace = (workspaceId) => {
-    setSearchTerm('');
-    setSearchOpen(false);
-    navigate(`/workspaces/${workspaceId}`);
+  /*
+   * ----------------------------------------------------
+   * Search
+   * ----------------------------------------------------
+   */
+  const handleSearch = (event) => {
+    event.preventDefault();
+
+    const value = search.trim();
+
+    if (!value) return;
+
+    /*
+     * Replace this with your actual document search route/API
+     * when the backend search endpoint is available.
+     */
+    navigate(`/documents?search=${encodeURIComponent(value)}`);
   };
 
-  const handleLogout = useCallback(() => {
-    authHook?.logout?.();
-    navigate('/login');
-  }, [authHook, navigate]);
+  /*
+   * ----------------------------------------------------
+   * Logout
+   * ----------------------------------------------------
+   */
+  const handleLogout = async () => {
+    setProfileOpen(false);
 
-  const initials = useMemo(() => getInitials(user?.name), [user?.name]);
-
-  if (!authReady) {
-    return (
-      <nav className="sticky top-0 z-40 h-16 flex items-center px-4 sm:px-6 bg-surface border-b border-border">
-        <span className="text-sm text-ink-muted">Loading...</span>
-      </nav>
-    );
-  }
+    try {
+      await logout();
+    } finally {
+      navigate('/login');
+    }
+  };
 
   return (
-    <nav className={`sticky top-0 z-40 h-16 flex items-center px-4 sm:px-6 bg-surface border-b border-border ${isAuthenticated ? 'md:pl-6' : ''}`}>
-      {isAuthenticated ? (
-        <div className="flex items-center justify-between w-full">
+    <header
+      className="
+        sticky
+        top-0
+        z-50
+        h-16
+        w-full
+        border-b
+        border-border
+        bg-surface
+      "
+    >
+      <div
+        className="flex h-full w-full items-center px-6"
+      >
+        {/* =================================================
+            LEFT — WORKSPACE / APP ICON
+        ================================================= */}
+        <div className="w-56 shrink-0">
           <button
             type="button"
-            onClick={onMenuClick}
-            className="md:hidden -ml-2 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2"
-            aria-label="Open menu"
+            onClick={() => navigate('/')}
+            aria-label="Workspace"
+            className="flex items-center gap-2 text-ink"
           >
-            <Bars3Icon className="h-6 w-6" />
+            <DocumentTextIcon className="h-5 w-5" />
+            <span className="text-sm font-semibold tracking-tight">DocManager</span>
+          </button>
+        </div>
+
+        {/* =================================================
+            RIGHT — UTILITY CONTROLS
+        ================================================= */}
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+
+          {/* -------------------------------------------------
+              SEARCH
+          ------------------------------------------------- */}
+          <form onSubmit={handleSearch} className="hidden w-full max-w-md sm:block">
+            <div
+              className="
+                flex
+                h-10
+                w-full
+                items-center
+                rounded-lg
+                border
+                border-border
+                bg-surface-2/40
+                transition-colors
+                focus-within:border-primary-400
+                focus-within:bg-surface
+              "
+            >
+              <MagnifyingGlassIcon
+                className="
+                  ml-3
+                  h-[17px]
+                  w-[17px]
+                  shrink-0
+                  text-ink-muted
+                "
+              />
+
+              <input
+                id="global-search-input"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search documents..."
+               className="
+  min-w-0
+  flex-1
+  border-0
+  bg-transparent
+  px-2
+  text-sm
+  text-ink
+  outline-none
+  ring-0
+  focus:border-0
+  focus:outline-none
+  focus:ring-0
+  appearance-none
+  placeholder:text-ink-muted
+"
+                aria-label="Search documents"
+              />
+
+              <kbd
+                className="
+                  mr-1.5
+                  hidden
+                  h-5
+                  min-w-5
+                  items-center
+                  justify-center
+                  rounded
+                  border
+                  border-border
+                  bg-surface
+                  px-1
+                  text-[10px]
+                  font-medium
+                  text-ink-muted
+                  lg:flex
+                "
+              >
+                /
+              </kbd>
+            </div>
+          </form>
+
+          {/* -------------------------------------------------
+              SEPARATOR
+          ------------------------------------------------- */}
+          <div className="mx-1 h-6 w-px bg-border" />
+
+          {/* =================================================
+              NOTIFICATIONS
+          ================================================= */}
+          <div
+            ref={notificationRef}
+            className="relative"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setNotificationsOpen((current) => !current);
+                setProfileOpen(false);
+              }}
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              className="
+                relative
+                flex
+                h-10
+                w-10
+                items-center
+                justify-center
+                rounded-lg
+                text-ink-muted
+                transition-colors
+                hover:bg-surface-2
+                hover:text-ink
+              "
+            >
+              <BellIcon className="h-[19px] w-[19px]" />
+
+              {/* Unread indicator */}
+              <span
+                className="
+                  absolute
+                  right-[7px]
+                  top-[6px]
+                  h-1.5
+                  w-1.5
+                  rounded-full
+                  bg-primary-600
+                  ring-2
+                  ring-surface
+                "
+              />
+            </button>
+
+            {/* Notification dropdown */}
+            {notificationsOpen && (
+              <div
+                className="
+                  absolute
+                  right-0
+                  top-[calc(100%+10px)]
+                  w-[360px]
+                  overflow-hidden
+                  rounded-xl
+                  border
+                  border-border
+                  bg-surface
+                  shadow-lg
+                "
+              >
+                {/* Header */}
+                <div
+                  className="
+                    flex
+                    h-12
+                    items-center
+                    justify-between
+                    border-b
+                    border-border
+                    px-4
+                  "
+                >
+                  <div>
+                    <h3 className="text-sm font-semibold text-ink">
+                      Notifications
+                    </h3>
+
+                    <p className="text-[11px] text-ink-muted">
+                      Recent activity
+                    </p>
+                  </div>
+
+
+                </div>
+
+                {/* Notification list */}
+                <div className="max-h-[340px] overflow-y-auto">
+
+                  {/* Notification 1 */}
+                  <button
+                    type="button"
+                    className="
+                      flex
+                      w-full
+                      gap-3
+                      border-b
+                      border-border
+                      px-4
+                      py-3.5
+                      text-left
+                      transition-colors
+                      hover:bg-surface-2
+                    "
+                  >
+                    <span
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
+                        bg-primary-50
+                        text-primary-600
+                        dark:bg-primary-950/40
+                      "
+                    >
+                      <DocumentTextIcon className="h-4 w-4" />
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-medium text-ink">
+                        Document requires review
+                      </span>
+
+                      <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
+                        Annual compliance report is waiting for your review.
+                      </span>
+
+                      <span className="mt-1.5 block text-[10px] text-ink-muted">
+                        12 minutes ago
+                      </span>
+                    </span>
+
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600" />
+                  </button>
+
+                  {/* Notification 2 */}
+                  <button
+                    type="button"
+                    className="
+                      flex
+                      w-full
+                      gap-3
+                      border-b
+                      border-border
+                      px-4
+                      py-3.5
+                      text-left
+                      transition-colors
+                      hover:bg-surface-2
+                    "
+                  >
+                    <span
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
+                        bg-amber-50
+                        text-amber-600
+                        dark:bg-amber-950/30
+                      "
+                    >
+                      <ClockIcon className="h-4 w-4" />
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-medium text-ink">
+                        Deadline approaching
+                      </span>
+
+                      <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
+                        Vendor agreement is due tomorrow.
+                      </span>
+
+                      <span className="mt-1.5 block text-[10px] text-ink-muted">
+                        1 hour ago
+                      </span>
+                    </span>
+                  </button>
+
+                  {/* Notification 3 */}
+                  <button
+                    type="button"
+                    className="
+                      flex
+                      w-full
+                      gap-3
+                      px-4
+                      py-3.5
+                      text-left
+                      transition-colors
+                      hover:bg-surface-2
+                    "
+                  >
+                    <span
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
+                        bg-emerald-50
+                        text-emerald-600
+                        dark:bg-emerald-950/30
+                      "
+                    >
+                      <CheckCircleIcon className="h-4 w-4" />
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-medium text-ink">
+                        Document approved
+                      </span>
+
+                      <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
+                        Q3 policy document was approved by the reviewer.
+                      </span>
+
+                      <span className="mt-1.5 block text-[10px] text-ink-muted">
+                        3 hours ago
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                {/* Footer */}
+                <div
+                  className="
+                    border-t
+                    border-border
+                    px-4
+                    py-2.5
+                  "
+                >
+                  <button
+                    type="button"
+                    className="
+                      text-xs
+                      font-medium
+                      text-primary-600
+                      hover:text-primary-700
+                      dark:text-primary-400
+                    "
+                  >
+                    Mark all as read
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* -------------------------------------------------
+              THEME
+          ------------------------------------------------- */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={
+              isDark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+            }
+            title={
+              isDark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+            }
+            className="
+              flex
+              h-10
+              w-10
+              items-center
+              justify-center
+              rounded-lg
+              text-ink-muted
+              transition-colors
+              hover:bg-surface-2
+              hover:text-ink
+            "
+          >
+            {isDark ? (
+              <SunIcon className="h-[19px] w-[19px]" />
+            ) : (
+              <MoonIcon className="h-[19px] w-[19px]" />
+            )}
           </button>
 
-          <div ref={searchRef} className="relative flex-1 max-w-sm mx-3 sm:mx-6">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onFocus={() => setSearchOpen(true)}
-              placeholder="Search workspaces..."
-              className="w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+          {/* -------------------------------------------------
+              SEPARATOR
+          ------------------------------------------------- */}
+          <div className="mx-1 h-6 w-px bg-border" />
 
-            {searchOpen && searchTerm.trim() && (
-              <div className="absolute left-0 right-0 top-full mt-2 rounded-xl border border-border bg-surface shadow-panel z-50 max-h-72 overflow-y-auto">
-                {searchResults.length > 0 ? (
-                  searchResults.map((ws) => (
-                    <button
-                      key={ws._id}
-                      type="button"
-                      onClick={() => handleSelectWorkspace(ws._id)}
-                      className="block w-full truncate px-4 py-2 text-left text-sm text-ink hover:bg-surface-2"
-                    >
-                      {ws.name}
-                    </button>
-                  ))
-                ) : (
-                  <p className="px-4 py-3 text-sm text-ink-muted">No workspaces match "{searchTerm}"</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {pendingInvitations.length > 0 && (
-              <RouterLink
-                to="/invitations"
-                className="relative p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2"
-              >
-                <BellIcon className="h-5 w-5" />
-                <Badge
-                  variant="danger"
-                  size="xs"
-                  className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 flex items-center justify-center"
-                >
-                  {pendingInvitations.length}
-                </Badge>
-              </RouterLink>
-            )}
-
-            <Dropdown
-              trigger={
-                <button className="flex items-center gap-2 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                  <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                    {user?.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      initials
-                    )}
-                  </div>
-                  <span className="hidden md:block text-ink">{user?.name || 'User'}</span>
-                  <ChevronDownIcon className="hidden md:block h-4 w-4 text-ink-muted" />
-                </button>
-              }
+          {/* =================================================
+              PROFILE
+          ================================================= */}
+          <div
+            ref={profileRef}
+            className="relative"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setProfileOpen((current) => !current);
+                setNotificationsOpen(false);
+              }}
+              aria-expanded={profileOpen}
+              className="
+                flex
+                h-9
+                items-center
+                gap-2
+                rounded-lg
+                px-1
+                transition-colors
+                hover:bg-surface-2
+              "
             >
-              <div className="py-1">
-                <RouterLink to="/profile" className="block px-4 py-2 text-sm text-ink hover:bg-surface-2">
-                  My Profile
-                </RouterLink>
-                {pendingInvitations.length > 0 && (
-                  <RouterLink to="/invitations" className="block px-4 py-2 text-sm text-ink hover:bg-surface-2">
-                    <div className="flex items-center justify-between">
-                      <span>Invitations</span>
-                      <Badge variant="danger" size="xs">{pendingInvitations.length}</Badge>
-                    </div>
-                  </RouterLink>
-                )}
-                <hr className="my-1 border-border" />
-                <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-ink hover:bg-surface-2">
-                  Sign Out
+              {/* Avatar */}
+              <span
+                className="
+                  flex
+                  h-8
+                  w-8
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-primary-100
+                  text-[11px]
+                  font-semibold
+                  text-primary-700
+                  dark:bg-primary-900/50
+                  dark:text-primary-300
+                "
+              >
+                {initials}
+              </span>
+
+              {/* User */}
+              <span className="hidden max-w-[110px] truncate text-left text-sm font-medium text-ink sm:block">
+                {displayName}
+              </span>
+
+              <ChevronDownIcon
+                className="
+                  h-3.5
+                  w-3.5
+                  shrink-0
+                  text-ink-muted
+                "
+              />
+            </button>
+
+            {/* Profile dropdown */}
+            {profileOpen && (
+              <div
+                className="
+                  absolute
+                  right-0
+                  top-[calc(100%+10px)]
+                  w-60
+                  overflow-hidden
+                  rounded-xl
+                  border
+                  border-border
+                  bg-surface
+                  shadow-lg
+                "
+              >
+                <div className="border-b border-border px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-ink">
+                    {displayName}
+                  </p>
+
+                  <p className="mt-0.5 truncate text-xs text-ink-muted">
+                    {email}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate('/profile');
+                  }}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-2.5
+                    px-4
+                    py-2.5
+                    text-left
+                    text-sm
+                    text-ink
+                    hover:bg-surface-2
+                  "
+                >
+                  <UserCircleIcon className="h-4 w-4 text-ink-muted" />
+                  Profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-2.5
+                    border-t
+                    border-border
+                    px-4
+                    py-2.5
+                    text-left
+                    text-sm
+                    text-red-600
+                    hover:bg-red-50
+                    dark:hover:bg-red-950/20
+                  "
+                >
+                  Sign out
                 </button>
               </div>
-            </Dropdown>
-
-            <ThemeToggle />
+            )}
           </div>
         </div>
-      ) : (
-        <div className="flex items-center justify-between w-full">
-          <RouterLink to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-            <span className="text-lg font-bold text-ink">DocManager</span>
-          </RouterLink>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Sign In</Button>
-            <Button size="sm" onClick={() => navigate('/register')}>Sign Up</Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      )}
-    </nav>
+      </div>
+    </header>
   );
 };
 
