@@ -1,4 +1,3 @@
-// src/store/slices/authSlice.js - FIXED Authentication Redux Slice
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import jwtDecode from 'jwt-decode';
 import { userApi } from '../../services/apiService';
@@ -48,17 +47,20 @@ export const validateToken = createAsyncThunk(
       // Verify with backend
       try {
         const profileResponse = await userApi.getProfile();
+        const profile = profileResponse?.data || profileResponse;
 
         const userData = {
           id: decoded.id,
-          name: decoded.name || profileResponse.name,
-          email: decoded.email || profileResponse.email,
-          role: decoded.role || profileResponse.role,
+          name: decoded.name || profile.name,
+          email: decoded.email || profile.email,
+          role: decoded.role || profile.role,
+          avatar: profile.avatar || 'avatar-01',
+          createdAt: profile.createdAt,
           // Without this, isGuest silently disappears on every refresh —
           // it's set correctly right after guest-login, but validateToken
           // (which runs on every page load) rebuilds the user object from
           // scratch and was never copying this field across.
-          isGuest: profileResponse.isGuest || false
+          isGuest: profile.isGuest || false
         };
 
         return {
@@ -105,7 +107,9 @@ export const loginUser = createAsyncThunk(
         id: decoded.id || data.user?.id,
         name: decoded.name || data.user?.name,
         email: decoded.email || data.user?.email,
-        role: decoded.role || data.user?.role
+        role: decoded.role || data.user?.role,
+        avatar: data.user?.avatar || 'avatar-01',
+        createdAt: data.user?.createdAt
       };
 
       return {
@@ -144,6 +148,8 @@ export const guestLoginUser = createAsyncThunk(
         name: decoded.name || data.user?.name,
         email: decoded.email || data.user?.email,
         role: decoded.role || data.user?.role,
+        avatar: data.user?.avatar || 'avatar-01',
+        createdAt: data.user?.createdAt,
         isGuest: true
       };
 

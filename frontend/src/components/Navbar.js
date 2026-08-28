@@ -1,37 +1,27 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bars3Icon,
-  MagnifyingGlassIcon,
-  BellIcon,
-  SunIcon,
-  MoonIcon,
-  ChevronDownIcon,
-  DocumentTextIcon,
-  UserCircleIcon,
-  CheckCircleIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+  Menu,
+  Search,
+  Sun,
+  Moon,
+  ChevronDown,
+  FileText,
+  UserCircle,
+} from 'lucide-react';
 
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
-import { useWorkspaces } from '../hooks/useWorkspaces';
+import { UserAvatar } from '../components/ui/Avatar';
 
-// onMenuClick opens the Sidebar's mobile drawer (components/layout/Sidebar.jsx) —
-// required on small screens since Sidebar's own rail is desktop-only (md:flex).
 const Navbar = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { searchWorkspaces } = useWorkspaces();
 
   const [search, setSearch] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const searchRef = useRef(null);
-  const notificationRef = useRef(null);
   const profileRef = useRef(null);
 
   const isDark = theme === 'dark';
@@ -39,49 +29,6 @@ const Navbar = ({ onMenuClick }) => {
   const displayName = user?.name || 'Guest';
   const email = user?.email || 'guest@edmsdemo.com';
 
-  const initials =
-    displayName
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase() || 'G';
-
-  /*
-   * ----------------------------------------------------
-   * Close dropdowns when clicking outside
-   * ----------------------------------------------------
-   */
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        notificationRef.current &&
-        !notificationRef.current.contains(event.target)
-      ) {
-        setNotificationsOpen(false);
-      }
-
-      if (
-        profileRef.current &&
-        !profileRef.current.contains(event.target)
-      ) {
-        setProfileOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  /*
-   * ----------------------------------------------------
-   * Search
-   * ----------------------------------------------------
-   */
   const handleSearch = (event) => {
     event.preventDefault();
 
@@ -89,18 +36,9 @@ const Navbar = ({ onMenuClick }) => {
 
     if (!value) return;
 
-    /*
-     * Replace this with your actual document search route/API
-     * when the backend search endpoint is available.
-     */
     navigate(`/documents?search=${encodeURIComponent(value)}`);
   };
 
-  /*
-   * ----------------------------------------------------
-   * Logout
-   * ----------------------------------------------------
-   */
   const handleLogout = async () => {
     setProfileOpen(false);
 
@@ -114,66 +52,86 @@ const Navbar = ({ onMenuClick }) => {
   return (
     <header
       className="
-        sticky
-        top-0
-        z-50
-        h-16
-        w-full
-        border-b
-        border-border
-        bg-surface
+        sticky top-0 z-50
+        h-16 w-full
+        
+        bg-surface/95
+        backdrop-blur
       "
     >
-      <div
-        className="flex h-full w-full items-center px-6"
-      >
-        {/* =================================================
-            LEFT — WORKSPACE / APP ICON
-        ================================================= */}
-        <div className="w-56 shrink-0">
+      <div className="relative flex h-full w-full items-center px-4 sm:px-5 lg:px-6">
+        {/* Mobile navigation */}
+        <div className="flex min-w-0 items-center md:hidden">
           <button
             type="button"
-            onClick={() => navigate('/')}
-            aria-label="Workspace"
-            className="flex items-center gap-2 text-ink"
+            onClick={onMenuClick}
+            aria-label="Open menu"
+            className="
+              mr-2 flex h-9 w-9 shrink-0 items-center justify-center
+              rounded-lg text-ink-muted
+              transition-colors duration-150
+              hover:bg-surface-2 hover:text-ink
+              focus-visible:outline-none
+              focus-visible:ring-2 focus-visible:ring-primary-500
+              focus-visible:ring-offset-2
+              focus-visible:ring-offset-surface
+            "
           >
-            <DocumentTextIcon className="h-5 w-5" />
-            <span className="text-sm font-semibold tracking-tight">DocManager</span>
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            aria-label="Go to dashboard"
+            className="
+              inline-flex min-w-0 items-center gap-2.5
+              rounded-lg px-1.5 py-1.5
+              text-ink
+              transition-colors duration-150
+              hover:bg-surface-2
+              focus-visible:outline-none
+              focus-visible:ring-2 focus-visible:ring-primary-500
+              focus-visible:ring-offset-2
+              focus-visible:ring-offset-surface
+            "
+          >
+            <span
+              className="
+                flex h-8 w-8 shrink-0 items-center justify-center
+                rounded-lg bg-primary-50 text-primary-700
+                dark:bg-primary-950/60 dark:text-primary-300
+              "
+              aria-hidden="true"
+            >
+              <FileText className="h-[17px] w-[17px]" />
+            </span>
+
+            <span className="truncate text-[15px] font-semibold tracking-tight">
+              DocManager
+            </span>
           </button>
         </div>
 
-        {/* =================================================
-            RIGHT — UTILITY CONTROLS
-        ================================================= */}
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-
-          {/* -------------------------------------------------
-              SEARCH
-          ------------------------------------------------- */}
-          <form onSubmit={handleSearch} className="hidden w-full max-w-md sm:block">
+        <div className="absolute left-1/2 hidden -translate-x-1/2 sm:block">
+          <form onSubmit={handleSearch} className="w-[min(520px,calc(100vw-22rem))]">
             <div
               className="
-                flex
-                h-10
-                w-full
-                items-center
-                rounded-lg
-                border
-                border-border
-                bg-surface-2/40
-                transition-colors
-                focus-within:border-primary-400
+                flex h-10 w-full items-center
+                rounded-xl
+                border border-border
+                bg-surface-2/50
+                px-1
+                transition-colors duration-150
+                focus-within:border-primary-300
                 focus-within:bg-surface
+                focus-within:ring-2
+                focus-within:ring-primary-500/10
               "
             >
-              <MagnifyingGlassIcon
-                className="
-                  ml-3
-                  h-[17px]
-                  w-[17px]
-                  shrink-0
-                  text-ink-muted
-                "
+              <Search
+                className="ml-2.5 h-[17px] w-[17px] shrink-0 text-ink-muted"
+                aria-hidden="true"
               />
 
               <input
@@ -182,41 +140,25 @@ const Navbar = ({ onMenuClick }) => {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search documents..."
-               className="
-  min-w-0
-  flex-1
-  border-0
-  bg-transparent
-  px-2
-  text-sm
-  text-ink
-  outline-none
-  ring-0
-  focus:border-0
-  focus:outline-none
-  focus:ring-0
-  appearance-none
-  placeholder:text-ink-muted
-"
+                className="
+                  min-w-0 flex-1
+                  border-0 bg-transparent
+                  px-2.5
+                  text-sm text-ink
+                  outline-none ring-0
+                  placeholder:text-ink-muted
+                  focus:border-0 focus:outline-none focus:ring-0
+                  appearance-none
+                "
                 aria-label="Search documents"
               />
 
               <kbd
                 className="
-                  mr-1.5
-                  hidden
-                  h-5
-                  min-w-5
-                  items-center
-                  justify-center
-                  rounded
-                  border
-                  border-border
-                  bg-surface
-                  px-1
-                  text-[10px]
-                  font-medium
-                  text-ink-muted
+                  mr-1.5 hidden h-6 min-w-6 items-center justify-center
+                  rounded-md border border-border
+                  bg-surface px-1.5
+                  text-[10px] font-medium text-ink-muted
                   lg:flex
                 "
               >
@@ -224,444 +166,173 @@ const Navbar = ({ onMenuClick }) => {
               </kbd>
             </div>
           </form>
+        </div>
 
-          {/* -------------------------------------------------
-              SEPARATOR
-          ------------------------------------------------- */}
-          <div className="mx-1 h-6 w-px bg-border" />
-
-          {/* =================================================
-              NOTIFICATIONS
-          ================================================= */}
+        {/* Mobile search */}
+        <form
+          onSubmit={handleSearch}
+          className="ml-auto min-w-0 flex-1 sm:hidden"
+        >
           <div
-            ref={notificationRef}
-            className="relative"
+            className="
+              ml-2 flex h-9 items-center
+              rounded-lg border border-border
+              bg-surface-2/50 px-1
+              focus-within:border-primary-300
+              focus-within:bg-surface
+              focus-within:ring-2 focus-within:ring-primary-500/10
+            "
           >
-            <button
-              type="button"
-              onClick={() => {
-                setNotificationsOpen((current) => !current);
-                setProfileOpen(false);
-              }}
-              aria-label="Notifications"
-              aria-expanded={notificationsOpen}
+            <Search
+              className="ml-2 h-4 w-4 shrink-0 text-ink-muted"
+              aria-hidden="true"
+            />
+
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search"
               className="
-                relative
-                flex
-                h-10
-                w-10
-                items-center
-                justify-center
-                rounded-lg
-                text-ink-muted
-                transition-colors
-                hover:bg-surface-2
-                hover:text-ink
+                min-w-0 flex-1 border-0 bg-transparent
+                px-2 text-sm text-ink outline-none ring-0
+                placeholder:text-ink-muted focus:border-0
+                focus:outline-none focus:ring-0
               "
-            >
-              <BellIcon className="h-[19px] w-[19px]" />
-
-              {/* Unread indicator */}
-              <span
-                className="
-                  absolute
-                  right-[7px]
-                  top-[6px]
-                  h-1.5
-                  w-1.5
-                  rounded-full
-                  bg-primary-600
-                  ring-2
-                  ring-surface
-                "
-              />
-            </button>
-
-            {/* Notification dropdown */}
-            {notificationsOpen && (
-              <div
-                className="
-                  absolute
-                  right-0
-                  top-[calc(100%+10px)]
-                  w-[360px]
-                  overflow-hidden
-                  rounded-xl
-                  border
-                  border-border
-                  bg-surface
-                  shadow-lg
-                "
-              >
-                {/* Header */}
-                <div
-                  className="
-                    flex
-                    h-12
-                    items-center
-                    justify-between
-                    border-b
-                    border-border
-                    px-4
-                  "
-                >
-                  <div>
-                    <h3 className="text-sm font-semibold text-ink">
-                      Notifications
-                    </h3>
-
-                    <p className="text-[11px] text-ink-muted">
-                      Recent activity
-                    </p>
-                  </div>
-
-
-                </div>
-
-                {/* Notification list */}
-                <div className="max-h-[340px] overflow-y-auto">
-
-                  {/* Notification 1 */}
-                  <button
-                    type="button"
-                    className="
-                      flex
-                      w-full
-                      gap-3
-                      border-b
-                      border-border
-                      px-4
-                      py-3.5
-                      text-left
-                      transition-colors
-                      hover:bg-surface-2
-                    "
-                  >
-                    <span
-                      className="
-                        flex
-                        h-8
-                        w-8
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-full
-                        bg-primary-50
-                        text-primary-600
-                        dark:bg-primary-950/40
-                      "
-                    >
-                      <DocumentTextIcon className="h-4 w-4" />
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-medium text-ink">
-                        Document requires review
-                      </span>
-
-                      <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
-                        Annual compliance report is waiting for your review.
-                      </span>
-
-                      <span className="mt-1.5 block text-[10px] text-ink-muted">
-                        12 minutes ago
-                      </span>
-                    </span>
-
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-600" />
-                  </button>
-
-                  {/* Notification 2 */}
-                  <button
-                    type="button"
-                    className="
-                      flex
-                      w-full
-                      gap-3
-                      border-b
-                      border-border
-                      px-4
-                      py-3.5
-                      text-left
-                      transition-colors
-                      hover:bg-surface-2
-                    "
-                  >
-                    <span
-                      className="
-                        flex
-                        h-8
-                        w-8
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-full
-                        bg-amber-50
-                        text-amber-600
-                        dark:bg-amber-950/30
-                      "
-                    >
-                      <ClockIcon className="h-4 w-4" />
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-medium text-ink">
-                        Deadline approaching
-                      </span>
-
-                      <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
-                        Vendor agreement is due tomorrow.
-                      </span>
-
-                      <span className="mt-1.5 block text-[10px] text-ink-muted">
-                        1 hour ago
-                      </span>
-                    </span>
-                  </button>
-
-                  {/* Notification 3 */}
-                  <button
-                    type="button"
-                    className="
-                      flex
-                      w-full
-                      gap-3
-                      px-4
-                      py-3.5
-                      text-left
-                      transition-colors
-                      hover:bg-surface-2
-                    "
-                  >
-                    <span
-                      className="
-                        flex
-                        h-8
-                        w-8
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-full
-                        bg-emerald-50
-                        text-emerald-600
-                        dark:bg-emerald-950/30
-                      "
-                    >
-                      <CheckCircleIcon className="h-4 w-4" />
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-medium text-ink">
-                        Document approved
-                      </span>
-
-                      <span className="mt-0.5 block text-[11px] leading-4 text-ink-muted">
-                        Q3 policy document was approved by the reviewer.
-                      </span>
-
-                      <span className="mt-1.5 block text-[10px] text-ink-muted">
-                        3 hours ago
-                      </span>
-                    </span>
-                  </button>
-                </div>
-
-                {/* Footer */}
-                <div
-                  className="
-                    border-t
-                    border-border
-                    px-4
-                    py-2.5
-                  "
-                >
-                  <button
-                    type="button"
-                    className="
-                      text-xs
-                      font-medium
-                      text-primary-600
-                      hover:text-primary-700
-                      dark:text-primary-400
-                    "
-                  >
-                    Mark all as read
-                  </button>
-                </div>
-              </div>
-            )}
+              aria-label="Search documents"
+            />
           </div>
+        </form>
 
-          {/* -------------------------------------------------
-              THEME
-          ------------------------------------------------- */}
+        {/* Right controls */}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={toggleTheme}
             aria-label={
-              isDark
-                ? 'Switch to light mode'
-                : 'Switch to dark mode'
+              isDark ? 'Switch to light mode' : 'Switch to dark mode'
             }
-            title={
-              isDark
-                ? 'Switch to light mode'
-                : 'Switch to dark mode'
-            }
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             className="
-              flex
-              h-10
-              w-10
-              items-center
-              justify-center
-              rounded-lg
-              text-ink-muted
-              transition-colors
-              hover:bg-surface-2
-              hover:text-ink
+              flex h-9 w-9 shrink-0 items-center justify-center
+              rounded-lg text-ink-muted
+              transition-colors duration-150
+              hover:bg-surface-2 hover:text-ink
+              focus-visible:outline-none
+              focus-visible:ring-2 focus-visible:ring-primary-500
+              focus-visible:ring-offset-2
+              focus-visible:ring-offset-surface
             "
           >
             {isDark ? (
-              <SunIcon className="h-[19px] w-[19px]" />
+              <Sun className="h-[18px] w-[18px]" aria-hidden="true" />
             ) : (
-              <MoonIcon className="h-[19px] w-[19px]" />
+              <Moon className="h-[18px] w-[18px]" aria-hidden="true" />
             )}
           </button>
 
-          {/* -------------------------------------------------
-              SEPARATOR
-          ------------------------------------------------- */}
-          <div className="mx-1 h-6 w-px bg-border" />
-
-          {/* =================================================
-              PROFILE
-          ================================================= */}
           <div
-            ref={profileRef}
-            className="relative"
-          >
+            className="mx-1 hidden h-5 w-px bg-border sm:block"
+            aria-hidden="true"
+          />
+
+          <div ref={profileRef} className="relative">
             <button
               type="button"
-              onClick={() => {
-                setProfileOpen((current) => !current);
-                setNotificationsOpen(false);
-              }}
+              onClick={() => setProfileOpen((current) => !current)}
               aria-expanded={profileOpen}
+              aria-haspopup="menu"
               className="
-                flex
-                h-9
-                items-center
-                gap-2
-                rounded-lg
-                px-1
-                transition-colors
+                flex h-10 items-center gap-2
+                rounded-xl px-1.5
+                transition-colors duration-150
                 hover:bg-surface-2
+                focus-visible:outline-none
+                focus-visible:ring-2 focus-visible:ring-primary-500
+                focus-visible:ring-offset-2
+                focus-visible:ring-offset-surface
               "
             >
-              {/* Avatar */}
-              <span
-                className="
-                  flex
-                  h-8
-                  w-8
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-primary-100
-                  text-[11px]
-                  font-semibold
-                  text-primary-700
-                  dark:bg-primary-900/50
-                  dark:text-primary-300
-                "
-              >
-                {initials}
-              </span>
+              <UserAvatar user={user} size="sm" />
 
-              {/* User */}
-              <span className="hidden max-w-[110px] truncate text-left text-sm font-medium text-ink sm:block">
+              <span className="hidden max-w-[130px] truncate text-left text-sm font-medium text-ink sm:block">
                 {displayName}
               </span>
 
-              <ChevronDownIcon
-                className="
-                  h-3.5
-                  w-3.5
-                  shrink-0
-                  text-ink-muted
-                "
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-ink-muted transition-transform duration-150 ${
+                  profileOpen ? 'rotate-180' : ''
+                }`}
+                aria-hidden="true"
               />
             </button>
 
-            {/* Profile dropdown */}
             {profileOpen && (
               <div
+                role="menu"
                 className="
-                  absolute
-                  right-0
-                  top-[calc(100%+10px)]
-                  w-60
-                  overflow-hidden
+                  absolute right-0 top-[calc(100%+8px)] z-50
+                  w-64 overflow-hidden
                   rounded-xl
-                  border
-                  border-border
+                  
                   bg-surface
-                  shadow-lg
+                  shadow-panel
                 "
               >
-                <div className="border-b border-border px-4 py-3">
-                  <p className="truncate text-sm font-semibold text-ink">
-                    {displayName}
-                  </p>
+                <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+                  <UserAvatar user={user} size="sm" />
 
-                  <p className="mt-0.5 truncate text-xs text-ink-muted">
-                    {email}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">
+                      {displayName}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-ink-muted">
+                      {email}
+                    </p>
+                  </div>
                 </div>
 
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={() => {
                     setProfileOpen(false);
                     navigate('/profile');
                   }}
                   className="
-                    flex
-                    w-full
-                    items-center
-                    gap-2.5
-                    px-4
-                    py-2.5
-                    text-left
-                    text-sm
-                    text-ink
+                    flex w-full items-center gap-2.5
+                    px-4 py-2.5 text-left text-sm text-ink
+                    transition-colors duration-150
                     hover:bg-surface-2
+                    focus-visible:outline-none
+                    focus-visible:bg-surface-2
                   "
                 >
-                  <UserCircleIcon className="h-4 w-4 text-ink-muted" />
+                  <UserCircle
+                    className="h-4 w-4 text-ink-muted"
+                    aria-hidden="true"
+                  />
                   Profile
                 </button>
 
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={handleLogout}
                   className="
-                    flex
-                    w-full
-                    items-center
-                    gap-2.5
-                    border-t
-                    border-border
-                    px-4
-                    py-2.5
-                    text-left
-                    text-sm
-                    text-red-600
-                    hover:bg-red-50
-                    dark:hover:bg-red-950/20
+                    flex w-full items-center gap-2.5
+                    border-t border-border
+                    px-4 py-2.5 text-left text-sm text-danger
+                    transition-colors duration-150
+                    hover:bg-danger-subtle/50
+                    focus-visible:outline-none
+                    focus-visible:bg-danger-subtle/50
                   "
                 >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-danger"
+                    aria-hidden="true"
+                  />
                   Sign out
                 </button>
               </div>

@@ -457,7 +457,7 @@ const Calendar = () => {
 
       {/* Selected-day overlay */}
       {selectedDayEvents && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/20 p-4 sm:items-center">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-overlay/20 p-4 sm:items-center">
           <div
             role="dialog"
             aria-modal="true"

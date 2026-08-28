@@ -66,9 +66,7 @@ const FEATURES = [
   },
 ];
 
-const scrollToFeatures = () => {
-  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-};
+
 
 // Small illustrative mock of the real DocumentRow/StatusPill/Avatar UI \u2014
 // this is what the product actually looks like, not a stock screenshot.
@@ -242,49 +240,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-                <span className="text-lg font-bold text-ink">DocManager</span>
-              </div>
-              <p className="text-ink-muted text-sm">Document review, tracked from draft to approved.</p>
-            </div>
-            <div>
-              <h3 className="text-ink font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-ink-muted text-sm">
-                <li>
-                  <button onClick={scrollToFeatures} className="hover:text-ink transition-colors">
-                    Features
-                  </button>
-                </li>
-                <li><a href="#pricing" className="hover:text-ink transition-colors">Pricing</a></li>
-                <li><a href="#security" className="hover:text-ink transition-colors">Security</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-ink font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-ink-muted text-sm">
-                <li><a href="#about" className="hover:text-ink transition-colors">About</a></li>
-                <li><a href="#contact" className="hover:text-ink transition-colors">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-ink font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-ink-muted text-sm">
-                <li><a href="#privacy" className="hover:text-ink transition-colors">Privacy</a></li>
-                <li><a href="#terms" className="hover:text-ink transition-colors">Terms</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-8 pt-8 border-t border-border text-center text-ink-muted text-sm">
-            <p>&copy; 2026 DocManager. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+
     </div>
   );
 };

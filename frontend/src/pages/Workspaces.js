@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Search, Plus, FolderKanban, ChevronRight, Settings } from 'lucide-react';
 
 import { useWorkspaces } from '../hooks/useWorkspaces';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
-import Modal from '../components/ui/Modal';
-import Table from '../components/ui/Table';
+import CreateWorkspaceModal from '../components/workspace/CreateWorkspaceModal';
 
 const getInitials = (name = '') => {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -40,14 +40,16 @@ const Workspaces = () => {
     createWorkspace,
     pagination,
     setCurrentPage,
+    loading: workspaceActionLoading,
   } = useWorkspaces();
 
   const [searchInput, setSearchInput] = useState(filters.search || '');
   const [isCreating, setIsCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [createError, setCreateError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+
+  // Search-filtered results live separately from the canonical `workspaces` list
+  // (which Sidebar reads globally) — see workspaceSlice.js fetchWorkspaces reducer.
+  const searchResults = useSelector((state) => state.workspaces.searchResults);
+  const workspaceCards = searchResults ?? workspaces;
 
   useEffect(() => {
     fetchWorkspaces();
@@ -66,113 +68,8 @@ const Workspaces = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
-  const handleCreate = async () => {
-    setCreateError('');
-    setIsSaving(true);
+  const closeCreateModal = () => setIsCreating(false);
 
-    try {
-      await createWorkspace({
-        name: newName.trim(),
-        description: newDescription.trim(),
-      });
-
-      setNewName('');
-      setNewDescription('');
-      setIsCreating(false);
-    } catch (error) {
-      setCreateError(error.message || 'Failed to create workspace');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const cancelCreate = () => {
-    setIsCreating(false);
-    setNewName('');
-    setNewDescription('');
-    setCreateError('');
-  };
-
-  const columns = [
-    {
-      key: 'name',
-      label: 'Name',
-      render: (workspace) => (
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="icon-badge icon-badge-3 h-9 w-9 text-xs font-semibold">
-            {getInitials(workspace.name)}
-          </div>
-
-          <div className="min-w-0">
-            <p className="truncate font-medium text-ink">
-              {workspace.name}
-            </p>
-
-            <p className="truncate text-xs text-ink-muted">
-              {workspace.settings?.isPublic ? 'Shared' : 'Private'}
-            </p>
-          </div>
-        </div>
-      ),
-    },
-
-    {
-      key: 'role',
-      label: 'Role',
-      render: (workspace) => (
-        <Badge variant="primary" size="sm" className="capitalize">
-          {workspace.userRole || '—'}
-        </Badge>
-      ),
-    },
-
-    {
-      key: 'members',
-      label: 'Members',
-      align: 'center',
-      render: (workspace) => workspace.memberCount ?? 0,
-    },
-
-    {
-      key: 'documents',
-      label: 'Documents',
-      align: 'center',
-      render: (workspace) => workspace.documentCount ?? 0,
-    },
-
-    {
-      key: 'updated',
-      label: 'Updated',
-      align: 'right',
-      render: (workspace) => formatUpdated(workspace.updatedAt),
-    },
-
-    {
-      key: 'actions',
-      label: '',
-      align: 'right',
-      render: (workspace) => (
-        <div className="flex items-center justify-end gap-1">
-          {(workspace.userRole === 'admin' ||
-            workspace.userRole === 'owner') && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/workspaces/${workspace._id}/settings`);
-              }}
-              className="rounded-md p-1.5 text-ink-muted hover:bg-surface-2 hover:text-ink"
-              aria-label={`Settings for ${workspace.name}`}
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-          )}
-
-          <ChevronRight className="h-4 w-4 text-ink-muted" />
-        </div>
-      ),
-    },
-  ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -181,8 +78,6 @@ const Workspaces = () => {
           <h1 className="text-2xl font-bold text-ink">
             Workspaces
           </h1>
-
-        
         </div>
 
         <Button
@@ -203,18 +98,34 @@ const Workspaces = () => {
       </div>
 
       {isLoading && !hasWorkspaces ? (
-        <div className="card overflow-hidden">
-          {[1, 2, 3].map((item) => (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {[1, 2, 3, 4].map((item) => (
             <div
               key={item}
-              className="flex items-center gap-3 border-b border-border px-5 py-4 last:border-0"
+              className="card min-h-[220px] p-5"
+              aria-hidden="true"
             >
-              <div className="h-9 w-9 shrink-0 animate-pulse rounded-lg bg-surface-2" />
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="h-11 w-11 shrink-0 animate-pulse rounded-xl bg-surface-2" />
 
-              <div className="flex-1 space-y-2">
-                <div className="h-3.5 w-1/4 animate-pulse rounded bg-surface-2" />
-                <div className="h-3 w-1/6 animate-pulse rounded bg-surface-2" />
+                  <div className="min-w-0 space-y-2">
+                    <div className="h-4 w-32 animate-pulse rounded bg-surface-2" />
+                    <div className="h-3 w-20 animate-pulse rounded bg-surface-2" />
+                  </div>
+                </div>
+
+                <div className="h-8 w-8 animate-pulse rounded-lg bg-surface-2" />
               </div>
+
+              <div className="mt-6 h-10 w-full animate-pulse rounded-xl bg-surface-2" />
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="h-14 animate-pulse rounded-xl bg-surface-2" />
+                <div className="h-14 animate-pulse rounded-xl bg-surface-2" />
+              </div>
+
+              <div className="mt-5 h-3 w-24 animate-pulse rounded bg-surface-2" />
             </div>
           ))}
         </div>
@@ -238,13 +149,176 @@ const Workspaces = () => {
           </Button>
         </div>
       ) : (
-        <Table
-          columns={columns}
-          data={workspaces}
-          onRowClick={(workspace) =>
-            navigate(`/workspaces/${workspace._id}`)
-          }
-        />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {workspaceCards.map((workspace) => {
+            const isPrivate = !workspace.settings?.isPublic;
+            const canManage =
+              workspace.userRole === 'admin' ||
+              workspace.userRole === 'owner';
+
+            return (
+              <article
+                key={workspace._id}
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  navigate(`/workspaces/${workspace._id}`)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    navigate(`/workspaces/${workspace._id}`);
+                  }
+                }}
+       className="
+  card
+  group
+  flex
+  min-h-[220px]
+  cursor-pointer
+  flex-col
+  p-5
+  transition-colors
+  duration-150
+
+  focus-visible:outline-none
+  focus-visible:ring-2
+  focus-visible:ring-primary-500
+  focus-visible:ring-offset-2
+  focus-visible:ring-offset-bg
+  dark:hover:border-primary-800
+  dark:hover:bg-primary-950/30
+"
+              >
+                {/* Identity / actions */}
+                <div className="flex min-w-0 items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
+                      className="icon-badge icon-badge-3 h-11 w-11 text-xs font-semibold"
+                      aria-hidden="true"
+                    >
+                      {getInitials(workspace.name)}
+                    </div>
+
+                    <div className="min-w-0">
+                      <h2
+                        title={workspace.name}
+                        className="truncate text-base font-semibold tracking-tight text-ink"
+                      >
+                        {workspace.name}
+                      </h2>
+
+                      <p className="mt-0.5 text-xs text-ink-muted">
+                        {isPrivate ? 'Private workspace' : 'Shared workspace'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(
+                            `/workspaces/${workspace._id}/settings`
+                          );
+                        }}
+                        className="
+                          flex
+                          h-8
+                          w-8
+                          items-center
+                          justify-center
+                          rounded-lg
+                          text-ink-muted
+                          transition-colors
+                          hover:bg-surface-2
+                          hover:text-ink
+                          focus-visible:outline-none
+                          focus-visible:ring-2
+                        "
+                        aria-label={`Settings for ${workspace.name}`}
+                      >
+                        <Settings
+                          className="h-4 w-4"
+                          aria-hidden="true"
+                        />
+                      </button>
+                    )}
+
+                    <span
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-ink-muted
+                        transition-all
+                        group-hover:bg-surface-2
+                        group-hover:text-primary-700
+                      "
+                      aria-hidden="true"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* Access */}
+                <div className="mt-5 flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+                    Access
+                  </span>
+
+                  <Badge
+                    variant="primary"
+                    size="sm"
+                    className="capitalize"
+                  >
+                    {workspace.userRole || '—'}
+                  </Badge>
+                </div>
+
+                {/* Metrics */}
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="card-nested rounded-xl p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                      Documents
+                    </p>
+
+                    <p className="mt-1 font-mono text-lg font-semibold leading-none tabular-nums text-ink">
+                      {workspace.documentCount ?? 0}
+                    </p>
+                  </div>
+
+                  <div className="card-nested rounded-xl p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                      Members
+                    </p>
+
+                    <p className="mt-1 font-mono text-lg font-semibold leading-none tabular-nums text-ink">
+                      {workspace.memberCount ?? 0}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Footer metadata */}
+                <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                  <span className="text-xs text-ink-muted">
+                    Updated {formatUpdated(workspace.updatedAt)}
+                  </span>
+
+                  <span className="text-xs font-medium text-primary-700 transition-transform group-hover:translate-x-0.5 dark:text-primary-300">
+                    Open workspace →
+                  </span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       )}
 
       {pagination.totalPages > 1 && (
@@ -275,69 +349,12 @@ const Workspaces = () => {
         </div>
       )}
 
-      <Modal
+      <CreateWorkspaceModal
         isOpen={isCreating}
-        onClose={cancelCreate}
-        title="Create workspace"
-      >
-        <div className="px-6 pt-5 pb-4">
-          {createError && (
-            <p className="mb-4 rounded-lg bg-primary-50 px-3 py-2 text-sm text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
-              {createError}
-            </p>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink">
-                Workspace name
-                <span className="ml-1 text-primary-600">*</span>
-              </label>
-
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Consumer Legal Team"
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink">
-                Description
-                <span className="ml-1 font-normal text-ink-muted">
-                  (optional)
-                </span>
-              </label>
-
-              <textarea
-                className="input-field min-h-[88px] resize-none"
-                rows={3}
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Briefly describe what this workspace is for"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-          <Button
-            variant="outline"
-            onClick={cancelCreate}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            onClick={handleCreate}
-            disabled={isSaving || !newName.trim()}
-          >
-            {isSaving ? 'Creating...' : 'Create workspace'}
-          </Button>
-        </div>
-      </Modal>
+        onClose={closeCreateModal}
+        onCreateWorkspace={createWorkspace}
+        isLoading={workspaceActionLoading?.createWorkspace || false}
+      />
     </div>
   );
 };

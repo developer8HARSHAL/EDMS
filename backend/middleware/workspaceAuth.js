@@ -49,7 +49,8 @@ const checkWorkspaceAccess = (requiredPermissions = ['canView']) => {
             canEdit: true,
             canAdd: true,
             canDelete: true,
-            canInvite: true
+            canInvite: true,
+            canManageWorkflow: true
           }
         };
         return next();
@@ -227,7 +228,8 @@ const checkDocumentWorkspaceAccess = async (userId, documentId, requiredPermissi
             canEdit: true,
             canAdd: true,
             canDelete: true,
-            canInvite: true
+            canInvite: true,
+            canManageWorkflow: true
           }
         }
       };

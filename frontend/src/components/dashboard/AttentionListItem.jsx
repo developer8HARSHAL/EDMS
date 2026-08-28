@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusPill from '../documents/StatusPill';
+import Badge from '../ui/Badge';
 
 // Formats a due/expiry date as relative "in N days" / "N days overdue" text.
 // Returns null if the date is missing so the caller can decide what to show.
@@ -28,6 +29,21 @@ const AttentionListItem = ({ item }) => {
   const workspaceName = doc?.workspace?.name;
   const dueText = relativeDueText(doc?.dueDate || doc?.expiryDate);
 
+  // Only present on pendingReview items (see getDashboardData) — absent on
+  // upcomingDeadlines items, which this component also renders.
+  const attentionRole = item?.attentionRole;
+  const attentionAction = item?.attentionAction;
+  const ACTION_LABEL = { review: 'Review', approve: 'Approve' };
+
+  // The other person relevant to this queue item — whoever uploaded it (for a
+  // reviewer's queue) or whoever passed it along (for an approver's queue).
+  const counterpartName =
+    attentionRole === 'reviewer'
+      ? doc?.uploadedBy?.name
+      : attentionRole === 'approver'
+      ? doc?.workflow?.reviewer?.name
+      : null;
+
   const handleClick = () => {
     if (!docId) return;
     navigate(workspaceId ? `/workspaces/${workspaceId}/documents/${docId}` : `/documents/preview/${docId}`);
@@ -41,15 +57,22 @@ const AttentionListItem = ({ item }) => {
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-ink">{doc?.name || 'Untitled document'}</p>
-        {(workspaceName || dueText) && (
+        {(workspaceName || counterpartName || dueText) && (
           <p className="truncate text-xs text-ink-muted">
             {workspaceName}
-            {workspaceName && dueText ? ' · ' : ''}
+            {workspaceName && counterpartName ? ' · ' : ''}
+            {counterpartName && (attentionRole === 'reviewer' ? `From ${counterpartName}` : `Passed by ${counterpartName}`)}
+            {(workspaceName || counterpartName) && dueText ? ' · ' : ''}
             {dueText}
           </p>
         )}
       </div>
-      {doc?.status && <StatusPill status={doc.status} />}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {attentionAction && (
+          <Badge variant="primary" size="sm">{ACTION_LABEL[attentionAction]}</Badge>
+        )}
+        {doc?.status && <StatusPill status={doc.status} />}
+      </div>
     </button>
   );
 };

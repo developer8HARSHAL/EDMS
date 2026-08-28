@@ -19,6 +19,7 @@
         |-- validateObjectId.js
         |-- workspaceAuth.js
     |-- models
+        |-- documentHistoryModel.js
         |-- documentModel.js
         |-- userModel.js
         |-- workspaceInvitationModel.js
@@ -32,8 +33,10 @@
         |-- workspaceRoutes.js
     |-- scripts
         |-- resetGuestWorkspace.js
+        |-- seed-workflow-dashboard.js
         |-- seedCalendarTestData.js
         |-- seedTestMembers.js
+        |-- workflow_api_test.js
     |-- server.js
     |-- test
         |-- model-test.js
@@ -72,6 +75,7 @@
             |-- AuthStatus.js
             |-- dashboard
                 |-- AttentionListItem.jsx
+                |-- DashboardWidgets.jsx
                 |-- MetricTile.jsx
             |-- documents
                 |-- Breadcrumb.jsx
@@ -84,6 +88,7 @@
                 |-- ShareRow.jsx
                 |-- StatusPill.jsx
                 |-- StatusTransitionMenu.jsx
+                |-- WorkflowAssignmentPanel.jsx
             |-- EditDocumentModal.js
             |-- ErrorBoundary.jsx
             |-- layout
@@ -96,6 +101,7 @@
                 |-- RoleSelector.jsx
             |-- Navbar.js
             |-- NotFound.js
+            |-- Notifications.js
             |-- permissions
                 |-- PermissionGuard.jsx
                 |-- RoleBasedComponent.jsx
@@ -110,6 +116,7 @@
                 |-- EmptyState.jsx
                 |-- Input.jsx
                 |-- Modal.jsx
+                |-- Table.jsx
                 |-- ThemeToggle.jsx
             |-- WithAuth.js
             |-- workspace
@@ -122,6 +129,7 @@
         |-- hooks
             |-- redux.js
             |-- useAuth.js
+            |-- useDashboard.js
             |-- useDocuments.js
             |-- useInvitations.js
             |-- useWorkspaces.js
@@ -158,6 +166,7 @@
         |-- utils
             |-- .gitkeep
             |-- AuthUtils.js
+            |-- dashboardUtils.js
             |-- fileTypeStyles.js
     |-- tailwind.config.js
 |-- README.md

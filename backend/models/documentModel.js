@@ -68,21 +68,33 @@ const DocumentSchema = new mongoose.Schema({
     type: Number,
     default: 1
   },
-  // Document lifecycle status
+  // Document lifecycle status. 'final-review' added for the sequential
+  // approval redesign — it's a distinct stage from 'in-review': the reviewer
+  // has already passed it, and it's now waiting on the assigned approver's
+  // sign-off, not the reviewer's.
   status: {
     type: String,
-    enum: ['draft', 'in-review', 'approved'],
+    enum: ['draft', 'in-review', 'final-review', 'approved'],
     default: 'draft'
   },
-  // Users assigned to review this document. Per-document assignment,
-  // separate from workspace role (an editor isn't automatically a reviewer
-  // for every document — they have to be explicitly assigned).
-  reviewers: [
-    {
+  // Sequential approval routing — replaces the old reviewers[] array.
+  // Exactly one reviewer and one approver per document, not a pool of
+  // candidates. Both must be set before the document can leave 'draft'
+  // (enforced in the controller, not here — see updateDocumentStatus).
+  // Assigned by the workspace owner or a member with canManageWorkflow,
+  // not by whoever happens to be editing the document.
+  workflow: {
+    reviewer: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'User',
+      default: null
+    },
+    approver: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     }
-  ],
+  },
   // Set when status moves to 'approved'; used to lock further edits.
   approvedAt: {
     type: Date
@@ -136,7 +148,8 @@ DocumentSchema.index({ owner: 1 });
 DocumentSchema.index({ workspace: 1 });
 DocumentSchema.index({ 'permissions.user': 1 });
 DocumentSchema.index({ favoritedBy: 1 });
-DocumentSchema.index({ reviewers: 1 });
+DocumentSchema.index({ 'workflow.reviewer': 1 });
+DocumentSchema.index({ 'workflow.approver': 1 });
 DocumentSchema.index({ status: 1 });
 DocumentSchema.index({ workspace: 1, status: 1 });
 DocumentSchema.index({ dueDate: 1 });
@@ -349,8 +362,3 @@ DocumentSchema.set('toJSON', { virtuals: true });
 DocumentSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Document', DocumentSchema);
-
-
-
-
-

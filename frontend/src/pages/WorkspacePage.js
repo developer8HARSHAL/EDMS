@@ -4,7 +4,6 @@ import { useSelector } from 'react-redux';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import Avatar from '../components/ui/Avatar';
 import MetricTile from '../components/dashboard/MetricTile';
 import MemberList from '../components/members/MemberList';
 import InviteMemberModal from '../components/members/InviteMemberModal';
@@ -54,12 +53,11 @@ const WorkspacePage = () => {
     hasError: workspaceError,
     fetchWorkspace,
     getUserRole,
-    getUserPermissions,
     updateMemberRole,
     removeMember,
   } = useWorkspaces();
 
-  const { recentActivity, fetchWorkspaceDocuments, fetchWorkspaceStats, fetchRecentActivity } = useDocuments(workspaceId);
+  const { fetchWorkspaceDocuments, fetchWorkspaceStats } = useDocuments(workspaceId);
 
   const workspaceDocuments = useSelector((state) => selectWorkspaceDocuments(state, workspaceId));
   const workspaceStats = useSelector((state) => selectWorkspaceStats(state, workspaceId));
@@ -70,7 +68,6 @@ const WorkspacePage = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const userRole = getUserRole(workspaceId);
-  const userPermissions = getUserPermissions(workspaceId);
 
   const documentStats = workspaceStats?.documents || {};
   const memberStats = workspaceStats?.members || {};
@@ -84,7 +81,6 @@ const WorkspacePage = () => {
     fetchWorkspace(workspaceId);
     fetchWorkspaceDocuments(workspaceId);
     fetchWorkspaceStats(workspaceId);
-    fetchRecentActivity(workspaceId);
     fetchWorkspaceInvitations(workspaceId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
@@ -205,68 +201,42 @@ const WorkspacePage = () => {
             <MetricTile label="This month" value={recentUploads} icon={ChartBarIcon} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-ink">Recent documents</h3>
-                <Link to={`/workspaces/${workspaceId}/documents`} className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
-                  View all
-                </Link>
-              </div>
-              <div className="space-y-1">
-                {workspaceDocuments?.slice(0, 5).map((doc) => (
-                  <div key={doc._id} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-2">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <DocumentIcon className="h-4 w-4 text-ink-muted shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-ink truncate">{doc.name}</p>
-                        <p className="text-xs text-ink-muted">{formatDate(doc.uploadDate || doc.createdAt)} · {formatFileSize(doc.size)}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)} className="text-ink-muted hover:text-ink">
-                      <EyeIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-                {(!workspaceDocuments || workspaceDocuments.length === 0) && (
-                  <div className="text-center py-8">
-                    <DocumentIcon className="h-8 w-8 mx-auto text-ink-muted mb-2" />
-                    <p className="text-sm text-ink-muted mb-3">No documents yet</p>
-                    <PermissionGuard requiredPermissions={['write']} workspaceId={workspaceId} showFallback={false}>
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/workspaces/${workspaceId}/upload`)}>
-                        Upload first document
-                      </Button>
-                    </PermissionGuard>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <h3 className="text-base font-semibold text-ink mb-4">Recent activity</h3>
-              <div className="space-y-3">
-                {recentActivity?.slice(0, 5).map((activity, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <Avatar user={activity.user} size="sm" />
+          {/* Recent activity panel deferred — source method (documentApi.getRecentActivity) doesn't exist yet */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-ink">Recent documents</h3>
+              <Link to={`/workspaces/${workspaceId}/documents`} className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+                View all
+              </Link>
+            </div>
+            <div className="space-y-1">
+              {workspaceDocuments?.slice(0, 5).map((doc) => (
+                <div key={doc._id} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-2">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <DocumentIcon className="h-4 w-4 text-ink-muted shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-sm text-ink">
-                        <span className="font-medium">{activity.user?.name}</span>{' '}
-                        <span className="text-ink-muted">{activity.action}</span>
-                        {activity.document && <span className="font-medium"> "{activity.document.filename}"</span>}
-                      </p>
-                      <p className="text-xs text-ink-muted">{formatDate(activity.timestamp)}</p>
+                      <p className="text-sm font-medium text-ink truncate">{doc.name}</p>
+                      <p className="text-xs text-ink-muted">{formatDate(doc.uploadDate || doc.createdAt)} · {formatFileSize(doc.size)}</p>
                     </div>
                   </div>
-                ))}
-                {(!recentActivity || recentActivity.length === 0) && (
-                  <div className="text-center py-8">
-                    <ClockIcon className="h-8 w-8 mx-auto text-ink-muted mb-2" />
-                    <p className="text-sm text-ink-muted">No recent activity</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
+                  <button onClick={() => navigate(`/workspaces/${workspaceId}/documents/${doc._id}`)} className="text-ink-muted hover:text-ink">
+                    <EyeIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              {(!workspaceDocuments || workspaceDocuments.length === 0) && (
+                <div className="text-center py-8">
+                  <DocumentIcon className="h-8 w-8 mx-auto text-ink-muted mb-2" />
+                  <p className="text-sm text-ink-muted mb-3">No documents yet</p>
+                  <PermissionGuard requiredPermissions={['add']} workspaceId={workspaceId} showFallback={false}>
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/workspaces/${workspaceId}/upload`)}>
+                      Upload first document
+                    </Button>
+                  </PermissionGuard>
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
       )}
 
@@ -277,7 +247,7 @@ const WorkspacePage = () => {
               <h2 className="text-lg font-semibold text-ink">Documents ({workspaceDocuments?.length || 0})</h2>
               <p className="text-sm text-ink-muted">Full management lives on the Documents page — this is a quick view.</p>
             </div>
-            <PermissionGuard requiredPermissions={['write']} workspaceId={workspaceId} showFallback={false}>
+            <PermissionGuard requiredPermissions={['add']} workspaceId={workspaceId} showFallback={false}>
               <Button variant="outline" onClick={() => navigate(`/workspaces/${workspaceId}/upload`)} leftIcon={<ArrowUpTrayIcon className="h-4 w-4" />}>
                 Upload document
               </Button>

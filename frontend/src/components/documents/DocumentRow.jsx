@@ -38,6 +38,13 @@ const DocumentRow = ({ document: doc, selectable = false, selected = false, onSe
   const workspaceId = doc.workspace?._id || doc.workspace;
   const ownerName = doc.owner?.name || doc.uploadedBy?.name;
 
+  // Only worth showing while the document is actually waiting on that person —
+  // a reviewer name on an approved or draft doc is stale context, not signal.
+  const showReviewer = doc.status === 'in-review' && doc.workflow?.reviewer;
+  const showApprover = doc.status === 'final-review' && doc.workflow?.approver;
+  const workflowPerson = showReviewer ? doc.workflow.reviewer : showApprover ? doc.workflow.approver : null;
+  const workflowLabel = showReviewer ? 'Reviewer' : showApprover ? 'Approver' : null;
+
   const handleActivate = () => {
     navigate(workspaceId ? `/workspaces/${workspaceId}/documents/${doc._id}` : `/documents/preview/${doc._id}`);
   };
@@ -110,6 +117,15 @@ const DocumentRow = ({ document: doc, selectable = false, selected = false, onSe
         <>
           {ownerName && <Avatar name={ownerName} size="sm" className="shrink-0" />}
           {doc.status && <StatusPill status={doc.status} />}
+          {workflowPerson && (
+            <span
+              className="flex items-center gap-1 shrink-0 text-xs text-ink-muted"
+              title={`${workflowLabel}: ${workflowPerson.name}`}
+            >
+              <Avatar name={workflowPerson.name} size="xs" />
+              <span className="hidden sm:inline">{workflowPerson.name}</span>
+            </span>
+          )}
           {doc.dueDate && <DueDateChip date={doc.dueDate} />}
           {formatModified(doc.updatedAt || doc.lastModified) && (
             <span className="hidden shrink-0 text-xs text-ink-muted sm:block">

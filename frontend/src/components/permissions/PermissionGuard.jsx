@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
@@ -32,15 +33,6 @@ const PermissionGuard = ({
   // ✅ FIXED: Properly extract workspaceId from params
   const actualWorkspaceId = workspaceId || (workspaceIdParam ? routeParams[workspaceIdParam] : null);
 
-  console.log('🔍 PermissionGuard Debug:', {
-    workspaceId,
-    workspaceIdParam, 
-    routeParams,
-    actualWorkspaceId,
-    requiredPermissions,
-    allowedRoles
-  });
-  
   // Get workspace and user data
   const workspace = useSelector(state => 
     state.workspaces.workspaces.find(w => w._id === actualWorkspaceId)
@@ -83,15 +75,8 @@ const PermissionGuard = ({
 const checkPermissions = () => {
   if (requiredPermissions.length === 0) return true;
 
-  console.log('🔐 PermissionGuard checkPermissions debug:');
-  console.log('- requiredPermissions:', requiredPermissions);
-  console.log('- userPermissions:', userPermissions);
-  console.log('- userPermissions type:', typeof userPermissions);
-
   // Handle object-based permissions (your actual format)
   if (userPermissions && typeof userPermissions === 'object' && !Array.isArray(userPermissions)) {
-    console.log('📋 Using object-based permission checking');
-
     // Map permission names to object properties
     const permissionMap = {
       'read': 'canView',
@@ -108,31 +93,21 @@ const checkPermissions = () => {
 
     if (requireAnyPermission) {
       // OR logic - user needs at least one of the required permissions
-      const result = requiredPermissions.some(permission => {
+      return requiredPermissions.some(permission => {
         const objectKey = permissionMap[permission] || permission;
-        const hasPermission = userPermissions[objectKey] === true;
-        console.log(`- Checking permission '${permission}' -> '${objectKey}':`, hasPermission);
-        return hasPermission;
+        return userPermissions[objectKey] === true;
       });
-      console.log('🔍 OR logic result:', result);
-      return result;
     } else {
       // AND logic - user needs all required permissions  
-      const result = requiredPermissions.every(permission => {
+      return requiredPermissions.every(permission => {
         const objectKey = permissionMap[permission] || permission;
-        const hasPermission = userPermissions[objectKey] === true;
-        console.log(`- Checking permission '${permission}' -> '${objectKey}':`, hasPermission);
-        return hasPermission;
+        return userPermissions[objectKey] === true;
       });
-      console.log('🔍 AND logic result:', result);
-      return result;
     }
   }
 
   // FALLBACK: Handle array-based permissions (if you ever use them)
   if (Array.isArray(userPermissions)) {
-    console.log('📋 Using array-based permission checking');
-
     if (requireAnyPermission) {
       return requiredPermissions.some(permission => 
         userPermissions.includes(permission)
@@ -144,7 +119,6 @@ const checkPermissions = () => {
     }
   }
 
-  console.log('⚠️ No valid permissions format found');
   return false;
 };
 
@@ -256,19 +230,17 @@ const hasPermission = () => {
     
     return (
       <div className={`permission-denied ${className}`}>
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <div className="bg-warning-subtle border border-warning-subtle-ink/20 rounded-lg p-4">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+              <AlertTriangle className="h-5 w-5 text-warning-subtle-ink" aria-hidden="true" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              <p className="text-sm text-warning-subtle-ink">
                 {fallbackMessage}
               </p>
               {userRole && (
-                <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
+                <p className="text-xs text-warning-subtle-ink/80 mt-1">
                   Your current role: {userRole}
                 </p>
               )}
@@ -290,7 +262,7 @@ export const withPermissions = (Component, permissionConfig = {}) => {
         {(permissionContext) => {
           if (!permissionContext.hasPermission) {
             return permissionConfig.fallback || (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-ink-muted">
                 Access Denied
               </div>
             );

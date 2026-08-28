@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrashIcon, ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Trash2, Download, X } from 'lucide-react';
 
 // showExport defaults false — no apiService/useDocuments export call exists yet
 // (backend has GET /documents/workspace/:id/export, frontend has no wiring to it).
@@ -16,7 +16,7 @@ const BulkActionBar = ({ selectedCount, onDelete, onExport, showExport = false, 
           className="text-ink-muted hover:text-ink"
           aria-label="Clear selection"
         >
-          <XMarkIcon className="h-4 w-4" />
+          <X className="h-4 w-4" />
         </button>
         <span className="text-sm text-ink">{selectedCount} selected</span>
       </div>
@@ -28,16 +28,16 @@ const BulkActionBar = ({ selectedCount, onDelete, onExport, showExport = false, 
             onClick={onExport}
             className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink px-2 py-1 rounded-lg hover:bg-surface-2"
           >
-            <ArrowDownTrayIcon className="h-4 w-4" />
+            <Download className="h-4 w-4" />
             Export
           </button>
         )}
         <button
           type="button"
           onClick={onDelete}
-          className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40"
+          className="inline-flex items-center gap-1.5 text-sm text-danger hover:text-danger-subtle-ink px-2 py-1 rounded-lg hover:bg-danger-subtle"
         >
-          <TrashIcon className="h-4 w-4" />
+          <Trash2 className="h-4 w-4" />
           Delete
         </button>
       </div>

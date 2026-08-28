@@ -221,12 +221,18 @@ const handleAcceptInvitation = async () => {
   };
 
   // Get role permissions description
+  // NOTE: role identity used to be color-coded (red/blue/green per role). The rest
+  // of the app (Badge.jsx, StatusPill.jsx) deliberately dropped per-status hues in
+  // favor of one blue family, differentiating by icon/shape/label instead — so all
+  // three roles now share the same icon-badge treatment (icon-badge-1..3) for tonal
+  // rhythm rather than reintroducing red/blue/green here. Flagging this as a
+  // judgment call: if role identity should stay color-coded on this page
+  // specifically, this is the block to revert.
   const getRolePermissions = (role) => {
     const permissions = {
       admin: {
         icon: ShieldCheckIcon,
-        color: 'text-red-600',
-        bgColor: 'bg-red-100',
+        badgeClass: 'icon-badge-4',
         permissions: [
           'Manage workspace settings',
           'Invite and remove members',
@@ -237,8 +243,7 @@ const handleAcceptInvitation = async () => {
       },
       editor: {
         icon: PencilIcon,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-100',
+        badgeClass: 'icon-badge-2',
         permissions: [
           'Upload and edit documents',
           'Create folders and organize files',
@@ -249,8 +254,7 @@ const handleAcceptInvitation = async () => {
       },
       viewer: {
         icon: EyeIcon,
-        color: 'text-green-600',
-        bgColor: 'bg-green-100',
+        badgeClass: 'icon-badge-3',
         permissions: [
           'View and download documents',
           'Comment on documents',
@@ -270,10 +274,10 @@ const handleAcceptInvitation = async () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading invitation...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary-300 border-t-primary-600 mx-auto mb-4"></div>
+          <p className="text-ink-muted">Loading invitation...</p>
         </div>
       </div>
     );
@@ -282,15 +286,15 @@ const handleAcceptInvitation = async () => {
   // Error state
   if (error || !invitationDetails) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <Card className="max-w-md mx-auto text-center p-8">
-          <div className="text-red-600 mb-4">
+          <div className="text-danger mb-4">
             <XCircleIconSolid className="h-16 w-16 mx-auto" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-xl font-semibold text-ink mb-2">
             Invalid Invitation
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-ink-muted mb-6">
             {error || "This invitation link is invalid or has expired."}
           </p>
           <div className="space-y-3">
@@ -319,21 +323,21 @@ const handleAcceptInvitation = async () => {
   // Success state
   if (actionResult === 'accepted') {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <Card className="max-w-md mx-auto text-center p-8">
-          <div className="text-green-600 mb-4">
+          <div className="text-success mb-4">
             <CheckCircleIconSolid className="h-16 w-16 mx-auto" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-xl font-semibold text-ink mb-2">
             Welcome to the team!
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-ink-muted mb-6">
             You've successfully joined "{invitationDetails.workspace.name}".
             Redirecting to workspace...
           </p>
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-            <span className="text-sm text-gray-500">Redirecting...</span>
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-300 border-t-primary-600 mr-2"></div>
+            <span className="text-sm text-ink-muted">Redirecting...</span>
           </div>
         </Card>
       </div>
@@ -343,15 +347,15 @@ const handleAcceptInvitation = async () => {
   // Rejection state
   if (actionResult === 'rejected') {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <Card className="max-w-md mx-auto text-center p-8">
-          <div className="text-gray-500 mb-4">
+          <div className="text-ink-muted mb-4">
             <XCircleIconSolid className="h-16 w-16 mx-auto" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-xl font-semibold text-ink mb-2">
             Invitation Declined
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-ink-muted mb-6">
             You've declined the invitation to join "{invitationDetails.workspace.name}".
           </p>
           <div className="space-y-3">
@@ -373,15 +377,15 @@ const handleAcceptInvitation = async () => {
   // Error state
   if (actionResult === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <Card className="max-w-md mx-auto text-center p-8">
-          <div className="text-red-600 mb-4">
+          <div className="text-danger mb-4">
             <ExclamationTriangleIcon className="h-16 w-16 mx-auto" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-xl font-semibold text-ink mb-2">
             Something Went Wrong
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-ink-muted mb-6">
             {user?.email?.toLowerCase() !== invitationDetails?.email?.toLowerCase() 
               ? `This invitation is for ${invitationDetails?.email}, but you're logged in as ${user?.email}.`
               : "We couldn't process your invitation response. Please try again."
@@ -409,17 +413,17 @@ const handleAcceptInvitation = async () => {
   const roleInfo = getRolePermissions(invitationDetails.role);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-bg py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-4">
-            <EnvelopeIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <div className="icon-badge icon-badge-1 h-16 w-16 mx-auto mb-4">
+            <EnvelopeIcon className="h-8 w-8" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-3xl font-bold text-ink">
             Workspace Invitation
           </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">
+          <p className="mt-2 text-ink-muted">
             You've been invited to collaborate
           </p>
         </div>
@@ -485,20 +489,20 @@ const handleAcceptInvitation = async () => {
           {/* Workspace Info */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <BuildingOfficeIcon className="h-12 w-12 text-gray-400 mr-3" />
+              <BuildingOfficeIcon className="h-12 w-12 text-ink-muted mr-3" />
               <div className="text-left">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-2xl font-bold text-ink">
                   {invitationDetails.workspace.name}
                 </h2>
                 {invitationDetails.workspace.description && (
-                  <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  <p className="text-ink-muted mt-1">
                     {invitationDetails.workspace.description}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center justify-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center space-x-6 text-sm text-ink-muted">
               <div className="flex items-center">
                 <UserGroupIcon className="h-4 w-4 mr-1" />
                 {invitationDetails.workspace.memberCount || 0} members
@@ -511,15 +515,15 @@ const handleAcceptInvitation = async () => {
           </div>
 
           {/* Invitation Details */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mb-6">
+          <div className="border-t border-border pt-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">
                 <Avatar user={invitationDetails.invitedBy} size="sm" className="mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-ink">
                     {invitationDetails.invitedBy?.name || 'Someone'}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-ink-muted">
                     invited you to join
                   </p>
                 </div>
@@ -530,33 +534,35 @@ const handleAcceptInvitation = async () => {
             </div>
 
             {invitationDetails.customMessage && (
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
-                <p className="text-sm text-gray-700 dark:text-gray-300 italic">
+              <div className="bg-surface-2 rounded-lg p-4 mb-6">
+                <p className="text-sm text-ink-muted italic">
                   "{invitationDetails.customMessage}"
                 </p>
               </div>
             )}
 
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="text-xs text-ink-muted">
               <p>Invited on {formatDate(invitationDetails.createdAt)}</p>
               <p>Expires on {formatDate(invitationDetails.expiresAt)}</p>
             </div>
           </div>
 
           {/* Role Permissions */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <roleInfo.icon className={`h-5 w-5 mr-2 ${roleInfo.color}`} />
+          <div className="border-t border-border pt-6 mb-8">
+            <h3 className="text-lg font-semibold text-ink mb-4 flex items-center">
+              <span className={`icon-badge ${roleInfo.badgeClass} h-8 w-8 mr-2`}>
+                <roleInfo.icon className="h-4 w-4" />
+              </span>
               Your Role: {invitationDetails.role}
             </h3>
-            <div className={`${roleInfo.bgColor} dark:opacity-20 rounded-lg p-4`}>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <div className="bg-surface-2 rounded-lg p-4">
+              <p className="text-sm font-medium text-ink-muted mb-3">
                 As a {invitationDetails.role}, you will be able to:
               </p>
               <ul className="space-y-2">
                 {roleInfo.permissions.map((permission, index) => (
-                  <li key={index} className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                    <CheckCircleIcon className={`h-4 w-4 mr-2 ${roleInfo.color}`} />
+                  <li key={index} className="flex items-center text-sm text-ink-muted">
+                    <CheckCircleIcon className="h-4 w-4 mr-2 text-primary-600 dark:text-primary-400" />
                     {permission}
                   </li>
                 ))}
@@ -575,7 +581,7 @@ const handleAcceptInvitation = async () => {
               >
                 {isAccepting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2"></div>
                     Accepting...
                   </>
                 ) : (
@@ -595,7 +601,7 @@ const handleAcceptInvitation = async () => {
               >
                 {isRejecting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-300 border-t-primary-600 mr-2"></div>
                     Declining...
                   </>
                 ) : (
@@ -611,19 +617,19 @@ const handleAcceptInvitation = async () => {
           {/* Authentication Required Notice */}
           {!isAuthenticated && !showLoginPrompt && (
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+              <p className="text-sm text-ink-muted mb-3">
                 To accept this invitation, you need to:
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
                   to={`/login?invitation=${token}&action=${urlAction || 'view'}&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-center hover:bg-blue-700 transition-colors"
+                  className="btn-primary flex-1 !inline-flex items-center justify-center text-center"
                 >
                   Sign In
                 </Link>
                 <Link
                   to={`/register?invitation=${token}&action=${urlAction || 'view'}&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                  className="flex-1 border border-gray-300 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="btn-tertiary flex-1 !inline-flex items-center justify-center text-center"
                 >
                   Create Account
                 </Link>
@@ -633,7 +639,7 @@ const handleAcceptInvitation = async () => {
         </Card>
 
         {/* Additional Info */}
-        <div className="text-center text-xs text-gray-500 dark:text-gray-400">
+        <div className="text-center text-xs text-ink-muted">
           <p>
             This invitation was sent to {invitationDetails.email}.
             If you have any questions, please contact the workspace owner.

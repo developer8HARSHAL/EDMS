@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  MagnifyingGlassIcon,
-  PlusIcon,
-  FolderOpenIcon,
-  BuildingOfficeIcon,
-  DocumentIcon,
-  StarIcon,
-} from '@heroicons/react/24/outline';
+  Search,
+  Plus,
+  FolderOpen,
+  Building2,
+  FileText,
+  Star,
+} from 'lucide-react';
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
+import StatusPill from '../components/documents/StatusPill';
 import EmptyState from '../components/ui/EmptyState';
 import Table from '../components/ui/Table';
 import BulkActionBar from '../components/documents/BulkActionBar';
@@ -23,6 +24,7 @@ const STATUS_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'draft', label: 'Draft' },
   { key: 'in-review', label: 'In review' },
+  { key: 'final-review', label: 'Final review' },
   { key: 'approved', label: 'Approved' },
 ];
 
@@ -31,12 +33,6 @@ const TABS = [
   { key: 'favorites', label: 'Favorites' },
   { key: 'shared', label: 'Shared with me' },
 ];
-
-const statusVariant = (status) => {
-  if (status === 'approved') return 'success';
-  if (status === 'in-review') return 'warning';
-  return 'gray';
-};
 
 const formatDate = (value) => {
   if (!value) return '—';
@@ -51,7 +47,8 @@ const formatDate = (value) => {
 const DocumentList = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
-  const { currentWorkspace, userRole } = useWorkspaces();
+  const { currentWorkspace, getUserRole } = useWorkspaces();
+  const userRole = workspaceId ? getUserRole(workspaceId) : null;
 
   const {
     documents,
@@ -225,7 +222,7 @@ const DocumentList = () => {
       render: (doc) => (
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-ink-muted">
-            <DocumentIcon className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
           </div>
 
           <div className="min-w-0">
@@ -247,15 +244,7 @@ const DocumentList = () => {
       key: 'status',
       label: 'Status',
       width: 'w-[130px]',
-      render: (doc) => (
-        <Badge
-          variant={statusVariant(doc.status)}
-          size="sm"
-          className="capitalize"
-        >
-          {doc.status || '—'}
-        </Badge>
-      ),
+      render: (doc) => <StatusPill status={doc.status} size="sm" />
     },
 
     {
@@ -293,7 +282,7 @@ const DocumentList = () => {
               : `Add ${doc.name} to favorites`
           }
         >
-          <StarIcon
+          <Star
             className={`h-4 w-4 ${
               doc.isFavorite ? 'fill-current text-primary-500' : ''
             }`}
@@ -308,7 +297,7 @@ const DocumentList = () => {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           {workspaceId && currentWorkspace && (
-            <BuildingOfficeIcon className="h-5 w-5 shrink-0 text-ink-muted" />
+            <Building2 className="h-5 w-5 shrink-0 text-ink-muted" />
           )}
 
           <h1 className="truncate text-2xl font-bold text-ink">
@@ -329,7 +318,7 @@ const DocumentList = () => {
         >
           <Button
             onClick={handleUpload}
-            leftIcon={<PlusIcon className="h-4 w-4" />}
+            leftIcon={<Plus className="h-4 w-4" />}
           >
             Upload document
           </Button>
@@ -361,7 +350,7 @@ const DocumentList = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search documents..."
-            leftIcon={<MagnifyingGlassIcon className="h-4 w-4" />}
+            leftIcon={<Search className="h-4 w-4" />}
           />
         </div>
 
@@ -413,13 +402,13 @@ const DocumentList = () => {
         <div className="card">
           {hasAnyDocuments ? (
             <EmptyState
-              icon={MagnifyingGlassIcon}
+              icon={Search}
               title="No documents match"
               description="Try a different search term or status filter."
             />
           ) : (
             <EmptyState
-              icon={FolderOpenIcon}
+              icon={FolderOpen}
               title="No documents yet"
               description={
                 workspaceId
