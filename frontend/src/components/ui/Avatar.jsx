@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { User, Camera } from 'lucide-react';
+import { DEFAULT_PROFILE_AVATAR, PROFILE_AVATARS } from '../../constants/profileAvatars';
 
 const Avatar = ({
   src,
+  avatar,
   alt,
   name,
   size = 'default',
@@ -19,30 +21,31 @@ const Avatar = ({
   loading = false,
   border = false,
   borderColor = 'gray',
-  // Status indicator
   statusPosition = 'bottom-right',
   statusSize = 'default',
-  // Group avatar
   isGroup = false,
   groupMembers = [],
   maxGroupDisplay = 3,
-  // Accessibility
   role = 'img',
   ariaLabel,
   tabIndex,
-  // Style customization
   backgroundColor,
   textColor,
   fontSize
 }) => {
-  const [imageSrc, setImageSrc] = useState(src);
+  const resolveAvatarSrc = (avatarKey) => (
+    avatarKey && PROFILE_AVATARS[avatarKey] ? PROFILE_AVATARS[avatarKey] : null
+  );
+
+  const resolvedSrc = resolveAvatarSrc(avatar) || src;
+  const [imageSrc, setImageSrc] = useState(resolvedSrc);
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    setImageSrc(src);
+    setImageSrc(resolveAvatarSrc(avatar) || src);
     setImageError(false);
-  }, [src]);
+  }, [avatar, src]);
 
   // Size classes
   const getSizeClasses = () => {
@@ -82,11 +85,18 @@ const Avatar = ({
     
     const borderColors = {
       gray: 'border-border',
-      blue: 'border-blue-500',
-      green: 'border-green-500',
-      red: 'border-red-500',
-      yellow: 'border-yellow-500',
-      purple: 'border-purple-500',
+      blue: 'border-primary-500',
+      green: 'border-success',
+      red: 'border-danger',
+      yellow: 'border-warning',
+      // No purple lane in this design system (monochrome-blue + danger/
+      // success/warning trio only) — falls back to border-border rather
+      // than introducing an unregistered hue.
+      purple: 'border-border',
+      // Literal white is an intentional exception here, not a token miss:
+      // this option exists for avatars sitting on a solid-color surface
+      // (e.g. ProfileCard) where the ring must read as white regardless
+      // of theme, the same way ProfileCard's own text is fixed white.
       white: 'border-white'
     };
     
@@ -94,29 +104,40 @@ const Avatar = ({
   };
 
   // Generate initials from name
-  const getInitials = (fullName) => {
-    if (!fullName) return '';
-    return fullName
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
-  };
+const getInitials = (fullName) => {
+  if (!fullName) return '';
+  if (typeof fullName !== 'string') {
+    console.warn('Avatar received a non-string name:', fullName);
+    return '';
+  }
+  return fullName
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+};
 
-  // Generate background color from name
-  const getBackgroundColor = (fullName) => {
-    if (backgroundColor) return backgroundColor;
-    if (!fullName) return 'bg-gray-500';
-    
-    const colors = [
-      'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
-      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-cyan-500',
-      'bg-orange-500', 'bg-lime-500', 'bg-emerald-500', 'bg-teal-500'
-    ];
-    
+  // Hash-based per-person color, distinct-looking without leaving the
+  // primary token scale — each stop is a registered Tailwind color with a
+  // paired text tone for contrast (light stops get dark text, dark stops
+  // get white text) instead of one hardcoded white applied to every hue.
+  const INITIALS_PALETTE = [
+    { bg: 'bg-primary-300', text: 'text-primary-900' },
+    { bg: 'bg-primary-400', text: 'text-white' },
+    { bg: 'bg-primary-500', text: 'text-white' },
+    { bg: 'bg-primary-600', text: 'text-white' },
+    { bg: 'bg-primary-700', text: 'text-white' },
+ 
+  ];
+  const INITIALS_FALLBACK = { bg: 'bg-surface-2', text: 'text-ink-muted' };
+
+  const getInitialsColors = (fullName) => {
+    if (backgroundColor) return { bg: '', text: textColor ? '' : 'text-white' };
+    if (!fullName || typeof fullName !== 'string') return INITIALS_FALLBACK;
+
     const hash = fullName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
+    return INITIALS_PALETTE[hash % INITIALS_PALETTE.length];
   };
 
   // Handle image error
@@ -161,7 +182,7 @@ const Avatar = ({
       <div className={`absolute ${positions[statusPosition]} transform translate-x-1/4 -translate-y-1/4`}>
         <div className={`
           ${statusSizes[statusSize] || statusSizes.default}
-          ${isOnline ? 'bg-green-500' : 'bg-gray-400'}
+          ${isOnline ? 'bg-success' : 'bg-ink-muted'}
           rounded-full border-2 border-surface
         `} />
       </div>
@@ -217,7 +238,7 @@ const Avatar = ({
     return (
       <div className={`
         absolute inset-0 flex items-center justify-center
-        bg-black bg-opacity-50 rounded-full opacity-0 transition-opacity
+        bg-overlay/50 rounded-full opacity-0 transition-opacity
         ${isHovered ? 'opacity-100' : ''}
       `}>
         <Camera className="w-1/3 h-1/3 text-white" />
@@ -275,10 +296,10 @@ const Avatar = ({
       ) : fallback ? (
         fallback
       ) : showInitials && name ? (
-        <span 
+        <span
           className={`
-            font-medium text-white select-none
-            ${getBackgroundColor(name)}
+            font-medium select-none
+            ${getInitialsColors(name).bg} ${getInitialsColors(name).text}
             w-full h-full flex items-center justify-center
             ${getVariantClasses()}
           `}
@@ -304,7 +325,8 @@ const Avatar = ({
 // Specialized Avatar Components
 export const UserAvatar = ({ user, ...props }) => (
   <Avatar
-    src={user?.avatar || user?.profilePicture}
+    avatar={user?.avatar}
+    src={user?.profilePicture}
     name={user?.name || user?.fullName || user?.username}
     alt={`${user?.name || 'User'} avatar`}
     {...props}

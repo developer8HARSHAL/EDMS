@@ -18,6 +18,7 @@ const WorkspaceSettings = lazy(() => import('../pages/WorkspaceSettings'));
 const InvitationPage = lazy(() => import('../pages/InvitationPage'));
 const LandingPage = lazy(() => import('../pages/LandingPage'));
 const Calendar = lazy(() => import('../pages/Calendar'));
+const Home = lazy(() => import('../pages/Home'));
 
 
 
@@ -46,7 +47,7 @@ function PublicRouteWrapper({ children }) {
   const { isAuthenticated } = useAuth();
 
   if (isAuthenticated && !isAuthPage) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return children;
@@ -75,7 +76,7 @@ const ApplicationRoutes = () => {
           path="/login"
           element={
             isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
+              <Navigate to="/home" replace />
             ) : (
               <Login />
             )
@@ -86,7 +87,7 @@ const ApplicationRoutes = () => {
           path="/register"
           element={
             isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
+              <Navigate to="/home" replace />
             ) : (
               <Register />
             )
@@ -96,6 +97,15 @@ const ApplicationRoutes = () => {
         <Route
           path="/invitation/:token"
           element={<InvitationPage />}
+        />
+
+      <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <Home/>
+            </ProtectedRoute>
+          }
         />
 
         <Route
@@ -124,6 +134,16 @@ const ApplicationRoutes = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/documents/:documentId"
+  element={
+    <ProtectedRoute>
+      <DocumentDetail />
+    </ProtectedRoute>
+  }
+/>
+
 
         <Route
           path="/workspaces/:workspaceId/documents"

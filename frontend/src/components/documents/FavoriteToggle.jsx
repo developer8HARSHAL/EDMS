@@ -1,14 +1,16 @@
 import React from 'react';
-import { StarIcon } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { Star } from 'lucide-react';
 
-// Pure presentational toggle — parent owns the actual toggleFavorite(docId, name) call
-// from useDocuments(), same separation used by DocumentRow for navigation.
-const FavoriteToggle = ({ isFavorite, onToggle, size = 'md', disabled = false }) => {
+const FavoriteToggle = ({
+  isFavorite,
+  onToggle,
+  size = 'md',
+  disabled = false,
+}) => {
   const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
 
-  const handleClick = (e) => {
-    e.stopPropagation();
+  const handleClick = (event) => {
+    event.stopPropagation();
     if (!disabled) onToggle?.();
   };
 
@@ -18,13 +20,16 @@ const FavoriteToggle = ({ isFavorite, onToggle, size = 'md', disabled = false })
       onClick={handleClick}
       disabled={disabled}
       aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-      className="shrink-0 text-ink-muted hover:text-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      aria-pressed={isFavorite}
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
     >
-      {isFavorite ? (
-        <StarIconSolid className={`${iconSize} text-amber-400`} />
-      ) : (
-        <StarIcon className={iconSize} />
-      )}
+      <Star
+        className={[
+          iconSize,
+          isFavorite ? 'fill-primary-500 text-primary-500' : 'text-current',
+        ].join(' ')}
+        aria-hidden="true"
+      />
     </button>
   );
 };

@@ -120,15 +120,15 @@ const Modal = ({
     }
   };
 
-  // Variant classes
+  // Variant classes — reverted to monochrome: danger/warning/success all
+  // render the same primary-toned border as info. The modal's title/icon
+  // shape (AlertTriangle vs CheckCircle vs AlertCircle) still differentiates
+  // intent — hue no longer does.
   const getVariantClasses = () => {
     switch (variant) {
       case 'danger':
-        return 'border-red-200 dark:border-red-800';
       case 'warning':
-        return 'border-yellow-200 dark:border-yellow-800';
       case 'success':
-        return 'border-green-200 dark:border-green-800';
       case 'info':
         return 'border-primary-200 dark:border-primary-800';
       default:
@@ -160,11 +160,8 @@ const Modal = ({
     const getIconColorClasses = () => {
       switch (iconColor) {
         case 'red':
-          return 'text-red-600 bg-red-100 dark:bg-red-900/20';
         case 'yellow':
-          return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20';
         case 'green':
-          return 'text-green-600 bg-green-100 dark:bg-green-900/20';
         case 'blue':
           return 'text-primary-600 bg-primary-100 dark:bg-primary-900/20';
         default:
@@ -237,7 +234,7 @@ const Modal = ({
       {/* Overlay */}
       <div
         ref={overlayRef}
-        className={`fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-${animationDuration} ${overlayClassName}`}
+        className={`fixed inset-0 bg-overlay/50 transition-opacity ${overlayClassName}`}
         onClick={handleOverlayClick}
       />
 
@@ -281,7 +278,7 @@ const Modal = ({
                     ml-4 text-ink-muted hover:text-ink
                     focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg p-1
                     transition-colors duration-150
-                    ${(preventClose || isLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-2'}
+                    ${(preventClose || isLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-hover'}
                   `}
                   aria-label="Close modal"
                 >
