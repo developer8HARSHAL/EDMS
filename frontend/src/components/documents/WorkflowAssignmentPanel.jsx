@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, LockKeyhole, UserRound } from 'lucide-react';
 import Avatar from '../ui/Avatar';
+import { Button } from '../ui/Button';
 
 const extractId = (value) => (typeof value === 'string' ? value : value?._id);
 
@@ -157,23 +158,24 @@ const WorkflowAssignmentPanel = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
           onClick={handleSave}
           disabled={!canSave}
-          className="inline-flex items-center gap-1.5 rounded-full bg-primary-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          size="sm"
+          leftIcon={<Check className="h-4 w-4" aria-hidden="true" />}
         >
-          <Check className="h-4 w-4" aria-hidden="true" />
           Save assignments
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
           onClick={cancelEditing}
-          className="rounded-full px-3.5 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          variant="ghost"
+          size="sm"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

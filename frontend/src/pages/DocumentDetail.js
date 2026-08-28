@@ -18,12 +18,10 @@ import StatusTransitionMenu from '../components/documents/StatusTransitionMenu';
 import FavoriteToggle from '../components/documents/FavoriteToggle';
 import { DueDateChip, ExpiryDateChip } from '../components/documents/DueDateChip';
 import WorkflowAssignmentPanel from '../components/documents/WorkflowAssignmentPanel';
-import ShareRow from '../components/documents/ShareRow';
 import {
   ArrowDownToLine,
   ArrowLeft,
   Eye,
-  Share2,
   Trash2,
 } from 'lucide-react';
 
@@ -170,7 +168,6 @@ const DocumentDetail = () => {
   const handleWorkflowChange = ({ reviewerId, approverId }) =>
     updateDocumentWorkflow(documentId, { reviewerId, approverId });
 
-  const handleShared = () => fetchDocument(documentId);
   const handleDownload = () => downloadDocument(documentId, document.name);
 
   const handleTogglePreview = () => {
@@ -233,7 +230,7 @@ const DocumentDetail = () => {
   });
 
   return (
-    <div className="min-h-full bg-surface">
+    <div className="min-h-full bg-bg">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Breadcrumb
           workspaceId={workspaceId}
@@ -290,16 +287,6 @@ const DocumentDetail = () => {
                   )}
 
                   <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <StatusTransitionMenu
-                      status={document.status}
-                      onChange={handleStatusChange}
-                      canEdit={canEdit}
-                      isReviewer={isReviewer}
-                      isApprover={isApprover}
-                      isOwner={isOwner}
-                      prominent
-                    />
-
                     {document.dueDate && <DueDateChip date={document.dueDate} />}
                     {document.expiryDate && <ExpiryDateChip date={document.expiryDate} />}
                     {document.isPublic && (
@@ -315,20 +302,17 @@ const DocumentDetail = () => {
             <section className="border-b border-border py-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold tracking-tight text-ink">
-                      Workflow
-                    </h2>
-                    <span className="badge-pill">
-                      {document.status.replace(/-/g, ' ')}
-                    </span>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-ink-muted">
+                      Document workflow
+                    </p>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      {workflowPermissionMessage}
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-ink-muted">
-                    {workflowPermissionMessage}
-                  </p>
                 </div>
 
-                <div className="shrink-0">
+                <div className="mt-4">
                   <StatusTransitionMenu
                     status={document.status}
                     onChange={handleStatusChange}
@@ -434,16 +418,7 @@ const DocumentDetail = () => {
                     Actions
                   </h2>
 
-                  <div className="mt-3 grid gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownload}
-                      leftIcon={<ArrowDownToLine className="h-4 w-4" aria-hidden="true" />}
-                    >
-                      Download
-                    </Button>
-
+                  <div className="mt-3">
                     <PermissionGuard
                       workspaceId={workspaceId}
                       requiredPermissions={['delete']}
@@ -455,39 +430,11 @@ const DocumentDetail = () => {
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-danger/30 px-3 text-sm font-medium text-danger transition-colors hover:bg-danger-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        Delete
+                        Delete document
                       </button>
                     </PermissionGuard>
                   </div>
                 </section>
-
-                <PermissionGuard
-                  workspaceId={workspaceId}
-                  requiredPermissions={['write']}
-                  showFallback={false}
-                >
-                  <section className="border-t border-border pt-6">
-                    <div className="flex items-start gap-2">
-                      <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
-                      <div>
-                        <h2 className="font-semibold tracking-tight text-ink">
-                          Share document
-                        </h2>
-                        <p className="mt-1 text-sm text-ink-muted">
-                          Grant another user viewer or editor access to this document.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <ShareRow
-                        documentId={documentId}
-                        permissions={document.permissions || []}
-                        onShared={handleShared}
-                      />
-                    </div>
-                  </section>
-                </PermissionGuard>
 
                 <button
                   type="button"

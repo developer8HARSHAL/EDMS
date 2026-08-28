@@ -147,23 +147,18 @@ const logOperation = (operation, status, data = null) => {
   }
 };
 
-// ============================================================================
-// MAIN HOOK
-// ============================================================================
+
 
 export const useWorkspaces = () => {
   const dispatch = useDispatch();
   const { user, isAuthenticated, isAuthReady } = useAuth();
 
-  // ============================================================================
-  // INTERNAL STATE & REFS
-  // ============================================================================
+
   
   const mountedRef = useRef(true);
   const fetchInitiatedRef = useRef(false);
   const lastFetchParamsRef = useRef(null);
   
-  // Internal loading states for granular operation tracking
   const [operationLoading, setOperationLoading] = useState({
     [OPERATION_TYPES.FETCH]: false,
     [OPERATION_TYPES.FETCH_SINGLE]: false,
@@ -177,16 +172,12 @@ export const useWorkspaces = () => {
     [OPERATION_TYPES.FETCH_STATS]: false
   });
 
-  // Helper to update operation loading state
   const setOperationLoadingState = useCallback((operation, isLoading) => {
     if (!mountedRef.current) return;
     setOperationLoading(prev => ({ ...prev, [operation]: isLoading }));
   }, []);
 
-  // ============================================================================
-  // REDUX SELECTORS
-  // ============================================================================
-  
+ 
   const workspaceState = useSelector(state => state.workspaces || {});
   const {
     workspaces = [],
@@ -205,14 +196,7 @@ export const useWorkspaces = () => {
     workspaceStats = null
   } = workspaceState;
 
-  // ============================================================================
-  // INTERNAL OPERATION WRAPPER
-  // ============================================================================
-
-  /**
-   * Generic async operation wrapper with enhanced error handling
-   * IMPORTANT: Returns data directly (not wrapped) to maintain backward compatibility
-   */
+  
 const executeOperation = useCallback(async (
   operationType,
   asyncThunk,
@@ -305,14 +289,7 @@ const executeOperation = useCallback(async (
   }
 }, [dispatch, setOperationLoadingState]);
 
-  // ============================================================================
-  // FETCH OPERATIONS (Public API - Backward Compatible)
-  // ============================================================================
-
-  /**
-   * Fetch all workspaces with optional filters and pagination
-   * ✅ RETURN FORMAT: Returns response data directly (original format preserved)
-   */
+  
   const fetchWorkspacesCallback = useCallback(async (params = {}) => {
     try {
       fetchInitiatedRef.current = true;
@@ -327,11 +304,9 @@ const executeOperation = useCallback(async (
         'Fetch workspaces'
       );
 
-      // Log extracted workspaces for debugging
       const workspaceList = extractWorkspacesFromResponse(result);
       console.log(`📋 Extracted ${workspaceList.length} workspaces`);
 
-      // ✅ BACKWARD COMPATIBLE: Return original response format
       return result;
     } catch (error) {
       fetchInitiatedRef.current = false;
@@ -339,10 +314,7 @@ const executeOperation = useCallback(async (
     }
   }, [executeOperation]);
 
-  /**
-   * Fetch a single workspace by ID
-   * ✅ RETURN FORMAT: Returns workspace data directly
-   */
+ 
   const fetchWorkspaceCallback = useCallback(async (workspaceId) => {
     if (!workspaceId) {
       throw new Error('Workspace ID is required');
@@ -356,10 +328,7 @@ const executeOperation = useCallback(async (
     );
   }, [executeOperation]);
 
-  /**
-   * Fetch workspace statistics
-   * ✅ RETURN FORMAT: Returns stats data directly
-   */
+ 
   const fetchStatsCallback = useCallback(async (workspaceId) => {
     if (!workspaceId) {
       throw new Error('Workspace ID is required');
@@ -373,16 +342,8 @@ const executeOperation = useCallback(async (
     );
   }, [executeOperation]);
 
-  // ============================================================================
-  // CRUD OPERATIONS (Public API - Backward Compatible)
-  // ============================================================================
-
-  /**
-   * Create a new workspace
-   * ✅ RETURN FORMAT: Returns created workspace directly
-   */
+ 
   const createWorkspaceCallback = useCallback(async (workspaceData) => {
-    // Internal validation (doesn't affect return format)
     const validation = validateWorkspaceData(workspaceData);
     if (!validation.isValid) {
       const errorMessage = Object.values(validation.errors).join(', ');
@@ -397,10 +358,7 @@ const executeOperation = useCallback(async (
     );
   }, [executeOperation]);
 
-  /**
-   * Update an existing workspace
-   * ✅ RETURN FORMAT: Returns updated workspace directly
-   */
+ 
 const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
   console.log("update", updates);
   if (!workspaceId) throw new Error('Workspace ID is required');
@@ -423,10 +381,7 @@ const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
 }, [executeOperation]);
 
 
-  /**
-   * Delete a workspace
-   * ✅ RETURN FORMAT: Returns deletion result directly
-   */
+ 
   const deleteWorkspaceCallback = useCallback(async (workspaceId) => {
     if (!workspaceId) {
       throw new Error('Workspace ID is required');
@@ -440,14 +395,7 @@ const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
     );
   }, [executeOperation]);
 
-  // ============================================================================
-  // MEMBER MANAGEMENT (Public API - Backward Compatible)
-  // ============================================================================
-
-  /**
-   * Add a member to workspace
-   * ✅ RETURN FORMAT: Returns result directly
-   */
+ 
   const addMemberCallback = useCallback(async (workspaceId, memberData) => {
     if (!workspaceId) {
       throw new Error('Workspace ID is required');
@@ -464,10 +412,7 @@ const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
     );
   }, [executeOperation]);
 
-  /**
-   * Remove a member from workspace
-   * ✅ RETURN FORMAT: Returns result directly
-   */
+
   const removeMemberCallback = useCallback(async (workspaceId, memberId) => {
     if (!workspaceId || !memberId) {
       throw new Error('Workspace ID and Member ID are required');
@@ -481,10 +426,7 @@ const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
     );
   }, [executeOperation]);
 
-  /**
-   * Update member role
-   * ✅ RETURN FORMAT: Returns result directly
-   */
+ 
   const updateMemberRoleCallback = useCallback(async (workspaceId, memberId, roleData) => {
     if (!workspaceId || !memberId) {
       throw new Error('Workspace ID and Member ID are required');
@@ -501,10 +443,7 @@ const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
     );
   }, [executeOperation]);
 
-  /**
-   * Leave a workspace
-   * ✅ RETURN FORMAT: Returns result directly
-   */
+  
   const leaveWorkspaceCallback = useCallback(async (workspaceId) => {
     if (!workspaceId) {
       throw new Error('Workspace ID is required');

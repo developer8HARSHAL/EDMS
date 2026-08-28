@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, LockKeyhole } from 'lucide-react';
+import { Check, ChevronDown, LockKeyhole } from 'lucide-react';
 import StatusPill from './StatusPill';
+import { Button } from '../ui/Button';
 
 const getNextOptions = (status, { canEdit, isReviewer, isApprover, isOwner }) => {
   switch (status) {
@@ -105,7 +106,7 @@ const StatusTransitionMenu = ({
   const isTransitionAvailable = !disabled && !loading && nextOptions.length > 0;
 
   return (
-    <div ref={ref} className="relative inline-flex flex-col items-start gap-1.5">
+    <div ref={ref} className="relative inline-flex min-w-0 flex-col items-start gap-1.5">
       {isTransitionAvailable ? (
         <button
           type="button"
@@ -113,70 +114,71 @@ const StatusTransitionMenu = ({
           disabled={loading}
           aria-haspopup="menu"
           aria-expanded={open}
-          className={[
-            'inline-flex items-center gap-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
-            prominent
-              ? 'min-h-10 rounded-xl border border-border bg-surface px-3.5'
-              : 'rounded-full',
-            open ? 'bg-surface-2' : 'hover:bg-surface-2',
-            loading ? 'opacity-50' : '',
-          ].join(' ')}
+          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3.5 text-left transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
         >
           <StatusPill status={status} />
+          <span className="text-sm font-medium text-ink">Change status</span>
           <ChevronDown
             className={`h-4 w-4 text-ink-muted transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
             aria-hidden="true"
           />
         </button>
       ) : (
-        <div className="flex items-center gap-2">
-          <StatusPill status={status} />
-          {!disabled && (
-            <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
-              <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
-              {STATUS_OWNER_LABEL[status] || 'No transition available for you'}
-            </span>
-          )}
+        <div className="flex flex-col items-start gap-2">
+          <div className="inline-flex items-center gap-2">
+            <StatusPill status={status} />
+            <LockKeyhole className="h-3.5 w-3.5 text-ink-muted" aria-hidden="true" />
+          </div>
+          <p className="max-w-xl text-sm leading-5 text-ink-muted">
+            {STATUS_OWNER_LABEL[status] || 'No workflow transition is available to you.'}
+          </p>
         </div>
       )}
 
       {open && pendingTarget === null && (
         <div
-          className="absolute left-0 top-full z-20 mt-2 w-64 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-soft"
+          className="absolute left-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-xl border border-border bg-surface shadow-panel"
           role="menu"
         >
-          <div className="px-2.5 py-2 text-xs text-ink-muted">
-            Change document status
+          <div className="border-b border-border px-3 py-2.5">
+            <p className="text-sm font-semibold text-ink">Change document status</p>
+            <p className="mt-0.5 text-xs leading-5 text-ink-muted">
+              Only transitions allowed for your current role are shown.
+            </p>
           </div>
 
-          {nextOptions.map((next) => (
-            <button
-              key={next}
-              type="button"
-              onClick={() => handleSelect(next)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              role="menuitem"
-            >
-              <StatusPill status={next} size="sm" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-ink">
-                  {EDGE_LABEL[`${status}->${next}`]}
+          <div className="p-1">
+            {nextOptions.map((next) => (
+              <button
+                key={next}
+                type="button"
+                onClick={() => handleSelect(next)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                role="menuitem"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-primary-700 dark:text-primary-300">
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
-                <span className="mt-0.5 block text-xs text-ink-muted">
-                  Move to {next.replace(/-/g, ' ')}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">
+                    {EDGE_LABEL[`${status}->${next}`]}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-ink-muted">
+                    Status becomes {next.replace(/-/g, ' ')}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {open && pendingTarget !== null && (
-        <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-border bg-surface p-3 shadow-soft">
-          <p className="text-sm font-medium text-ink">
+        <div className="absolute left-0 top-full z-20 mt-2 w-80 rounded-xl border border-border bg-surface p-4 shadow-panel">
+          <p className="text-sm font-semibold text-ink">
             {EDGE_LABEL[`${status}->${pendingTarget}`]}
           </p>
-          <p className="mt-1 text-xs text-ink-muted">
+          <p className="mt-1 text-xs leading-5 text-ink-muted">
             A comment is required for this transition.
           </p>
           <textarea
@@ -184,30 +186,27 @@ const StatusTransitionMenu = ({
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             placeholder="Explain what needs to change..."
-            rows={3}
-            className="input-field mt-3 resize-none"
+            rows={4}
+            className="input-field mt-3 w-full resize-none px-3 py-2.5"
           />
           <div className="mt-3 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={closeMenu}
-              className="rounded-full px-3 py-1.5 text-sm text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={closeMenu}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
               onClick={handleConfirmComment}
               disabled={!comment.trim()}
-              className="rounded-full bg-primary-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-40"
+              leftIcon={<Check className="h-4 w-4" aria-hidden="true" />}
             >
               Confirm
-            </button>
+            </Button>
           </div>
         </div>
       )}
     </div>
   );
-};
+}
 
 export default StatusTransitionMenu;
