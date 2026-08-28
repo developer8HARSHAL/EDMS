@@ -1,6 +1,5 @@
-// src/components/ui/ThemeToggle.jsx - Fixed for Tailwind + React
 import React from 'react';
-import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 export const ThemeToggle = () => {
@@ -9,14 +8,14 @@ export const ThemeToggle = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="p-2 rounded-lg bg-surface-2 hover:bg-surface-hover transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {isDark ? (
-        <SunIcon className="h-5 w-5 text-yellow-500" />
+        <Sun className="h-5 w-5 text-warning" />
       ) : (
-        <MoonIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+        <Moon className="h-5 w-5 text-ink-muted" />
       )}
     </button>
   );

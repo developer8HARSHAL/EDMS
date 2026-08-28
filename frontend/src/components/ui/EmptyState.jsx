@@ -1,8 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
 
-// Presentational-only, no backend data — used wherever a list can be empty
-// (Documents table today; Workspaces/Members lists reuse this later)
 const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction }) => (
   <div className="flex flex-col items-center justify-center text-center py-16 px-6">
     {Icon && (

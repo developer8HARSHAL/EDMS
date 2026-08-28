@@ -5,7 +5,6 @@ export const Dropdown = ({ trigger, children, className, fullWidth = false }) =>
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -53,7 +52,6 @@ export const Dropdown = ({ trigger, children, className, fullWidth = false }) =>
         {trigger}
       </div>
 
-      {/* Dropdown Menu — fullWidth spans the trigger; otherwise fixed-width, right-aligned menu */}
       {isOpen && (
         <div
           className={clsx(
@@ -80,7 +78,7 @@ export const DropdownItem = ({ children, onClick, className, ...props }) => {
   return (
     <button
       className={clsx(
-        'text-ink hover:bg-surface-2',
+        'text-ink hover:bg-surface-hover',
         'group flex w-full items-center rounded-lg px-2 py-2 text-sm transition-colors duration-150',
         className
       )}

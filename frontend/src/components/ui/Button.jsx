@@ -5,7 +5,7 @@ const buttonVariants = {
   primary: 'bg-primary-600 hover:bg-primary-700 active:bg-primary-800 disabled:bg-primary-200 disabled:text-primary-400 text-white focus:ring-primary-500',
   secondary: 'bg-primary-100 hover:bg-primary-200 active:bg-primary-300 disabled:bg-primary-50 disabled:text-primary-300 text-primary-700 dark:bg-primary-950/60 dark:hover:bg-primary-900/60 dark:active:bg-primary-800/60 dark:text-primary-300 focus:ring-primary-500',
   outline: 'bg-transparent border border-primary-300 hover:bg-primary-50 active:bg-primary-100 disabled:opacity-40 text-primary-700 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-950/40 focus:ring-primary-500',
-  ghost: 'hover:bg-surface-2 text-ink-muted hover:text-ink focus:ring-primary-500',
+  ghost: 'hover:bg-surface-hover text-ink-muted hover:text-ink focus:ring-primary-500',
   link: 'text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline focus:ring-primary-500'
 };
 

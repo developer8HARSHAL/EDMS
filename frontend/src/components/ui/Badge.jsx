@@ -18,56 +18,31 @@ const Badge = ({
   onClick,
   href,
   target,
-  // Status-specific props
   status,
   role,
   count,
   max = 99,
   showZero = false,
-  // Visual — small solid dot before the label, in the variant's text color.
-  // Opt-in only; nothing renders a dot unless a call site explicitly passes it.
   dot = false,
-  // Accessibility
   ariaLabel,
   title
 }) => {
-  // Variant color classes
-  // Deliberate design choice, not an oversight: success/warning/danger/info/
-  // purple/pink/indigo stay on explicit Tailwind hues because they carry
-  // semantic meaning a neutral/brand token can't express. primary/secondary/
-  // gray/default route through tokens since they're neutral/brand, not semantic.
-  // Alert.jsx follows this same policy.
-  //
-  // Dark-mode intensity: every filled semantic variant below uses the same
-  // {color}-950/60 + {color}-300 formula that index.css already established
-  // for primary (.badge-pill, .icon-badge-3) — keeps dark mode consistent
-  // across the whole badge family instead of each hue picking its own opacity.
+
   const getVariantClasses = () => {
     const baseClasses = outline 
       ? 'border-2 bg-transparent' 
       : 'border border-transparent';
+
+    const monochrome = outline
+      ? `${baseClasses} border-primary-500 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:border-primary-400 dark:hover:bg-primary-950/40`
+      : `${baseClasses} bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300`;
     
     switch (finalVariant) {
       case 'primary':
-        return outline
-          ? `${baseClasses} border-primary-500 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:border-primary-400 dark:hover:bg-primary-950/40`
-          : `${baseClasses} bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300`;
-      case 'secondary':
-        return outline
-          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
-          : `${baseClasses} bg-surface-2 text-ink-muted`;
       case 'success':
-        return outline
-          ? `${baseClasses} border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/40`
-          : `${baseClasses} bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300`;
       case 'warning':
-        return outline
-          ? `${baseClasses} border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-400 dark:hover:bg-yellow-950/40`
-          : `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300`;
       case 'danger':
-        return outline
-          ? `${baseClasses} border-red-500 text-red-600 hover:bg-red-50 dark:text-red-400 dark:border-red-400 dark:hover:bg-red-950/40`
-          : `${baseClasses} bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300`;
+        return monochrome;
       case 'info':
         return outline
           ? `${baseClasses} border-cyan-500 text-cyan-600 hover:bg-cyan-50 dark:text-cyan-400 dark:border-cyan-400 dark:hover:bg-cyan-950/40`
@@ -86,11 +61,11 @@ const Badge = ({
           : `${baseClasses} bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300`;
       case 'gray':
         return outline
-          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
+          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-hover dark:hover:bg-surface-hover`
           : `${baseClasses} bg-surface-2 text-ink-muted`;
       case 'black':
         return outline
-          ? `${baseClasses} border-black text-black hover:bg-gray-50 dark:border-white dark:text-white dark:hover:bg-gray-800`
+          ? `${baseClasses} border-black text-black hover:bg-surface-hover dark:border-white dark:text-white dark:hover:bg-surface-hover`
           : `${baseClasses} bg-black text-white dark:bg-white dark:text-black`;
       case 'white':
         return outline
@@ -98,13 +73,11 @@ const Badge = ({
           : `${baseClasses} bg-white text-gray-900 dark:bg-gray-900 dark:text-white`;
       default:
         return outline
-          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-2 dark:hover:bg-surface-2`
+          ? `${baseClasses} border-border text-ink-muted hover:bg-surface-hover dark:hover:bg-surface-hover`
           : `${baseClasses} bg-surface-2 text-ink-muted`;
     }
   };
 
-  // Size classes — default/lg get slightly roomier vertical padding (py-1.5
-  // instead of py-1) so the pill doesn't feel cramped; xs/sm/xl unchanged.
   const getSizeClasses = () => {
     switch (size) {
       case 'xs':
@@ -120,7 +93,6 @@ const Badge = ({
     }
   };
 
-  // Status badge
   const getStatusIcon = (statusType) => {
     switch (statusType) {
       case 'active':
@@ -142,7 +114,6 @@ const Badge = ({
     }
   };
 
-  // Role badge
   const getRoleIcon = (roleType) => {
     switch (roleType) {
       case 'owner':
@@ -173,7 +144,6 @@ const Badge = ({
     }
   };
 
-  // Count badge (notification style)
   const renderCount = () => {
     if (typeof count !== 'number') return null;
     if (count === 0 && !showZero) return null;
@@ -187,9 +157,6 @@ const Badge = ({
     );
   };
 
-  // Dot indicator — solid circle, currentColor so it always matches this
-  // badge's own text color regardless of variant. Rendered before the icon
-  // (if any) and the label.
   const renderDot = () => {
     if (!dot) return null;
 
@@ -203,7 +170,6 @@ const Badge = ({
     );
   };
 
-  // Icon rendering
   const renderIcon = () => {
     let iconElement = null;
     
@@ -235,7 +201,7 @@ const Badge = ({
           e.stopPropagation();
           onRemove?.(e);
         }}
-        className="ml-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-full p-0.5 transition-colors"
+        className="ml-1 hover:bg-surface-hover dark:hover:bg-surface-hover rounded-full p-0.5 transition-colors"
         aria-label="Remove"
       >
         <X className="w-3 h-3" />
@@ -250,10 +216,6 @@ const Badge = ({
                      status === 'info' ? 'info' : variant :
                      role && !variant ? getRoleVariant(role) : variant;
 
-  // Common classes — tracking-tight added for the tighter, more confident
-  // type treatment confirmed on the alert mockup (Tailwind's built-in scale,
-  // no arbitrary values). hover:shadow-xs uses the project's real shadow
-  // token instead of Tailwind's generic default.
   const baseClasses = `
     inline-flex items-center font-medium leading-none tracking-tight
     ${rounded ? 'rounded-full' : 'rounded-md'}
