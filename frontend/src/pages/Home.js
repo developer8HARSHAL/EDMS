@@ -120,7 +120,15 @@ const Home = () => {
 
               <Card padding={false} className="divide-y divide-border">
                 {topAttentionItems.map((item) => (
-                  <AttentionListItem key={item.documentId} item={item} />
+                  <button
+                    key={item.documentId}
+                    type="button"
+                    onClick={() => navigate(`/documents/${item.documentId}`)}
+                    className="block w-full text-left"
+                    aria-label={`Open ${item.title || 'document'}`}
+                  >
+                    <AttentionListItem item={item} />
+                  </button>
                 ))}
               </Card>
 
@@ -131,7 +139,7 @@ const Home = () => {
                   className="mt-2 text-sm font-medium text-primary-700 hover:underline"
                 >
                   View all {attentionCount}
-                  
+
                 </button>
               )}
             </section>
