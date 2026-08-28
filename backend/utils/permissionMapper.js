@@ -71,28 +71,32 @@ const getDefaultPermissionsForRole = (role) => {
       canAdd: true,
       canDelete: true,
       canInvite: true,
-      canManage: true
+      canManage: true,
+      canManageWorkflow: false
     },
     admin: {
       canView: true,
       canEdit: true,
       canAdd: true,
       canDelete: true,
-      canInvite: true
+      canInvite: true,
+      canManageWorkflow: false
     },
     editor: {
       canView: true,
       canEdit: true,
       canAdd: true,
       canDelete: false,
-      canInvite: false
+      canInvite: false,
+      canManageWorkflow: false
     },
     viewer: {
       canView: true,
       canEdit: false,
       canAdd: false,
       canDelete: false,
-      canInvite: false
+      canInvite: false,
+      canManageWorkflow: false
     }
   };
   return rolePermissions[role] || rolePermissions.viewer;
@@ -108,7 +112,7 @@ const validateBackendPermissions = (permissions) => {
     return { isValid: false, errors: ['Permissions must be an object'] };
   }
 
-  const validPermissions = ['canView', 'canEdit', 'canAdd', 'canDelete', 'canInvite'];
+  const validPermissions = ['canView', 'canEdit', 'canAdd', 'canDelete', 'canInvite','canManageWorkflow'];
   const errors = [];
 
   const providedKeys = Object.keys(permissions);

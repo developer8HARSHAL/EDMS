@@ -47,6 +47,12 @@ workspaces: [{
     enum: ['user', 'admin'],
     default: 'user'
   },
+  // Predefined profile avatar key. The frontend maps this key to a bundled asset.
+  avatar: {
+    type: String,
+    enum: ['avatar-01', 'avatar-02', 'avatar-03', 'avatar-04', 'avatar-05','avatar-06','avatar-07','avatar-08'],
+    default: 'avatar-01'
+  },
   // Marks the single shared demo/guest account used by "Continue as Guest"
   isGuest: {
     type: Boolean,

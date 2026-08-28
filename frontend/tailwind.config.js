@@ -21,9 +21,30 @@ module.exports = {
         bg: 'rgb(var(--color-bg) / <alpha-value>)',
         surface: 'rgb(var(--color-surface) / <alpha-value>)',
         'surface-2': 'rgb(var(--color-surface-2) / <alpha-value>)',
+        'surface-hover': 'rgb(var(--color-surface-hover) / <alpha-value>)',
+        'surface-active': 'rgb(var(--color-surface-active) / <alpha-value>)',
         border: 'rgb(var(--color-border) / <alpha-value>)',
+        'border-strong': 'rgb(var(--color-border-strong) / <alpha-value>)',
         ink: 'rgb(var(--color-ink) / <alpha-value>)',
         'ink-muted': 'rgb(var(--color-ink-muted) / <alpha-value>)',
+        overlay: 'rgb(var(--color-overlay) / <alpha-value>)',
+
+        // Semantic status scales — each follows the same solid / subtle /
+        // subtle-ink shape, so a component never invents its own tint math.
+        // bg-danger-subtle/50 etc. works out of the box since these resolve
+        // through <alpha-value>, same as every other semantic token.
+        danger: 'rgb(var(--color-danger) / <alpha-value>)',
+        'danger-subtle': 'rgb(var(--color-danger-subtle) / <alpha-value>)',
+        'danger-subtle-ink': 'rgb(var(--color-danger-subtle-ink) / <alpha-value>)',
+
+        success: 'rgb(var(--color-success) / <alpha-value>)',
+        'success-subtle': 'rgb(var(--color-success-subtle) / <alpha-value>)',
+        'success-subtle-ink': 'rgb(var(--color-success-subtle-ink) / <alpha-value>)',
+
+        warning: 'rgb(var(--color-warning) / <alpha-value>)',
+        'warning-subtle': 'rgb(var(--color-warning-subtle) / <alpha-value>)',
+        'warning-subtle-ink': 'rgb(var(--color-warning-subtle-ink) / <alpha-value>)',
+
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -61,11 +82,23 @@ module.exports = {
         }
       },
       borderRadius: {
-        '4xl': '2rem',
+        // Overriding the DEFAULT Tailwind scale values (not adding new keys)
+        // so every existing rounded-2xl / rounded-3xl / rounded-4xl usage
+        // across Card, panels, and page sections gets the softer, more
+        // generous corner from the reference UIs automatically — nothing in
+        // Dashboard.js / WorkspacePage.js / LandingPage.js needs to change.
+        '2xl': '1.25rem',  /* was 1rem  — primary card radius */
+        '3xl': '1.75rem',  /* was 1.5rem — larger hero/panel radius */
+        '4xl': '2.25rem',  /* was 2rem  — reserved for large decorative wrappers */
       },
       boxShadow: {
         'xs': '0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06)',
-        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.08), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
+        // Re-tinted toward --color-ink (slate) instead of flat black, and
+        // widened/softened the blur — this is the "cards feel lifted, not
+        // outlined" quality in the references. Same token name (`shadow-soft`),
+        // so anything already using it (or switched to it, see .card below)
+        // updates automatically.
+        'soft': '0 4px 24px -4px rgba(15, 23, 42, 0.08), 0 12px 28px -6px rgba(15, 23, 42, 0.05)',
         'medium': '0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         'large': '0 10px 40px -10px rgba(0, 0, 0, 0.15)',
         'panel': '0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(15, 23, 42, 0.12)',

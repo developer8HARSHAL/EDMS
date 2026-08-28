@@ -13,6 +13,7 @@ import MemberList from '../components/members/MemberList';
 import InviteMemberModal from '../components/members/InviteMemberModal';
 import PermissionGuard from '../components/permissions/PermissionGuard';
 import { useWorkspaces } from '../hooks/useWorkspaces';
+import { useDocuments } from '../hooks/useDocuments';
 import { useInvitations } from '../hooks/useInvitations';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -51,7 +52,7 @@ const WorkspaceSettings = () => {
     isLoading: workspaceLoading,
     hasError: workspaceError,
     fetchWorkspace,
-    fetchStats,
+    isDeleting,
     updateWorkspace,
     deleteWorkspace,
     removeMember,
@@ -59,6 +60,10 @@ const WorkspaceSettings = () => {
     leaveWorkspace,
     getUserRole,
   } = useWorkspaces();
+
+  // fetchWorkspaceStats (not useWorkspaces' fetchStats) writes to the documentsSlice-scoped
+  // state that selectWorkspaceStats below actually reads from — see fetch/read mismatch note.
+  const { fetchWorkspaceStats } = useDocuments(workspaceId);
 
   const {
     workspaceInvitations,
@@ -87,13 +92,14 @@ const WorkspaceSettings = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteError, setDeleteError] = useState(null);
 
   const [workspaceForm, setWorkspaceForm] = useState({ name: '', description: '', isPublic: false });
 
   useEffect(() => {
     if (!workspaceId) return;
     fetchWorkspace(workspaceId);
-    fetchStats(workspaceId).catch((err) => console.warn('Could not fetch workspace stats:', err));
+    fetchWorkspaceStats(workspaceId).catch((err) => console.warn('Could not fetch workspace stats:', err));
     fetchWorkspaceInvitations(workspaceId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
@@ -129,15 +135,31 @@ const WorkspaceSettings = () => {
     }
   };
 
-  const handleDeleteWorkspace = async () => {
-    if (!isOwner || deleteConfirmText !== currentWorkspace?.name) return;
-    try {
-      await deleteWorkspace(workspaceId);
-      navigate('/workspaces');
-    } catch (error) {
-      console.error('Failed to delete workspace:', error);
-    }
-  };
+const handleDeleteWorkspace = async () => {
+  if (
+    !isOwner ||
+    deleteConfirmText !== currentWorkspace?.name
+  ) {
+    return;
+  }
+
+  setDeleteError(null);
+
+  try {
+    await deleteWorkspace(workspaceId);
+    navigate('/workspaces');
+  } catch (error) {
+    console.error(
+      'Failed to delete workspace:',
+      error
+    );
+
+    setDeleteError(
+      error?.message ||
+      'Unable to delete this workspace.'
+    );
+  }
+};
 
   const handleLeaveWorkspace = async () => {
     if (isOwner) return;
@@ -198,7 +220,7 @@ const WorkspaceSettings = () => {
   if (workspaceError || !currentWorkspace) {
     return (
       <div className="max-w-md mx-auto text-center py-16">
-        <ExclamationTriangleIcon className="h-10 w-10 mx-auto text-red-600 mb-4" />
+        <ExclamationTriangleIcon className="h-10 w-10 mx-auto text-danger mb-4" />
         <h3 className="text-lg font-semibold text-ink mb-2">Access denied</h3>
         <p className="text-ink-muted mb-4">You don't have permission to access this workspace's settings.</p>
         <Button onClick={() => navigate(`/workspaces/${workspaceId}`)}>Back to workspace</Button>
@@ -353,15 +375,15 @@ const WorkspaceSettings = () => {
           <p className="text-sm text-ink-muted">Pending</p>
         </Card>
         <Card className="p-4 text-center">
-          <p className="text-2xl font-semibold text-green-600 dark:text-green-400">{invitationStats?.accepted || 0}</p>
+          <p className="text-2xl font-semibold text-success">{invitationStats?.accepted || 0}</p>
           <p className="text-sm text-ink-muted">Accepted</p>
         </Card>
         <Card className="p-4 text-center">
-          <p className="text-2xl font-semibold text-red-600 dark:text-red-400">{invitationStats?.rejected || 0}</p>
+          <p className="text-2xl font-semibold text-danger">{invitationStats?.rejected || 0}</p>
           <p className="text-sm text-ink-muted">Rejected</p>
         </Card>
         <Card className="p-4 text-center">
-          <p className="text-2xl font-semibold text-orange-600 dark:text-orange-400">{invitationStats?.expired || 0}</p>
+          <p className="text-2xl font-semibold text-warning">{invitationStats?.expired || 0}</p>
           <p className="text-sm text-ink-muted">Expired</p>
         </Card>
       </div>
@@ -427,13 +449,13 @@ const WorkspaceSettings = () => {
       </Alert>
 
       {!isOwner && (
-        <Card className="p-6 border-orange-200 dark:border-orange-800">
+        <Card className="p-6 border-warning/30">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h4 className="text-base font-medium text-ink">Leave workspace</h4>
               <p className="text-sm text-ink-muted mt-1">You will lose access to all documents in this workspace.</p>
             </div>
-            <Button variant="outline" onClick={() => setShowLeaveModal(true)} className="text-orange-600 border-orange-600 hover:bg-orange-50 shrink-0">
+            <Button variant="outline" onClick={() => setShowLeaveModal(true)} className="text-warning border-warning hover:bg-warning-subtle shrink-0">
               Leave workspace
             </Button>
           </div>
@@ -441,7 +463,7 @@ const WorkspaceSettings = () => {
       )}
 
       {isOwner && (
-        <Card className="p-6 border-red-200 dark:border-red-800">
+        <Card className="p-6 border-danger/30">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h4 className="text-base font-medium text-ink">Delete workspace</h4>
@@ -452,7 +474,7 @@ const WorkspaceSettings = () => {
                 <p>• All pending invitations will be canceled</p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => setShowDeleteModal(true)} leftIcon={<TrashIcon className="h-4 w-4" />} className="text-red-600 border-red-600 hover:bg-red-50 shrink-0">
+            <Button variant="outline" onClick={() => setShowDeleteModal(true)} leftIcon={<TrashIcon className="h-4 w-4" />} className="text-danger border-danger hover:bg-danger-subtle shrink-0">
               Delete workspace
             </Button>
           </div>
@@ -499,56 +521,137 @@ const WorkspaceSettings = () => {
       {activeTab === 'invitations' && renderInvitationsTab()}
       {activeTab === 'danger' && renderDangerZoneTab()}
 
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete workspace" variant="danger">
-        <div className="p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <ExclamationTriangleIcon className="h-10 w-10 text-red-600 shrink-0" />
-            <div>
-              <h3 className="text-base font-semibold text-ink">Are you absolutely sure?</h3>
-              <p className="text-sm text-ink-muted">
-                This will permanently delete "{currentWorkspace?.name}" and all its contents. This cannot be undone.
-              </p>
-            </div>
-          </div>
+      <Modal
+  isOpen={showDeleteModal}
+  onClose={() => {
+    if (!isDeleting) {
+      setShowDeleteModal(false);
+      setDeleteError(null);
+    }
+  }}
+  title="Delete workspace"
+  variant="danger"
+>
+  <div className="p-6">
+    <div className="flex items-start gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger-subtle text-danger-subtle-ink">
+        <ExclamationTriangleIcon
+          className="h-5 w-5"
+          aria-hidden="true"
+        />
+      </div>
 
-          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg mb-4">
-            <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-2">This will delete:</p>
-            <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
-              <li>• {documentCount} documents</li>
-              <li>• {workspaceMembers.length} member access permissions</li>
-              <li>• {invitationStats?.pending || 0} pending invitations</li>
-            </ul>
-          </div>
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-ink">
+          Delete "{currentWorkspace?.name}"?
+        </h3>
 
-          <p className="text-sm text-ink-muted mb-3">
-            Type <strong className="text-ink">{currentWorkspace?.name}</strong> to confirm.
-          </p>
-          <Input
-            value={deleteConfirmText}
-            onChange={(e) => setDeleteConfirmText(e.target.value)}
-            placeholder={`Type "${currentWorkspace?.name}" here`}
-          />
-        </div>
+        <p className="mt-1 text-sm leading-5 text-ink-muted">
+          This action cannot be undone.
+        </p>
+      </div>
+    </div>
 
-        <div className="flex justify-end gap-3 px-6 pb-6">
-          <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
-          <Button variant="danger" onClick={handleDeleteWorkspace} disabled={deleteConfirmText !== currentWorkspace?.name} leftIcon={<TrashIcon className="h-4 w-4" />}>
-            Delete workspace
-          </Button>
-        </div>
-      </Modal>
+    <div className="mt-5 rounded-lg border border-border bg-surface-2 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+        This will remove
+      </p>
+
+      <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
+        <p>
+          {documentCount} documents
+        </p>
+
+        <p>
+          {workspaceMembers.length} member access permissions
+        </p>
+
+        <p>
+          {invitationStats?.pending || 0} pending invitations
+        </p>
+      </div>
+    </div>
+
+    {deleteError && (
+      <div className="mt-4">
+        <Alert
+          variant="error"
+          title="Workspace can't be deleted"
+        >
+          {deleteError}
+        </Alert>
+      </div>
+    )}
+
+    <div className="mt-5">
+      <p className="text-sm text-ink-muted">
+        Type{' '}
+        <strong className="font-semibold text-ink">
+          {currentWorkspace?.name}
+        </strong>{' '}
+        to confirm.
+      </p>
+
+      <div className="mt-2">
+        <Input
+          value={deleteConfirmText}
+          onChange={(e) => {
+            setDeleteConfirmText(e.target.value);
+            if (deleteError) {
+              setDeleteError(null);
+            }
+          }}
+          placeholder={`Type "${currentWorkspace?.name}" here`}
+          disabled={isDeleting}
+        />
+      </div>
+    </div>
+  </div>
+
+  <div className="flex justify-end gap-3 px-6 pb-6">
+    <Button
+      variant="outline"
+      onClick={() => {
+        setShowDeleteModal(false);
+        setDeleteError(null);
+      }}
+      disabled={isDeleting}
+    >
+      Cancel
+    </Button>
+
+    <Button
+      variant="danger"
+      onClick={handleDeleteWorkspace}
+      disabled={
+        deleteConfirmText !== currentWorkspace?.name ||
+        isDeleting
+      }
+      leftIcon={
+        <TrashIcon
+          className="h-4 w-4"
+          aria-hidden="true"
+        />
+      }
+    >
+      {isDeleting
+        ? 'Deleting...'
+        : 'Delete workspace'}
+    </Button>
+  </div>
+</Modal>
 
       <Modal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} title="Leave workspace" variant="warning">
         <div className="p-6">
           <div className="flex items-center gap-4 mb-4">
-            <ExclamationTriangleIcon className="h-10 w-10 text-orange-600 shrink-0" />
+            <ExclamationTriangleIcon className="h-10 w-10 text-warning shrink-0" />
             <div>
               <h3 className="text-base font-semibold text-ink">Leave "{currentWorkspace?.name}"?</h3>
               <p className="text-sm text-ink-muted">You will lose access to all documents in this workspace.</p>
             </div>
           </div>
-          <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
-            <p className="text-sm text-orange-800 dark:text-orange-200">You can be re-invited later by an admin or owner.</p>
+          <div className="bg-warning-subtle p-4 rounded-lg">
+            <p className="text-sm text-warning-subtle-ink">You can be re-invited later by an admin or owner.</p>
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 pb-6">

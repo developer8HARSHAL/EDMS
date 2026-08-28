@@ -77,7 +77,8 @@ const DEFAULT_PERMISSIONS = {
   canEdit: false,
   canAdd: false,
   canDelete: false,
-  canInvite: false
+  canInvite: false,
+  canManageWorkflow: false
 };
 
 const OWNER_PERMISSIONS = {
@@ -85,7 +86,8 @@ const OWNER_PERMISSIONS = {
   canEdit: true,
   canAdd: true,
   canDelete: true,
-  canInvite: true
+  canInvite: true,
+  canManageWorkflow: true
 };
 
 // ============================================================================
@@ -211,64 +213,97 @@ export const useWorkspaces = () => {
    * Generic async operation wrapper with enhanced error handling
    * IMPORTANT: Returns data directly (not wrapped) to maintain backward compatibility
    */
-  const executeOperation = useCallback(async (
-    operationType,
-    asyncThunk,
-    params,
-    operationName
-  ) => {
-    // Unmount check
+const executeOperation = useCallback(async (
+  operationType,
+  asyncThunk,
+  params,
+  operationName
+) => {
+  if (!mountedRef.current) {
+    const error = new Error('Component unmounted');
+    logOperation(
+      operationName,
+      'error',
+      'Component unmounted during operation'
+    );
+    throw error;
+  }
+
+  try {
+    setOperationLoadingState(operationType, true);
+
+    logOperation(operationName, 'start', params);
+
+    const result = await dispatch(asyncThunk(params));
+
     if (!mountedRef.current) {
       const error = new Error('Component unmounted');
-      logOperation(operationName, 'error', 'Component unmounted during operation');
+      logOperation(
+        operationName,
+        'error',
+        'Component unmounted after operation'
+      );
       throw error;
     }
 
-    try {
-      // Set operation loading state
-      setOperationLoadingState(operationType, true);
-      
-      logOperation(operationName, 'start', params);
+    if (asyncThunk.fulfilled.match(result)) {
+      logOperation(
+        operationName,
+        'success',
+        result.payload
+      );
 
-      // Execute Redux async thunk
-      const result = await dispatch(asyncThunk(params));
-
-      // Unmount check after async operation
-      if (!mountedRef.current) {
-        const error = new Error('Component unmounted');
-        logOperation(operationName, 'error', 'Component unmounted after operation');
-        throw error;
-      }
-
-      // Check if operation was successful
-      if (asyncThunk.fulfilled.match(result)) {
-        logOperation(operationName, 'success', result.payload);
-        
-        // ✅ BACKWARD COMPATIBLE: Return payload directly (not wrapped)
-        return result.payload;
-      } else {
-        // Operation rejected
-        const internalError = createInternalError(
-          result.payload,
-          `${operationName} failed`
-        );
-        logOperation(operationName, 'error', internalError);
-        
-        // ✅ BACKWARD COMPATIBLE: Throw original error format
-        throw new Error(result.payload?.message || `${operationName} failed`);
-      }
-    } catch (error) {
-      logOperation(operationName, 'error', error);
-      
-      // ✅ BACKWARD COMPATIBLE: Re-throw error in original format
-      throw error;
-    } finally {
-      // Clear operation loading state
-      if (mountedRef.current) {
-        setOperationLoadingState(operationType, false);
-      }
+      return result.payload;
     }
-  }, [dispatch, setOperationLoadingState]);
+
+    const payload = result?.payload;
+
+    const backendMessage =
+      payload?.original?.message ||
+      payload?.original?.response?.data?.message ||
+      payload?.original ||
+      payload?.response?.data?.message ||
+      payload?.message ||
+      `${operationName} failed`;
+
+    const status =
+      payload?.status ||
+      payload?.original?.response?.status ||
+      payload?.response?.status ||
+      500;
+
+    const internalError = createInternalError(
+      {
+        ...payload,
+        message: backendMessage,
+        status,
+      },
+      backendMessage
+    );
+
+    logOperation(
+      operationName,
+      'error',
+      internalError
+    );
+
+    const error = new Error(backendMessage);
+    error.status = status;
+    error.original = payload;
+
+    throw error;
+  } catch (error) {
+    logOperation(operationName, 'error', error);
+    throw error;
+  } finally {
+    if (mountedRef.current) {
+      setOperationLoadingState(
+        operationType,
+        false
+      );
+    }
+  }
+}, [dispatch, setOperationLoadingState]);
 
   // ============================================================================
   // FETCH OPERATIONS (Public API - Backward Compatible)
@@ -871,7 +906,7 @@ const updateWorkspaceCallback = useCallback(async (workspaceId, updates) => {
         isAuthenticated &&
         isAuthReady &&
         workspaces.length === 0 &&
-        !loading &&
+        !loading.fetchWorkspaces &&
         !fetchInitiatedRef.current &&
         isMounted
       ) {

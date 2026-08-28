@@ -1,4 +1,3 @@
-// src/components/WithAuth.js - FIXED VERSION
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -12,7 +11,6 @@ const WithAuth = ({ component: Component, ...props }) => {
   const { isAuthenticated, loading, tokenValidated } = useAuth();
   const location = useLocation();
 
-  // Show loading state while checking authentication or validating token
   if (loading || !tokenValidated) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -21,7 +19,6 @@ const WithAuth = ({ component: Component, ...props }) => {
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return (
       <Navigate
@@ -32,8 +29,6 @@ const WithAuth = ({ component: Component, ...props }) => {
     );
   }
 
-  // Render the protected component if authenticated
-  // FIXED: Ensure Component is properly instantiated
   return Component ? <Component {...props} /> : null;
 };
 

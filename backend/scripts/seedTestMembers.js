@@ -1,105 +1,292 @@
 /**
- * seedTestMembers.js
+ * seedTestMembers_direct.js
  *
- * Creates throwaway test users (via the real register API, so password
- * hashing/validation happens exactly like production) and adds them as
- * workspace members with varied roles, so EDMS features that need >1
- * member (sharing, reviewers, role-gating) can be tested without email.
+ * Creates a fresh test workspace and test users, then directly adds those users
+ * to workspace.members[] with the required roles/permissions.
  *
- * DOES NOT touch backend code, models, or business logic. The only direct
- * database write here is a targeted $push onto workspace.members[] and
- * (optionally) document.reviewers[] — no other fields are touched, using
- * the exact shapes documented in backend_briefing_for_frontend.md §2.
+ * IMPORTANT:
+ * - No invitation flow is used.
+ * - Uses the real register API for users.
+ * - Creates the workspace through the real POST /api/workspaces endpoint.
+ * - Direct MongoDB write is used only for workspace member assignment.
+ * - Development/local database only. Do NOT run against production.
  *
- * Run manually: node scripts/seedTestMembers.js
- * Run this against a dev/local database only, not production.
+ * Run:
+ *   node scripts/seedTestMembers_direct.js
+ *
+ * Required:
+ *   MONGODB_URI
+ *
+ * Optional:
+ *   API_BASE_URL=http://localhost:5000/api
  */
 
 const { MongoClient, ObjectId } = require('mongodb');
 
-// ===== CONFIG — fill these in before running =====
-const MONGO_URI = `mongodb+srv://harshal:harshal2003@edms-cluster.ctqybsg.mongodb.net/?retryWrites=true&w=majority&appName=edms-cluster` || 'mongodb://localhost:27017/edms'; // match your .env
-const API_BASE_URL = 'http://localhost:5000/api'; // your local backend, not Render prod
-const WORKSPACE_ID = '6a7d799ec18dba3a0c149e13';
-const DOCUMENT_ID_FOR_REVIEWERS = ''; // optional
+const MONGO_URI = `mongodb+srv://harshalpinge2_db_user:Harshal@082003@edms-cluster.ctqybsg.mongodb.net/?appName=edms-cluster`;
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000/api';
 
-const TEST_USERS = [
-  { name: 'ravi', email: 'Harshalravi@gmail.com', password: 'Harshal2', role: 'editor' },
-  { name: 'sara', email: 'Harshalsara@gmail.com', password: 'Harshal2', role: 'viewer' },
-  { name: 'jorge', email: 'Harshaljorge@gmail.com', password: 'Harshal2', role: 'admin' },
-];
+if (!MONGO_URI) {
+  throw new Error('MONGODB_URI environment variable is required.');
+}
 
-// permissions shape per backend briefing §2 — matches role loosely, edit if you want gaps to test
-const permissionsForRole = (role) => ({
-  canView: true,
-  canEdit: role === 'editor' || role === 'admin',
-  canAdd: role === 'editor' || role === 'admin',
-  canDelete: role === 'admin',
-  canInvite: role === 'admin',
-});
+const RUN_ID = Date.now();
+
+const TEST_USERS = {
+  admin: {
+    name: 'Test Admin',
+    email: `workflow-admin-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'admin',
+  },
+  editor: {
+    name: 'Test Editor',
+    email: `workflow-editor-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'editor',
+  },
+  viewer: {
+    name: 'Test Viewer',
+    email: `workflow-viewer-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'viewer',
+  },
+  reviewer: {
+    name: 'Test Reviewer',
+    email: `workflow-reviewer-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'editor',
+  },
+  approver: {
+    name: 'Test Approver',
+    email: `workflow-approver-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'editor',
+  },
+  uploader: {
+    name: 'Test Uploader',
+    email: `workflow-uploader-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'editor',
+  },
+  workflowManager: {
+    name: 'Test Workflow Manager',
+    email: `workflow-manager-${RUN_ID}@test.com`,
+    password: 'TestPass123!',
+    role: 'admin',
+  },
+};
+
+function permissionsForRole(role, isWorkflowManager = false) {
+  const permissions = {
+    canView: true,
+    canEdit: false,
+    canAdd: false,
+    canDelete: false,
+    canInvite: false,
+    canManageWorkflow: false,
+  };
+
+  if (role === 'admin' || role === 'editor') {
+    permissions.canEdit = true;
+    permissions.canAdd = true;
+  }
+
+  if (role === 'admin') {
+    permissions.canDelete = true;
+    permissions.canInvite = true;
+  }
+
+  // Explicit grant. Admin does NOT get this automatically.
+  if (isWorkflowManager) {
+    permissions.canManageWorkflow = true;
+  }
+
+  return permissions;
+}
+
+async function request(method, path, { token, body } = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const data = await response.json().catch(() => null);
+  return { status: response.status, data };
+}
 
 async function registerUser(user) {
-  const res = await fetch(`${API_BASE_URL}/users/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: user.name, email: user.email, password: user.password }),
+  const result = await request('POST', '/users/register', {
+    body: {
+      name: user.name,
+      email: user.email,
+      password: user.password,
+    },
   });
-  const data = await res.json();
-  if (!res.ok || !data.user?.id) {
-    // Already-registered is fine for re-runs — just flag anything else
-    console.warn(`⚠️  Register failed for ${user.email}: ${data.message || res.status}`);
-    return null;
+
+  if (result.status !== 200 && result.status !== 201) {
+    throw new Error(
+      `Registration failed for ${user.email}: ${JSON.stringify(result.data)}`
+    );
   }
-  console.log(`✅ Registered ${user.email} -> ${data.user.id}`);
-  return data.user.id;
+
+  const id = result.data?.user?.id;
+  const token = result.data?.token;
+
+  if (!id || !token) {
+    throw new Error(
+      `Registration response missing user id/token for ${user.email}: ${JSON.stringify(result.data)}`
+    );
+  }
+
+  console.log(`✅ Registered ${user.email} -> ${id}`);
+  return { id, token };
+}
+
+async function createWorkspace(ownerToken) {
+  const workspaceName = `Workflow Test Workspace ${RUN_ID}`;
+
+  const result = await request('POST', '/workspaces', {
+    token: ownerToken,
+    body: {
+      name: workspaceName,
+      description: 'Temporary workspace for EDMS workflow/API testing',
+    },
+  });
+
+  if (result.status !== 200 && result.status !== 201) {
+    throw new Error(
+      `Workspace creation failed: ${JSON.stringify(result.data)}`
+    );
+  }
+
+  const workspaceId =
+    result.data?.data?._id ||
+    result.data?.data?.id ||
+    result.data?._id ||
+    result.data?.id;
+
+  if (!workspaceId || !ObjectId.isValid(workspaceId)) {
+    throw new Error(
+      `Workspace ID missing from create response: ${JSON.stringify(result.data)}`
+    );
+  }
+
+  console.log(`✅ Workspace created: ${workspaceName}`);
+  console.log(`   workspaceId: ${workspaceId}`);
+
+  return workspaceId;
 }
 
 async function run() {
   const client = new MongoClient(MONGO_URI);
   await client.connect();
-  const db = client.db();
 
   try {
-    const createdUserIds = [];
+    const db = client.db();
 
-    for (const user of TEST_USERS) {
-      const userId = await registerUser(user);
-      if (userId) createdUserIds.push({ id: userId, role: user.role });
+    console.log('--- Creating test users ---');
+
+    const users = {};
+    const owner = {
+      name: 'Test Owner',
+      email: `workflow-owner-${RUN_ID}@test.com`,
+      password: 'TestPass123!',
+    };
+
+    const ownerAuth = await registerUser(owner);
+    users.owner = { ...owner, ...ownerAuth };
+
+    for (const [key, user] of Object.entries(TEST_USERS)) {
+      const auth = await registerUser(user);
+      users[key] = { ...user, ...auth };
     }
 
-    if (createdUserIds.length === 0) {
-      console.log('No users created — nothing to add as members. Check API_BASE_URL is reachable.');
-      return;
+    console.log('\n--- Creating workspace ---');
+    const workspaceIdString = await createWorkspace(users.owner.token);
+    const workspaceId = new ObjectId(workspaceIdString);
+
+    const workspace = await db.collection('workspaces').findOne({
+      _id: workspaceId,
+    });
+
+    if (!workspace) {
+      throw new Error(`Workspace not found after creation: ${workspaceIdString}`);
     }
 
-    const newMembers = createdUserIds.map(({ id, role }) => ({
-      user: new ObjectId(id),
+    console.log(`\nWorkspace owner: ${users.owner.email}`);
+
+    console.log('\n--- Directly assigning members + roles ---');
+
+    const memberDefinitions = [
+      ['admin', 'admin', false],
+      ['editor', 'editor', false],
+      ['viewer', 'viewer', false],
+      ['reviewer', 'editor', false],
+      ['approver', 'editor', false],
+      ['uploader', 'editor', false],
+      ['workflowManager', 'admin', true],
+    ];
+
+    const members = memberDefinitions.map(([key, role, isWorkflowManager]) => ({
+      user: new ObjectId(users[key].id),
       role,
-      permissions: permissionsForRole(role),
+      permissions: permissionsForRole(role, isWorkflowManager),
+      joinedAt: new Date(),
     }));
 
-    const workspaceResult = await db.collection('workspaces').updateOne(
-      { _id: new ObjectId(WORKSPACE_ID) },
-      { $push: { members: { $each: newMembers } } }
+    await db.collection('workspaces').updateOne(
+      { _id: workspaceId },
+      { $push: { members: { $each: members } } }
     );
-    console.log(`✅ Workspace members updated: matched ${workspaceResult.matchedCount}, modified ${workspaceResult.modifiedCount}`);
 
-    if (DOCUMENT_ID_FOR_REVIEWERS && DOCUMENT_ID_FOR_REVIEWERS !== 'PASTE_A_DOCUMENT_ID_HERE_OR_LEAVE_NULL') {
-      const reviewerIds = createdUserIds.map(({ id }) => new ObjectId(id));
-      const docResult = await db.collection('documents').updateOne(
-        { _id: new ObjectId(DOCUMENT_ID_FOR_REVIEWERS) },
-        { $addToSet: { reviewers: { $each: reviewerIds } } }
+    for (const [key, role, isWorkflowManager] of memberDefinitions) {
+      console.log(
+        `✅ ${key}: role=${role}, canManageWorkflow=${isWorkflowManager}`
       );
-      console.log(`✅ Document reviewers updated: matched ${docResult.matchedCount}, modified ${docResult.modifiedCount}`);
     }
 
-    console.log('\nDone. Test account passwords are all "TestPass123!" unless you changed TEST_USERS above.');
+    const finalWorkspace = await db.collection('workspaces').findOne(
+      { _id: workspaceId },
+      { projection: { name: 1, owner: 1, members: 1 } }
+    );
+
+    console.log('\n============================================================');
+    console.log('TEST WORKSPACE READY');
+    console.log('============================================================');
+    console.log(`Workspace ID: ${workspaceIdString}`);
+    console.log(`Workspace:    ${finalWorkspace.name}`);
+    console.log(`Owner ID:     ${users.owner.id}`);
+    console.log('');
+    console.log('Members:');
+
+    for (const [key, user] of Object.entries(users)) {
+      if (key === 'owner') {
+        console.log(`  owner           ${user.email}`);
+        continue;
+      }
+
+      const member = finalWorkspace.members.find(
+        (item) => item.user.toString() === user.id
+      );
+
+      console.log(
+        `  ${key.padEnd(15)} ${user.email} | role=${member?.role} | canManageWorkflow=${member?.permissions?.canManageWorkflow}`
+      );
+    }
+
+    console.log('\nUse this workspace directly for manual workflow/API testing.');
+    console.log('No invitations were created or sent.');
   } finally {
     await client.close();
   }
 }
 
-run().catch((err) => {
-  console.error('❌ Seed script failed:', err);
+run().catch((error) => {
+  console.error('❌ Seed script failed:', error.message);
   process.exit(1);
 });

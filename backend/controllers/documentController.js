@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Document = require('../models/documentModel');
 const User = require('../models/userModel');
 const Workspace = require('../models/workspaceModel');
+const DocumentHistory = require('../models/documentHistoryModel');
 const path = require('path');
 const { ObjectId } = mongoose.Types;
 
@@ -322,15 +323,18 @@ exports.getDashboardData = async (req, res) => {
     const now = new Date();
     const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    // Combined query: recent docs + stats + pending-review + upcoming deadlines
-    // (4 DB calls in parallel, not sequential — same pattern as before, just
-    // extended rather than adding separate round-trips).
-    const [recentDocs, stats, pendingReview, upcomingDeadlines] = await Promise.all([
+    // Combined query: recent docs + stats + reviewer queue + approver queue +
+    // upcoming deadlines (5 DB calls in parallel, not sequential).
+    const [recentDocs, stats, reviewerQueue, approverQueue, upcomingDeadlines] = await Promise.all([
       Document.find(accessFilter)
-        // status/dueDate added so the "needs my attention" UI can show them
-        // on the recent-documents list, not just in the two new sections below.
-        .select("name type uploadDate size workspace status dueDate")
+        // status/dueDate/workflow added so the "needs my attention" UI can show
+        // assigned reviewer/approver on the recent-documents list too, not just
+        // in the two dedicated sections below.
+        .select("name type uploadDate size workspace status dueDate workflow")
         .populate("workspace", "name")
+        .populate("uploadedBy", "name email")
+        .populate("workflow.reviewer", "name email")
+        .populate("workflow.approver", "name email")
         .sort({ uploadDate: -1 })
         .limit(10)
         .lean(),
@@ -357,15 +361,35 @@ exports.getDashboardData = async (req, res) => {
         }
       ]),
 
-      // Documents in-review where the current user is an assigned reviewer —
-      // the actual "needs my attention" queue.
+      // Documents in-review where the current user is the assigned reviewer —
+      // supersedes the old `reviewers: userObjectId` array check (design_plan.md
+      // Phase 3 replaced reviewers[] with workflow.reviewer/workflow.approver).
       Document.find({
         status: 'in-review',
-        reviewers: userObjectId
+        'workflow.reviewer': userObjectId
       })
-        .select("name workspace status dueDate uploadedBy")
+        .select("name workspace status dueDate uploadedBy workflow")
         .populate("workspace", "name")
         .populate("uploadedBy", "name email")
+        .populate("workflow.reviewer", "name email")
+        .populate("workflow.approver", "name email")
+        .sort({ lastModified: -1 })
+        .limit(10)
+        .lean(),
+
+      // Documents in final-review where the current user is the assigned
+      // approver — this queue didn't exist before; the old query only ever
+      // matched status:'in-review', so an approver's documents never
+      // surfaced in "needs my attention" at all.
+      Document.find({
+        status: 'final-review',
+        'workflow.approver': userObjectId
+      })
+        .select("name workspace status dueDate uploadedBy workflow")
+        .populate("workspace", "name")
+        .populate("uploadedBy", "name email")
+        .populate("workflow.reviewer", "name email")
+        .populate("workflow.approver", "name email")
         .sort({ lastModified: -1 })
         .limit(10)
         .lean(),
@@ -382,6 +406,15 @@ exports.getDashboardData = async (req, res) => {
         .limit(10)
         .lean()
     ]);
+
+    // attentionRole/attentionAction distinguish why an item is in the queue —
+    // reviewer entries need "review" acted on them, approver entries need
+    // "approve" — since the two are now genuinely different queries merged
+    // into one list, not variations of the same one.
+    const pendingReview = [
+      ...reviewerQueue.map(doc => ({ ...doc, attentionRole: 'reviewer', attentionAction: 'review' })),
+      ...approverQueue.map(doc => ({ ...doc, attentionRole: 'approver', attentionAction: 'approve' }))
+    ].slice(0, 10);
 
     res.status(200).json({
       success: true,
@@ -533,37 +566,10 @@ exports.getDocument = async (req, res) => {
 // @access  Private
 exports.toggleFavorite = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id);
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Check if user is authorized to access this document
-    // (owner, explicit permission entry, or workspace member)
-    const isOwner = document.owner.toString() === req.user.id;
-    const hasPermission = document.permissions.some(
-      permission => permission.user.toString() === req.user.id
-    );
-    let isWorkspaceMember = false;
-    if (!isOwner && !hasPermission) {
-      const workspace = await Workspace.findById(document.workspace);
-      isWorkspaceMember = !!workspace && (
-        workspace.owner.toString() === req.user.id ||
-        workspace.members.some(member => member.user.toString() === req.user.id)
-      );
-    }
-
-    if (!isOwner && !hasPermission && !isWorkspaceMember) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this document'
-      });
-    }
-
+    // Access already verified (membership + legacy share + ownership) and
+    // document fetched by checkDocumentAccess(['canView']) middleware — see
+    // documentRoutes.js. No re-lookup or re-check needed here.
+    const document = req.document;
     const userId = req.user.id;
     const alreadyFavorited = document.favoritedBy.some(
       favUserId => favUserId.toString() === userId
@@ -625,20 +631,23 @@ exports.getFavoriteDocuments = async (req, res) => {
   }
 };
 
-// Valid status transitions and who's allowed to make them.
-// 'draft' -> 'in-review': anyone who can edit the document (submitting for review)
-// 'in-review' -> 'approved': only an assigned reviewer, or a workspace admin
-// 'in-review' -> 'draft': only an assigned reviewer, or a workspace admin (rejection/send-back)
-// 'approved' -> 'draft' or 'in-review': only a workspace admin (reopening a locked doc)
-const STATUS_VALUES = ['draft', 'in-review', 'approved'];
+const STATUS_VALUES = [
+  'draft',
+  'in-review',
+  'final-review',
+  'approved'
+];
 
-// @desc    Update a document's lifecycle status
+// @desc    Update document lifecycle status
 // @route   PATCH /api/documents/:id/status
 // @access  Private
 exports.updateDocumentStatus = async (req, res) => {
   try {
-    const { status: newStatus } = req.body;
+    const { status: newStatus, comment } = req.body;
 
+    // ----------------------------------------------------------
+    // 1. Validate requested status
+    // ----------------------------------------------------------
     if (!STATUS_VALUES.includes(newStatus)) {
       return res.status(400).json({
         success: false,
@@ -646,74 +655,558 @@ exports.updateDocumentStatus = async (req, res) => {
       });
     }
 
+    // ----------------------------------------------------------
+    // 2. Get document
+    // ----------------------------------------------------------
     const document = await Document.findById(req.params.id);
+
     if (!document) {
-      return res.status(404).json({ success: false, message: 'Document not found' });
-    }
-
-    const workspace = await Workspace.findById(document.workspace);
-    if (!workspace) {
-      return res.status(404).json({ success: false, message: 'Workspace not found' });
-    }
-
-    const userId = req.user._id.toString();
-    const member = workspace.members.find(m => m.user.equals(req.user._id));
-    const isOwner = workspace.owner.toString() === userId;
-    const isAdmin = isOwner || member?.role === 'admin';
-    const isAssignedReviewer = document.reviewers.some(r => r.toString() === userId);
-
-    if (!member && !isOwner) {
-      return res.status(403).json({ success: false, message: 'Not a member of this workspace' });
-    }
-
-    const currentStatus = document.status;
-
-    let allowed = false;
-    if (currentStatus === 'draft' && newStatus === 'in-review') {
-      allowed = !!member?.permissions?.canEdit || isAdmin;
-    } else if (currentStatus === 'in-review' && (newStatus === 'approved' || newStatus === 'draft')) {
-      allowed = isAssignedReviewer || isAdmin;
-    } else if (currentStatus === 'approved' && (newStatus === 'draft' || newStatus === 'in-review')) {
-      allowed = isAdmin;
-    } else if (currentStatus === newStatus) {
-      allowed = true; // no-op, harmless
-    }
-
-    if (!allowed) {
-      return res.status(403).json({
+      return res.status(404).json({
         success: false,
-        message: `Not authorized to move this document from '${currentStatus}' to '${newStatus}'`
+        message: 'Document not found'
       });
     }
 
-    document.status = newStatus;
+    // ----------------------------------------------------------
+    // 3. Get workspace
+    // ----------------------------------------------------------
+    const workspace = await Workspace.findById(document.workspace);
 
-    if (newStatus === 'approved') {
-      document.approvedAt = new Date();
-      document.approvedBy = req.user._id;
-    } else {
-      // Leaving 'approved' clears the approval record — it's no longer approved.
-      document.approvedAt = undefined;
-      document.approvedBy = undefined;
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found'
+      });
     }
 
+    const userId = req.user._id.toString();
+
+    // ----------------------------------------------------------
+    // 4. Check workspace membership
+    // ----------------------------------------------------------
+    const member = workspace.members.find(
+      member => member.user.toString() === userId
+    );
+
+    const isOwner =
+      workspace.owner.toString() === userId;
+
+    if (!member && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not a member of this workspace'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 5. Get workflow assignments
+    // ----------------------------------------------------------
+    const reviewerId =
+      document.workflow?.reviewer?.toString() || null;
+
+    const approverId =
+      document.workflow?.approver?.toString() || null;
+
+    const isAssignedReviewer =
+      reviewerId === userId;
+
+    const isAssignedApprover =
+      approverId === userId;
+
+    const currentStatus = document.status;
+
+    // Captured per-branch below, written to DocumentHistory after a successful
+    // save. No Mongoose session/transaction is used anywhere in this file, so
+    // this is "same request lifecycle," not a true atomic DB transaction — if
+    // document.save() succeeds but DocumentHistory.create() fails, the status
+    // change persists without a matching history record. Logged loudly if so.
+    let historyAction = null;
+    let historyActingRole = null;
+
+    // ----------------------------------------------------------
+    // 6. Validate workflow assignments
+    // ----------------------------------------------------------
+
+    // Uploader cannot be reviewer
+    if (
+      reviewerId &&
+      reviewerId === document.uploadedBy.toString()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'The document uploader cannot be the assigned reviewer'
+      });
+    }
+
+    // Reviewer and approver cannot be the same person
+    if (
+      reviewerId &&
+      approverId &&
+      reviewerId === approverId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'The reviewer and approver must be different users'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 7. DRAFT → IN-REVIEW
+    // ----------------------------------------------------------
+    if (
+      currentStatus === 'draft' &&
+      newStatus === 'in-review'
+    ) {
+      // Workflow must be configured before submission
+      if (!reviewerId || !approverId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'A reviewer and final approver must be assigned before submitting the document for review'
+        });
+      }
+
+      // Reviewer must belong to workspace
+      const reviewerIsMember = workspace.members.some(
+        member => member.user.toString() === reviewerId
+      );
+
+      const reviewerIsOwner =
+        workspace.owner.toString() === reviewerId;
+
+      if (!reviewerIsMember && !reviewerIsOwner) {
+        return res.status(400).json({
+          success: false,
+          message: 'Assigned reviewer must belong to this workspace'
+        });
+      }
+
+      // Approver must belong to workspace
+      const approverIsMember = workspace.members.some(
+        member => member.user.toString() === approverId
+      );
+
+      const approverIsOwner =
+        workspace.owner.toString() === approverId;
+
+      if (!approverIsMember && !approverIsOwner) {
+        return res.status(400).json({
+          success: false,
+          message: 'Assigned approver must belong to this workspace'
+        });
+      }
+
+      // User submitting the document needs edit permission
+      const canEdit =
+        isOwner || member?.permissions?.canEdit === true;
+
+      if (!canEdit) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'You do not have permission to submit this document for review'
+        });
+      }
+
+      document.status = 'in-review';
+      historyAction = 'submitted';
+      historyActingRole = 'editor';
+    }
+    // ----------------------------------------------------------
+    // 8. IN-REVIEW → DRAFT
+    // Reviewer requests changes
+    // ----------------------------------------------------------
+    else if (
+      currentStatus === 'in-review' &&
+      newStatus === 'draft'
+    ) {
+      if (!isAssignedReviewer) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Only the assigned reviewer can request changes'
+        });
+      }
+
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'A comment is required when requesting changes'
+        });
+      }
+
+      document.status = 'draft';
+      historyAction = 'changes_requested';
+      historyActingRole = 'reviewer';
+    }
+
+    // ----------------------------------------------------------
+    // 9. IN-REVIEW → FINAL-REVIEW
+    // Reviewer passes document
+    // ----------------------------------------------------------
+    else if (
+      currentStatus === 'in-review' &&
+      newStatus === 'final-review'
+    ) {
+      if (!isAssignedReviewer) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Only the assigned reviewer can pass the document to final review'
+        });
+      }
+
+      document.status = 'final-review';
+      historyAction = 'review_passed';
+      historyActingRole = 'reviewer';
+    }
+
+    // ----------------------------------------------------------
+    // 10. FINAL-REVIEW → IN-REVIEW
+    // Final approver requests changes
+    // ----------------------------------------------------------
+    else if (
+      currentStatus === 'final-review' &&
+      newStatus === 'in-review'
+    ) {
+      if (!isAssignedApprover) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Only the assigned final approver can request changes'
+        });
+      }
+
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'A comment is required when requesting changes'
+        });
+      }
+
+      document.status = 'in-review';
+      historyAction = 'changes_requested';
+      historyActingRole = 'approver';
+    }
+    // ----------------------------------------------------------
+    // 11. FINAL-REVIEW → APPROVED
+    // Final approver approves document
+    // ----------------------------------------------------------
+    else if (
+      currentStatus === 'final-review' &&
+      newStatus === 'approved'
+    ) {
+      if (!isAssignedApprover) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Only the assigned final approver can approve this document'
+        });
+      }
+
+      document.status = 'approved';
+      document.approvedAt = new Date();
+      document.approvedBy = req.user._id;
+      historyAction = 'approved';
+      historyActingRole = 'approver';
+    }
+
+    // ----------------------------------------------------------
+    // 12. APPROVED → IN-REVIEW
+    // Workspace owner override
+    // ----------------------------------------------------------
+    else if (
+      currentStatus === 'approved' &&
+      newStatus === 'in-review'
+    ) {
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Only the workspace owner can reopen an approved document'
+        });
+      }
+
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'A comment is required when reopening an approved document'
+        });
+      }
+
+      document.status = 'in-review';
+
+      // The document is no longer currently approved.
+      // The historical approval will later be preserved
+      // through DocumentHistory.
+      document.approvedAt = undefined;
+      document.approvedBy = undefined;
+      historyAction = 'overridden';
+      historyActingRole = 'owner-override';
+    }
+
+    // ----------------------------------------------------------
+    // 13. Prevent every other transition
+    // ----------------------------------------------------------
+    else {
+      return res.status(403).json({
+        success: false,
+        message:
+          `Invalid workflow transition from '${currentStatus}' to '${newStatus}'`
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 14. Update modification information
+    // ----------------------------------------------------------
     document.lastModifiedBy = req.user._id;
+
     await document.save();
 
-    res.status(200).json({
+    // ----------------------------------------------------------
+    // 14b. Write audit trail — see design_plan.md Phase 7. Not part of the
+    // same DB transaction as the save above (no session used anywhere in
+    // this file); if this throws, the status change above has already
+    // persisted. Logged loudly rather than silently swallowed so a gap in
+    // the audit trail is visible in server logs, not just invisible in the UI.
+    // ----------------------------------------------------------
+    try {
+      await DocumentHistory.create({
+        document: document._id,
+        action: historyAction,
+        fromStatus: currentStatus,
+        toStatus: document.status,
+        performedBy: req.user._id,
+        actingRole: historyActingRole,
+        comment: comment && comment.trim() ? comment.trim() : undefined
+      });
+    } catch (historyError) {
+      console.error(
+        `DocumentHistory write failed for document ${document._id} (status change to '${document.status}' already persisted):`,
+        historyError
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 15. Return updated document workflow
+    // ----------------------------------------------------------
+    return res.status(200).json({
       success: true,
       data: {
         _id: document._id,
         status: document.status,
+        workflow: document.workflow,
         approvedAt: document.approvedAt,
-        approvedBy: document.approvedBy
+        approvedBy: document.approvedBy,
+        lastModifiedBy: document.lastModifiedBy
       }
     });
+
   } catch (error) {
     console.error('Error updating document status:', error);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: 'Could not update document status',
+      error: error.message
+    });
+  }
+};
+
+
+
+// @desc    Assign reviewer and final approver to a document
+// @route   PATCH /api/documents/:id/workflow
+// @access  Private (workspace owner or workflow manager)
+exports.assignWorkflow = async (req, res) => {
+  try {
+    const { reviewerId, approverId } = req.body;
+
+    // ----------------------------------------------------------
+    // 1. Validate IDs
+    // ----------------------------------------------------------
+    if (!reviewerId || !approverId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Both reviewerId and approverId are required'
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(reviewerId) ||
+      !mongoose.Types.ObjectId.isValid(approverId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reviewer or approver ID'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 2. Reviewer and approver must be different
+    // ----------------------------------------------------------
+    if (reviewerId === approverId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reviewer and approver must be different users'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 3. Get document
+    // ----------------------------------------------------------
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 4. Get workspace
+    // ----------------------------------------------------------
+    const workspace = await Workspace.findById(document.workspace);
+
+    if (!workspace) {
+      return res.status(404).json({
+        success: false,
+        message: 'Workspace not found'
+      });
+    }
+
+    const userId = req.user._id.toString();
+
+    const isOwner =
+      workspace.owner.toString() === userId;
+
+    const member = workspace.members.find(
+      member => member.user.toString() === userId
+    );
+
+    const canManageWorkflow =
+      isOwner ||
+      member?.permissions?.canManageWorkflow === true;
+
+    if (!canManageWorkflow) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'You do not have permission to manage this document workflow'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 5. Both users must belong to workspace
+    // ----------------------------------------------------------
+    const reviewerIsMember = workspace.members.some(
+      member => member.user.toString() === reviewerId
+    );
+
+    const reviewerIsOwner =
+      workspace.owner.toString() === reviewerId;
+
+    const approverIsMember = workspace.members.some(
+      member => member.user.toString() === approverId
+    );
+
+    const approverIsOwner =
+      workspace.owner.toString() === approverId;
+
+    if (!reviewerIsMember && !reviewerIsOwner) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reviewer must be a member of this workspace'
+      });
+    }
+
+    if (!approverIsMember && !approverIsOwner) {
+      return res.status(400).json({
+        success: false,
+        message: 'Approver must be a member of this workspace'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 6. Uploader cannot review their own document
+    // ----------------------------------------------------------
+    if (
+      document.uploadedBy.toString() === reviewerId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'The document uploader cannot be assigned as reviewer'
+      });
+    }
+
+    // ----------------------------------------------------------
+    // 7. Assign workflow
+    // ----------------------------------------------------------
+    document.workflow = {
+      reviewer: reviewerId,
+      approver: approverId
+    };
+
+    document.lastModifiedBy = req.user._id;
+
+    await document.save();
+
+    // ----------------------------------------------------------
+    // 7b. Write audit trail — see design_plan.md Phase 7. Same caveat as
+    // updateDocumentStatus above: no session/transaction, so this is
+    // same-request-lifecycle, not atomic with the save above. A failure here
+    // is logged loudly rather than silently swallowed or failing the request,
+    // since the workflow assignment itself already succeeded.
+    // ----------------------------------------------------------
+    try {
+      await DocumentHistory.create({
+        document: document._id,
+        action: 'workflow_assigned',
+        fromStatus: document.status,
+        toStatus: document.status,
+        performedBy: req.user._id,
+        actingRole: 'workflow-manager'
+      });
+    } catch (historyError) {
+      console.error(
+        `DocumentHistory write failed for document ${document._id} (workflow assignment already persisted):`,
+        historyError
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 8. Return populated workflow
+    // ----------------------------------------------------------
+    await document.populate([
+      {
+        path: 'workflow.reviewer',
+        select: 'name email'
+      },
+      {
+        path: 'workflow.approver',
+        select: 'name email'
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        _id: document._id,
+        workflow: document.workflow
+      }
+    });
+
+  } catch (error) {
+    console.error('Error assigning document workflow:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Could not assign document workflow',
       error: error.message
     });
   }
@@ -790,46 +1283,24 @@ exports.assignReviewers = async (req, res) => {
 // @access  Private
 exports.updateDocument = async (req, res) => {
   try {
-    console.log("------[updateDocument] Params:", req.params);
-    console.log("------[updateDocument] Body:", req.body);
-    console.log("------[updateDocument] User from token:", req.user);
-
-    const document = await Document.findById(req.params.id);
-    if (!document) {
-      console.log("------Document not found:", req.params.id);
-      return res.status(404).json({ success: false, message: 'Document not found' });
-    }
-
-    // ---- Fetch workspace ----
-    const workspace = await Workspace.findById(document.workspace);
-    if (!workspace) {
-      console.log("------Workspace not found for document:", document._id);
-      return res.status(404).json({ success: false, message: 'Workspace not found' });
-    }
-
-    // ---- Check if user is a member of the workspace ----
-    const member = workspace.members.find(m => m.user.equals(req.user._id));
-    if (!member) {
-      console.log("------User not a member of workspace:", req.user._id);
-      return res.status(403).json({ success: false, message: 'Not a member of this workspace' });
-    }
-
-    // ---- Check role-based permission ----
-    if (!member.permissions?.canEdit) {
-      console.log("------User cannot edit based on permissions:", req.user._id);
-      return res.status(403).json({ success: false, message: 'No permission to edit document' });
-    }
+    // Access already verified (membership + legacy share + ownership) and
+    // document fetched by checkDocumentAccess(['canEdit']) middleware — see
+    // documentRoutes.js. This is the fix for the gap where a legacy
+    // (outside-workspace) 'write' share could view/favorite a document but
+    // got a 403 here because this endpoint used to check workspace
+    // membership only, ignoring document.permissions[] entirely.
+    const document = req.document;
 
     // ---- Approved documents are locked from edits ----
     // Must go through PATCH /:id/status to move it back to draft/in-review first.
+    // This is a lifecycle rule, not an access-control check, so it stays here
+    // rather than moving into the middleware.
     if (document.status === 'approved') {
       return res.status(403).json({
         success: false,
         message: 'This document is approved and locked. Change its status before editing.'
       });
     }
-
-    console.log("------User authorized based on workspace role:", member.role);
 
     const userId = req.user._id.toString();
 
@@ -896,66 +1367,14 @@ exports.updateDocument = async (req, res) => {
 // @access  Private
 exports.deleteDocument = async (req, res) => {
   try {
-    // Populate workspace with members to check permissions
-    const document = await Document.findById(req.params.id).populate({
-      path: 'workspace',
-      populate: {
-        path: 'members.user',
-        select: '_id'
-      }
-    });
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found"
-      });
-    }
-
-    console.log("Delete request by user:", req.user.id);
-    console.log("Document workspace:", document.workspace?._id);
-
-    // For workspace documents, check role-based permissions
-    if (document.workspace) {
-      // Check if user is workspace owner
-      const isWorkspaceOwner = document.workspace.owner.toString() === req.user.id;
-
-      console.log("Is workspace owner?", isWorkspaceOwner);
-
-      // Find member in workspace
-      const member = document.workspace.members.find(
-        m => {
-          const memberId = m.user._id ? m.user._id.toString() : m.user.toString();
-          return memberId === req.user.id;
-        }
-      );
-
-      console.log("Member found:", member);
-      console.log("Member permissions:", member?.permissions);
-      console.log("Member role:", member?.role);
-
-      // Check permissions
-      const canDelete = member?.permissions?.canDelete === true;
-      const isAdmin = member?.role === 'admin';
-
-      console.log("Can delete?", canDelete);
-      console.log("Is admin?", isAdmin);
-
-      if (!isWorkspaceOwner && !canDelete && !isAdmin) {
-        return res.status(403).json({
-          success: false,
-          message: "Not authorized to delete this document"
-        });
-      }
-    } else {
-      // For non-workspace documents, check ownership
-      if (document.owner.toString() !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          message: "Not authorized to delete this document"
-        });
-      }
-    }
+    // Access already verified (membership + legacy share + ownership) and
+    // document fetched by checkDocumentAccess(['canDelete']) middleware —
+    // see documentRoutes.js. This replaces the previous inline check, which
+    // (a) never consulted document.permissions[], so a legacy external
+    // 'write' share could never delete a document it was granted write
+    // access to, and (b) duplicated logic that already existed correctly
+    // in checkDocumentWorkspaceAccess (workspaceAuth.js).
+    const document = req.document;
 
     // Delete file from GridFS
     try {

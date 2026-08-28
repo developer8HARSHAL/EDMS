@@ -6,19 +6,19 @@ export const StatCard = ({ title, stat, icon: Icon, description, isLoading }) =>
     <Card className="p-6 hover:shadow-medium transition-all duration-300 hover:-translate-y-1">
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
+          <p className="text-sm font-medium text-ink-muted truncate">
             {title}
           </p>
           {isLoading ? (
             <div className="mt-2 mb-2">
-              <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-8 w-16 bg-surface-2 rounded animate-pulse"></div>
             </div>
           ) : (
-            <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-white">
+            <p className="mt-2 text-3xl font-semibold text-ink">
               {stat}
             </p>
           )}
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-ink-muted">
             {description}
           </p>
         </div>

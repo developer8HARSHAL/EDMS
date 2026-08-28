@@ -37,7 +37,9 @@ exports.register = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar: user.avatar,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
@@ -93,7 +95,9 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar: user.avatar,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
@@ -121,6 +125,8 @@ exports.guestLogin = async (req, res) => {
         name: guestUser.name,
         email: guestUser.email,
         role: guestUser.role,
+        avatar: guestUser.avatar,
+        createdAt: guestUser.createdAt,
         isGuest: true
       }
     });
@@ -148,6 +154,7 @@ exports.getProfile = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatar: user.avatar,
         createdAt: user.createdAt
       }
     });
@@ -164,7 +171,7 @@ exports.getProfile = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, currentPassword, newPassword } = req.body;
+    const { name, avatar, currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
     // Find user
@@ -180,6 +187,28 @@ exports.updateProfile = async (req, res) => {
     // Update fields
     if (name) {
       user.name = name;
+    }
+
+    if (avatar !== undefined) {
+      const allowedAvatars = [
+        'avatar-01',
+        'avatar-02',
+        'avatar-03',
+        'avatar-04',
+        'avatar-05',
+        'avatar-06',
+        'avatar-07',
+        'avatar-08',
+      ];
+
+      if (!allowedAvatars.includes(avatar)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid profile avatar selected'
+        });
+      }
+
+      user.avatar = avatar;
     }
 
     // Handle password change if provided
@@ -212,7 +241,9 @@ exports.updateProfile = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar: user.avatar,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {

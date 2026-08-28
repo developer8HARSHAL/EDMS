@@ -4,6 +4,7 @@ import workspaceService from '../../services/workspaceService';
 // Initial state
 const initialState = {
   workspaces: [],
+  searchResults: null,
   currentWorkspace: null,
   workspaceMembers: [],
   selectedWorkspaceId: null,
@@ -371,26 +372,35 @@ const workspaceSlice = createSlice({
       .addCase(fetchWorkspaces.fulfilled, (state, action) => {
         state.loading.fetchWorkspaces = false;
         state.isLoading = false;
-        
-        // ✅ CLEANED UP: Simple response handling
-        state.workspaces = action.payload.workspaces || [];
+
+        // action.meta.arg is the original thunk argument (createAsyncThunk default) —
+        // used to route search-triggered fetches away from the canonical Sidebar list.
+        const isSearchFetch = !!action.meta.arg?.search;
+        if (isSearchFetch) {
+          state.searchResults = action.payload.workspaces || [];
+        } else {
+          state.workspaces = action.payload.workspaces || [];
+          state.searchResults = null;
+        }
         state.pagination = action.payload.pagination || initialState.pagination;
-        
+
         state.errors.fetch = null;
         state.errors.workspaces = null;
-        console.log("🔧 Reducer received payload:", action.payload);
-console.log("🔧 Before update:", state.workspaces);
-        
-        console.log('✅ Redux: Workspaces updated:', state.workspaces.length);
       })
       .addCase(fetchWorkspaces.rejected, (state, action) => {
         state.loading.fetchWorkspaces = false;
         state.isLoading = false;
         state.errors.fetch = action.payload;
         state.errors.workspaces = action.payload;
-        state.workspaces = [];
-        
-        console.error('❌ Redux: fetchWorkspaces rejected:', action.payload);
+
+        // Same routing as fulfilled — a failed search fetch must not wipe the
+        // canonical Sidebar list.
+        const isSearchFetch = !!action.meta.arg?.search;
+        if (isSearchFetch) {
+          state.searchResults = [];
+        } else {
+          state.workspaces = [];
+        }
       })
       
       // ✅ FIXED: Handle backend response format for fetchWorkspace
@@ -635,37 +645,37 @@ export const {
 } = workspaceSlice.actions;
 
 // ✅ FIXED: Add null checks to all selectors
-export const selectAllWorkspaces = (state) => state.workspace?.workspaces || [];
-export const selectCurrentWorkspace = (state) => state.workspace?.currentWorkspace || null;
-export const selectWorkspaceMembers = (state) => state.workspace?.workspaceMembers || [];
-export const selectSelectedWorkspaceId = (state) => state.workspace?.selectedWorkspaceId || null;
-export const selectWorkspaceStats = (state) => state.workspace?.workspaceStats || null;
+export const selectAllWorkspaces = (state) => state.workspaces?.workspaces || [];
+export const selectCurrentWorkspace = (state) => state.workspaces?.currentWorkspace || null;
+export const selectWorkspaceMembers = (state) => state.workspaces?.workspaceMembers || [];
+export const selectSelectedWorkspaceId = (state) => state.workspaces?.selectedWorkspaceId || null;
+export const selectWorkspaceStats = (state) => state.workspaces?.workspaceStats || null;
 
 // ✅ FIXED: Loading selectors with null checks
-export const selectWorkspaceLoading = (state) => state.workspace?.isLoading || state.workspace?.loading?.fetchWorkspaces || false;
-export const selectWorkspacesLoading = (state) => state.workspace?.loading?.fetchWorkspaces || false;
-export const selectWorkspaceDetailsLoading = (state) => state.workspace?.loading?.fetchWorkspace || false;
-export const selectCreateWorkspaceLoading = (state) => state.workspace?.loading?.createWorkspace || false;
-export const selectUpdateWorkspaceLoading = (state) => state.workspace?.loading?.updateWorkspace || false;
-export const selectDeleteWorkspaceLoading = (state) => state.workspace?.loading?.deleteWorkspace || false;
-export const selectMemberOperationsLoading = (state) => state.workspace?.loading?.memberOperations || false;
+export const selectWorkspaceLoading = (state) => state.workspaces?.isLoading || state.workspaces?.loading?.fetchWorkspaces || false;
+export const selectWorkspacesLoading = (state) => state.workspaces?.loading?.fetchWorkspaces || false;
+export const selectWorkspaceDetailsLoading = (state) => state.workspaces?.loading?.fetchWorkspace || false;
+export const selectCreateWorkspaceLoading = (state) => state.workspaces?.loading?.createWorkspace || false;
+export const selectUpdateWorkspaceLoading = (state) => state.workspaces?.loading?.updateWorkspace || false;
+export const selectDeleteWorkspaceLoading = (state) => state.workspaces?.loading?.deleteWorkspace || false;
+export const selectMemberOperationsLoading = (state) => state.workspaces?.loading?.memberOperations || false;
 
 // ✅ FIXED: Error selectors with null checks - Updated for backend format
-export const selectWorkspaceErrors = (state) => state.workspace?.errors || {};
-export const selectWorkspacesError = (state) => state.workspace?.errors?.workspaces || state.workspace?.errors?.fetch || null;
-export const selectCurrentWorkspaceError = (state) => state.workspace?.errors?.currentWorkspace || state.workspace?.errors?.current || null;
-export const selectMemberOperationsError = (state) => state.workspace?.errors?.memberOperations || null;
-export const selectWorkspaceStatsError = (state) => state.workspace?.errors?.stats || null;
+export const selectWorkspaceErrors = (state) => state.workspaces?.errors || {};
+export const selectWorkspacesError = (state) => state.workspaces?.errors?.workspaces || state.workspaces?.errors?.fetch || null;
+export const selectCurrentWorkspaceError = (state) => state.workspaces?.errors?.currentWorkspace || state.workspaces?.errors?.current || null;
+export const selectMemberOperationsError = (state) => state.workspaces?.errors?.memberOperations || null;
+export const selectWorkspaceStatsError = (state) => state.workspaces?.errors?.stats || null;
 
 // ✅ FIXED: Pagination and filters with null checks
-export const selectWorkspacePagination = (state) => state.workspace?.pagination || { 
+export const selectWorkspacePagination = (state) => state.workspaces?.pagination || { 
   currentPage: 1, 
   totalPages: 1, 
   totalDocs: 0,
   hasNextPage: false,
   hasPrevPage: false
 };
-export const selectWorkspaceFilters = (state) => state.workspace?.filters || { 
+export const selectWorkspaceFilters = (state) => state.workspaces?.filters || { 
   search: '', 
   sortBy: 'updatedAt', 
   sortOrder: 'desc', 
@@ -674,12 +684,12 @@ export const selectWorkspaceFilters = (state) => state.workspace?.filters || {
 
 // ✅ FIXED: Complex selectors with null checks
 export const selectWorkspaceById = (state, workspaceId) => {
-  const workspaces = state.workspace?.workspaces || [];
+  const workspaces = state.workspaces?.workspaces || [];
   return workspaces.find(workspace => workspace._id === workspaceId) || null;
 };
 
 export const selectUserRoleInWorkspace = (state, workspaceId, userId) => {
-  const workspace = selectWorkspaceById(state, workspaceId) || state.workspace?.currentWorkspace;
+  const workspace = selectWorkspaceById(state, workspaceId) || state.workspaces?.currentWorkspace;
   if (!workspace || !userId) return null;
   
   // Check if user is owner
@@ -695,7 +705,7 @@ export const selectUserRoleInWorkspace = (state, workspaceId, userId) => {
 };
 
 export const selectUserPermissionsInWorkspace = (state, workspaceId, userId) => {
-  const workspace = selectWorkspaceById(state, workspaceId) || state.workspace?.currentWorkspace;
+  const workspace = selectWorkspaceById(state, workspaceId) || state.workspaces?.currentWorkspace;
   if (!workspace || !userId) return null;
   
   // Owner has all permissions
@@ -728,7 +738,7 @@ export const selectIsWorkspaceOwner = (state, workspaceId, userId) => {
 export const selectWorkspacesByRole = (state, userId, role) => {
   if (!userId) return [];
   
-  const workspaces = state.workspace?.workspaces || [];
+  const workspaces = state.workspaces?.workspaces || [];
   return workspaces.filter(workspace => {
     if (role === 'owner') {
       const ownerId = workspace.owner?._id || workspace.owner;
@@ -743,7 +753,7 @@ export const selectWorkspacesByRole = (state, userId, role) => {
   });
 };
 
-export const selectWorkspaceCount = (state) => state.workspace?.workspaces?.length || 0;
-export const selectHasWorkspaces = (state) => (state.workspace?.workspaces?.length || 0) > 0;
+export const selectWorkspaceCount = (state) => state.workspaces?.workspaces?.length || 0;
+export const selectHasWorkspaces = (state) => (state.workspaces?.workspaces?.length || 0) > 0;
 
 export default workspaceSlice.reducer;

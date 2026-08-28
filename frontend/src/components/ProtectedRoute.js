@@ -1,16 +1,10 @@
-// src/components/ProtectedRoute.js
 import React from 'react';
 import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSelector } from 'react-redux';
 import PermissionGuard  from './permissions/PermissionGuard';
 
-/**
- * A wrapper component that protects routes requiring authentication
- * and optionally workspace permissions
- * Redirects to login if user is not authenticated
- * Shows access denied if workspace permissions are insufficient
- */
+
 const ProtectedRoute = ({ 
   children, 
   requireWorkspace = false,
@@ -25,16 +19,13 @@ const ProtectedRoute = ({
   const location = useLocation();
   const params = useParams();
   
-  // Extract workspace ID from URL params if available
   const workspaceId = params.workspaceId || params.workspace;
   
-  // Get workspace data from Redux store
   const workspace = useSelector(state => 
     workspaceId ? state.workspace?.workspaces?.find(w => w._id === workspaceId) : null
   );
   const workspaceLoading = useSelector(state => state.workspace?.loading || false);
 
-  // Show loading spinner while authentication state is being determined
   if (loading || (requireWorkspace && workspaceLoading)) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -48,13 +39,10 @@ const ProtectedRoute = ({
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    // Save the location they were trying to access for redirect after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If workspace is required but not found
   if (requireWorkspace && workspaceId && !workspace) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -141,9 +129,7 @@ const ProtectedRoute = ({
   return children;
 };
 
-/**
- * Higher-order component for workspace-specific protected routes
- */
+
 export const WorkspaceProtectedRoute = ({ 
   children, 
   requiredPermissions = ['read'],

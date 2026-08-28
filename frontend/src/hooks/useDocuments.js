@@ -317,10 +317,10 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
   // Calls the dedicated PATCH /:id/status endpoint directly (bypasses the generic
   // updateDocument thunk above, which hits PUT and skips the backend's role/reviewer
   // transition rules) then refetches to bring Redux state back in sync.
-  const handleUpdateDocumentStatus = useCallback(async (documentId, status, targetWorkspaceId) => {
+  const handleUpdateDocumentStatus = useCallback(async (documentId, status, targetWorkspaceId, comment) => {
     const wsId = targetWorkspaceId || workspaceId || currentWorkspaceId;
     try {
-      await apiService.documentApi.updateDocumentStatus(documentId, status);
+      await apiService.documentApi.updateDocumentStatus(documentId, status, comment);
       toast.success(`Status changed to ${status}`);
       await dispatch(fetchDocument(documentId));
       if (wsId) setTimeout(() => handleFetchWorkspaceDocuments(wsId), 500);
@@ -331,6 +331,21 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
       return false;
     }
   }, [dispatch, workspaceId, currentWorkspaceId, handleFetchWorkspaceDocuments]);
+
+  // Assigns reviewer + approver together (PATCH /:id/workflow) — see design_plan.md
+  // Phase 5. Supersedes the old reviewers[] array handler below.
+  const handleUpdateDocumentWorkflow = useCallback(async (documentId, { reviewerId, approverId }) => {
+    try {
+      await apiService.documentApi.updateDocumentWorkflow(documentId, { reviewerId, approverId });
+      toast.success('Workflow assignment updated');
+      await dispatch(fetchDocument(documentId));
+      return true;
+    } catch (error) {
+      console.error('Update document workflow error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update workflow assignment');
+      return false;
+    }
+  }, [dispatch]);
 
   // Same pattern for PATCH /:id/reviewers — server validates reviewer IDs are
   // actual workspace members, which the generic PUT endpoint does not do.
@@ -729,6 +744,7 @@ const handleFetchDocuments = useCallback(async (params = {}) => {
     uploadDocument: handleUploadDocument,
     updateDocument: handleUpdateDocument, 
     updateDocumentStatus: handleUpdateDocumentStatus,
+    updateDocumentWorkflow: handleUpdateDocumentWorkflow,
     updateDocumentReviewers: handleUpdateDocumentReviewers,
     deleteDocument: handleDeleteDocument,
     toggleFavorite: handleToggleFavorite,

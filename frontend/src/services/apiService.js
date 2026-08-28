@@ -1,4 +1,3 @@
-// apiService.js - FIXED: Authentication and API Issues
 import axios from 'axios';
 
 // Base URL for API requests
@@ -424,12 +423,26 @@ export const documentApi = {
   },
   // Dedicated status-transition endpoint — enforces role/reviewer rules the
   // generic PUT above does not (see backend_briefing_for_frontend.md §4).
-  updateDocumentStatus: async (documentId, status) => {
+  // comment is required server-side for reviewer/approver "request changes"
+  // and owner "reopen" transitions — see design_plan.md Phase 6.
+  updateDocumentStatus: async (documentId, status, comment) => {
     try {
-      const response = await api.patch(`/documents/${documentId}/status`, { status });
+      const body = comment ? { status, comment } : { status };
+      const response = await api.patch(`/documents/${documentId}/status`, body);
       return response.data;
     } catch (error) {
       console.error(`❌ Update document status ${documentId} error:`, error);
+      throw error;
+    }
+  },
+  // Assigns reviewer + approver together — design_plan.md Phase 5 supersedes
+  // the old reviewers[] array with these two single-user fields.
+  updateDocumentWorkflow: async (documentId, { reviewerId, approverId }) => {
+    try {
+      const response = await api.patch(`/documents/${documentId}/workflow`, { reviewerId, approverId });
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Update document workflow ${documentId} error:`, error);
       throw error;
     }
   },
@@ -611,7 +624,8 @@ export const userApi = {
   updateProfile: async (userData) => {
     try {
       const updateData = {
-        name: userData.name
+        name: userData.name,
+        avatar: userData.avatar
       };
 
       if (userData.currentPassword && userData.newPassword) {

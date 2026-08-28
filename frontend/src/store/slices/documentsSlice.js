@@ -85,7 +85,6 @@ export const fetchWorkspaceDocuments = createAsyncThunk(
       let documents = [];
       
       if (Array.isArray(response.data)) {
-        // If response.data is directly an array of documents
         documents = response.data;
       } else if (response.data && Array.isArray(response.data.data)) {
         // If response.data.data contains the documents array
@@ -114,7 +113,6 @@ export const fetchWorkspaceDocuments = createAsyncThunk(
   }
 );
 
-// NEW: Fetch workspace document statistics
 export const fetchWorkspaceStats = createAsyncThunk(
   'documents/fetchWorkspaceStats',
   async (workspaceId, { rejectWithValue }) => {
@@ -129,7 +127,6 @@ export const fetchWorkspaceStats = createAsyncThunk(
 );
 
 
-// NEW: Fetch recent activity
 export const fetchRecentActivity = createAsyncThunk(
   'documents/fetchRecentActivity',
   async (workspaceId, { rejectWithValue }) => {
@@ -157,7 +154,6 @@ export const fetchPopularDocuments = createAsyncThunk(
   }
 );
 
-// NEW: Fetch documents by category
 export const fetchDocumentsByCategory = createAsyncThunk(
   'documents/fetchDocumentsByCategory',
   async ({ workspaceId, category }, { rejectWithValue }) => {

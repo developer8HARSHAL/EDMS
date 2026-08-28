@@ -35,7 +35,8 @@ const WorkspaceSchema = new mongoose.Schema({
       canEdit: { type: Boolean, default: false },
       canAdd: { type: Boolean, default: false },
       canDelete: { type: Boolean, default: false },
-      canInvite: { type: Boolean, default: false }
+      canInvite: { type: Boolean, default: false },
+      canManageWorkflow: { type: Boolean, default: false }
     },
     joinedAt: { type: Date, default: Date.now }
   }],

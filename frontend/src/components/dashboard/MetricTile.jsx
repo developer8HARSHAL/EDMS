@@ -1,18 +1,31 @@
 import React from 'react';
 
-// Single stat tile for the Home metric strip. Purely presentational — parent
-// passes the already-computed label/value from dashboard-data.stats.
+// Compact, presentational metric tile.
+// The parent supplies the already-computed label/value; this component does not
+// read or transform backend data.
 const MetricTile = ({ label, value, icon: Icon }) => {
   return (
-    <div className="card p-4 flex items-center gap-3">
+    <div className="card flex min-h-[88px] items-center gap-3 px-4 py-3">
       {Icon && (
-        <div className="icon-badge icon-badge-1 h-10 w-10 shrink-0">
-          <Icon className="h-5 w-5" />
+        <div className="icon-badge icon-badge-1 h-9 w-9 shrink-0">
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </div>
       )}
+
       <div className="min-w-0">
-        <p className="text-2xl font-semibold text-ink truncate">{value}</p>
-        <p className="text-xs text-ink-muted truncate">{label}</p>
+        <p
+          title={label}
+          className="truncate text-xs font-medium uppercase tracking-[0.06em] text-ink-muted"
+        >
+          {label}
+        </p>
+
+        <p
+          title={String(value)}
+          className="mt-1 truncate text-xl font-semibold leading-none tracking-tight text-ink"
+        >
+          {value}
+        </p>
       </div>
     </div>
   );
